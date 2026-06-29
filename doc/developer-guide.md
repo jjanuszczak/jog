@@ -13,7 +13,7 @@ The authoring model is explicit:
 - create controls with `new`
 - set properties directly
 - compose with `Add`
-- handle events with methods such as `OnClick` or `Change`
+- handle events with `OnX` methods such as `OnClick` and `OnChange`
 - bind input controls to a `JOG.Store`
 
 JOG owns rendering, DOM creation, styling injection, and event wiring.
@@ -29,6 +29,12 @@ Implemented public surface in `v2/JOG.js`:
 - controls: `Label`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
 - state: `Store`
 - event payload type: `EventArgs`
+- control-level validation state: `Invalid`, `ErrorText`, `SetError()`, `ClearError()`, `BindError()`
+- application diagnostics: `Debug`, `DumpTree()`, `LogTree()`
+
+Test entrypoint:
+
+- `node test/run-v2-tests.js`
 
 Example apps:
 
@@ -64,6 +70,59 @@ Every control is a JavaScript object with internal state. State changes do not w
 4. each control applies current state to its DOM node
 
 This is the core architectural shift from V1. It separates control state from direct DOM mutation.
+
+## Diagnostics
+
+JOG now has a small built-in diagnostics layer on `Application`.
+
+Available surface:
+
+- `app.Debug = true`
+- `app.DumpTree()`
+- `app.LogTree()`
+
+What `Debug = true` does today:
+
+- logs dirty queue activity
+- logs render and mount lifecycle work
+- logs event dispatch with handler counts
+
+What tree dump does:
+
+- prints the current control hierarchy
+- includes control type, control name or id, visible state, enabled state, lifecycle state, and basic size or position data when present
+
+Typical usage:
+
+```js
+var app = new JOG.Application();
+app.Debug = true;
+app.Run(page);
+
+console.log(app.DumpTree());
+```
+
+Use `LogTree()` when you just want the tree in the console without formatting it yourself.
+
+## Tests
+
+JOG V2 now has a small zero-dependency Node test harness.
+
+Run it with:
+
+```bash
+node test/run-v2-tests.js
+```
+
+What it covers today:
+
+- store subscription and unsubscribe behavior
+- duplicate child name protection
+- error binding and disposal behavior
+- control tree dump output
+- resizable window handle behavior
+
+This is intentionally lightweight. It does not replace browser-level verification, but it does give the repo a fast regression check for core runtime behavior.
 
 ## Layout Model
 
@@ -153,7 +212,7 @@ Useful window properties today:
 - `Width`, `Height`, `MinWidth`, `MinHeight`
 - `Left`, `Top`
 
-Important limitation: `Resizable` exists as a property but resize behavior is not implemented yet.
+When `Resizable = true`, the window shows a lower-right resize handle. Resize behavior currently respects `MinWidth` and `MinHeight`.
 
 ## Store and Binding Model
 
@@ -185,9 +244,51 @@ Current explicit binding helpers:
 
 Binding is explicit and per-control. There is no expression language, selector syntax, derived store, or automatic form model.
 
+## Validation Model
+
+JOG now has a small control-level validation surface.
+
+Available on components and controls:
+
+- `Invalid`
+- `ErrorText`
+- `SetError(message)`
+- `ClearError()`
+- `BindError(store, key)`
+
+What this does today:
+
+- toggles invalid styling on supported input controls
+- sets `aria-invalid`
+- uses the error text as the control tooltip
+- can bind a control's error state directly to a store key
+
+What it does not do:
+
+- it does not provide a form validator DSL
+- it does not render inline error text automatically
+- it does not manage validation timing for you
+
+The intended usage is explicit. App code decides when validation runs, stores error messages where useful, and can show inline error labels beside controls.
+
+The recommended pattern now is:
+
+1. keep error strings in the store
+2. call `control.BindError(store, "someErrorKey")`
+3. have validation code set or clear that store key
+4. render inline error labels only where you want them
+
+You can also keep a separate summary key in the store when you want a page-level validation summary block above the form.
+
 ## Events
 
 Controls expose event registration methods instead of raw DOM listeners.
+
+Current event registration rule:
+
+- use `OnX(listener)` as the standard documented style
+- shorthand aliases such as `Click(listener)` and `Change(listener)` remain supported for compatibility
+- `Focus()` is reserved for imperative browser focus, so focus event registration uses `OnFocus(listener)`
 
 Current event methods on `Control`:
 
@@ -216,7 +317,7 @@ Events receive a `JOG.EventArgs` instance with:
 - `Value` when applicable
 - `Key` when applicable
 
-Current limitation: event naming is not fully normalized yet. For example, `OnFocus` exists but `Focus(listener)` does not. This should be cleaned up later.
+Current limitation: the shorthand and `OnX` styles both still exist. The runtime now treats `OnX` as the preferred public style, while the older shorthand remains as a compatibility layer.
 
 ## Lifecycle and Rendering
 
@@ -267,6 +368,12 @@ Calling setters on a disposed control throws.
 - list box binding
 - textarea binding
 - computed summary updates from store subscriptions
+- explicit save-time validation
+- invalid control styling
+- `BindError()` for field-level invalid state
+- inline error labels driven by store state
+- validation summary region driven by store state
+- checkbox validation with invalid-state styling
 
 ## Guidance for Developers
 
@@ -279,10 +386,13 @@ Calling setters on a disposed control throws.
 
 Not implemented yet:
 
-- validation model
-- inline error presentation
 - theming API beyond built-in styles
 - resize behavior for windows
 - menus, tabs, grids for data, trees, toolbars
 - diagnostics tooling
 - automated tests
+
+Partially implemented:
+
+- validation exists at the control level, but there is no first-class form validation API yet
+- inline error presentation is possible, but app code must render the error labels explicitly

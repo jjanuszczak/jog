@@ -7,6 +7,9 @@
     this.Title = "Customer Detail";
     this.Name = "customerWindow";
     this.SetBounds(220, 100, 420, 240);
+    this.Resizable = true;
+    this.MinWidth = 360;
+    this.MinHeight = 220;
 
     var layout = new JOG.StackPanel();
     layout.Name = "customerWindowLayout";
@@ -23,7 +26,7 @@
 
     var saveButton = new JOG.Button();
     saveButton.Text = "Save";
-    saveButton.Click(function() {
+    saveButton.OnClick(function() {
       global.alert("Saved customer: " + store.Get("name"));
     });
 
@@ -64,7 +67,7 @@
     hero.Text = "JOG V2 example. This page is intentionally sparse so the runtime is easier to evaluate.";
 
     var helper = new JOG.Label();
-    helper.Text = "Edit the customer name below, then open the modal window.";
+    helper.Text = "Edit the customer name below, then open the modal window. Drag the lower-right corner to resize it.";
 
     var customerName = new JOG.TextBox();
     customerName.Name = "customerNameInline";
@@ -84,7 +87,7 @@
     var customerWindow = new CustomerWindow(state);
     customerWindow.Hide();
 
-    openWindow.Click(function() {
+    openWindow.OnClick(function() {
       customerWindow.ShowModal();
     });
 

@@ -11,6 +11,8 @@ This reference covers the implemented public API in [v2/JOG.js](/Users/johnjanus
 Methods:
 
 - `Run(page)`
+- `DumpTree()`
+- `LogTree()`
 
 Properties:
 
@@ -21,6 +23,9 @@ Properties:
 Notes:
 
 - `Run(page)` attaches to `document.body` and performs the first render.
+- `Debug = true` enables runtime console logging for dirty queue activity, lifecycle work, and event dispatch
+- `DumpTree()` returns a text representation of the current control tree
+- `LogTree()` writes that control tree to the console
 
 ### `JOG.Page`
 
@@ -57,6 +62,8 @@ Common properties:
 - `Text`
 - `CssClass`
 - `Tooltip`
+- `Invalid`
+- `ErrorText`
 - `Padding`
 - `Margin`
 - `Gap`
@@ -76,11 +83,17 @@ Common methods:
 - `Location(x, y)`
 - `Size(width, height)`
 - `SetBounds(x, y, width, height)`
+- `SetError(message)`
+- `ClearError()`
+- `BindError(store, key)`
 
 Notes:
 
 - `Dock` accepts `none`, `top`, `bottom`, `left`, `right`, `fill`
 - `ColumnSpan` and `RowSpan` default to `1`
+- `SetError(message)` sets both `ErrorText` and `Invalid`
+- `ClearError()` clears both
+- `BindError(store, key)` binds control error state to a store key whose value is an error string or empty
 
 ### `JOG.Control`
 
@@ -88,6 +101,8 @@ Extends `JOG.Component`.
 
 Event registration methods:
 
+- preferred style: `OnX(listener)`
+- compatibility aliases remain supported
 - `Click(listener)`
 - `Change(listener)`
 - `OnFocus(listener)`
@@ -99,6 +114,12 @@ Event registration methods:
 - `OnBlur(listener)`
 - `OnKeyDown(listener)`
 - `OnKeyUp(listener)`
+
+Notes:
+
+- `OnClick`, `OnChange`, `OnFocus`, `OnBlur`, `OnKeyDown`, and `OnKeyUp` are the preferred registration methods
+- `Click`, `Change`, `Blur`, `KeyDown`, and `KeyUp` remain available as compatibility aliases
+- `Focus()` is an imperative component method, so focus event registration uses `OnFocus(listener)`
 
 ### `JOG.Container`
 
@@ -238,6 +259,10 @@ Emits:
 - `KeyDown`
 - `KeyUp`
 
+Notes:
+
+- supports invalid styling through inherited `Invalid` and `ErrorText`
+
 ### `JOG.TextArea`
 
 Extends `JOG.Control`.
@@ -254,6 +279,7 @@ Methods:
 Notes:
 
 - shares the same binding helper as `TextBox`
+- supports invalid styling through inherited `Invalid` and `ErrorText`
 
 ### `JOG.CheckBox`
 
@@ -266,6 +292,10 @@ Properties:
 Methods:
 
 - `BindChecked(store, key)`
+
+Notes:
+
+- supports invalid styling through inherited `Invalid` and `ErrorText`
 
 ### `JOG.RadioButton`
 
@@ -284,6 +314,7 @@ Methods:
 Notes:
 
 - intended to be used in a group where each radio binds to the same store key
+- supports invalid styling through inherited `Invalid` and `ErrorText`
 
 ### `JOG.DropDownList`
 
@@ -309,6 +340,8 @@ Options format:
 
 Plain string arrays also work.
 
+Supports invalid styling through inherited `Invalid` and `ErrorText`.
+
 ### `JOG.ListBox`
 
 Extends `JOG.Control`.
@@ -326,6 +359,7 @@ Methods:
 Notes:
 
 - single-select only at present
+- supports invalid styling through inherited `Invalid` and `ErrorText`
 
 ## Windows
 
@@ -353,7 +387,8 @@ Methods:
 
 Notes:
 
-- `Resizable` is defined but not implemented
+- `Resizable = true` enables a lower-right resize handle
+- resize behavior respects `MinWidth` and `MinHeight`
 - width defaults to `420px` if not set
 
 ### `JOG.Dialog`

@@ -15,6 +15,9 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - store subscription cleanup during control disposal
 - modal overlay support
 - window z-order management
+- control-level invalid state and error text
+- application diagnostics with debug logging and tree dump
+- zero-dependency Node test runner for core runtime regression checks
 
 ### Base Types
 
@@ -51,10 +54,14 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - `RadioButton.BindSelectedValue`
 - `DropDownList.BindSelectedValue`
 - `ListBox.BindSelectedValue`
+- `SetError(message)`
+- `ClearError()`
+- `BindError(store, key)`
 
 ### Windows and Dialogs
 
 - draggable windows
+- resizable windows with lower-right resize handle
 - close button support
 - close-on-escape support
 - modal dialogs
@@ -65,13 +72,20 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - simple example app
 - customer admin example
 - form demo with grid layout
+- form demo validation and inline error feedback
+- form demo validation summary and checkbox invalid-state feedback
+
+### Tests
+
+- Node test runner at `test/run-v2-tests.js`
+- baseline coverage for store, container rules, diagnostics, error binding, and resizable window behavior
 
 ## Partial
 
 ### Window System
 
-- `Resizable` property exists, but resize behavior is not implemented
 - modal support assumes one active modal overlay at a time
+- resizing currently uses a lower-right handle only
 
 ### Layout
 
@@ -82,53 +96,46 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 
 ### Events
 
-- event naming is not yet fully normalized
-- focus registration is inconsistent with other event helpers
+- shorthand aliases still exist alongside the preferred `OnX` style
 
 ### Styling
 
 - framework injects built-in styles
 - public theme API is not implemented yet
 
+### Validation
+
+- control-level validation exists
+- error-state binding from store to control now exists
+- app code must still orchestrate when validation runs
+- inline error labels and summary regions are still app concerns rather than first-class runtime constructs
+
 ## Next Recommended Work
 
-### 1. Validation
+### 1. Validation Maturity
 
-Add a small validation model for forms:
+Build on the new validation surface:
 
-- invalid state per control
-- inline error text
-- validation hooks for save actions
-- visual invalid styling
+- more examples of reusable page-level validation patterns
+- consider whether radio-group level invalid styling should get a stronger built-in pattern
 
-This is the most useful next step for real data-entry apps.
+### 2. Window Maturity
 
-### 2. Event API Cleanup
-
-Normalize the event registration surface so it is predictable:
-
-- `Focus(listener)` and `Blur(listener)` symmetry
-- decide whether `OnX` aliases stay or go
-- document the final event naming rule
-
-### 3. Window Maturity
-
-- implement actual resize behavior or remove `Resizable` until ready
 - improve modal stacking rules
 - add load/show/hide lifecycle events if needed
+- add richer resize affordances if needed beyond the lower-right handle
 
-### 4. Diagnostics
+### 3. Diagnostics Maturity
 
-- control tree dump
-- lifecycle transition logging
-- dirty queue logging
-- clearer runtime errors
+- clearer runtime error formatting
+- optional category-based debug filtering
+- richer tree dump detail when needed
 
-### 5. Tests
+### 4. Test Maturity
 
-- unit coverage for property setters
-- integration checks for store binding and dialog behavior
-- regression coverage for example apps
+- broaden unit coverage for property setters and lifecycle rules
+- add stronger integration coverage for dialog behavior and binding flows
+- add regression checks that mirror example app usage more closely
 
 ## Deferred
 

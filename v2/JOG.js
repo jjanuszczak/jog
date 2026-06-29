@@ -91,6 +91,44 @@
     }
   }
 
+  function clamp(value, minValue) {
+    if (!isNumber(minValue)) {
+      return value;
+    }
+    return Math.max(value, minValue);
+  }
+
+  function controlDebugName(control) {
+    if (!control || !control._state) {
+      return "Unknown";
+    }
+    return control._typeName + "(" + (control._state.name || control._state.id) + ")";
+  }
+
+  function appendTreeLines(control, depth, lines) {
+    var indent = new Array(depth + 1).join("  ");
+    var state = control._state || {};
+    var summary = [
+      controlDebugName(control),
+      "visible=" + (!!state.visible),
+      "enabled=" + (!!state.enabled),
+      "lifecycle=" + (control._lifecycle || "Unknown")
+    ];
+
+    if (isNumber(state.left) || isNumber(state.top)) {
+      summary.push("pos=(" + (state.left || 0) + "," + (state.top || 0) + ")");
+    }
+    if (isNumber(state.width) || isNumber(state.height)) {
+      summary.push("size=(" + (state.width || "auto") + "," + (state.height || "auto") + ")");
+    }
+
+    lines.push(indent + summary.join(" "));
+
+    ensureArray(control._children).forEach(function(child) {
+      appendTreeLines(child, depth + 1, lines);
+    });
+  }
+
   function scheduleMicrotask(fn) {
     if (typeof queueMicrotask === "function") {
       queueMicrotask(fn);
@@ -167,10 +205,18 @@
     this.rootHost = rootHost;
   };
 
+  Runtime.prototype.debugLog = function(topic, message) {
+    if (!this.application || !this.application.Debug || !global.console || typeof global.console.log !== "function") {
+      return;
+    }
+    global.console.log("[JOG][" + topic + "] " + message);
+  };
+
   Runtime.prototype.markDirty = function(control) {
     if (!control || control._lifecycle === "Disposed") {
       return;
     }
+    this.debugLog("Dirty", "Queued " + controlDebugName(control));
     this._dirtyControls.add(control);
     if (this._scheduled) {
       return;
@@ -190,6 +236,7 @@
 
     var controls = Array.from(this._dirtyControls);
     this._dirtyControls.clear();
+    this.debugLog("Flush", "Rendering " + controls.length + " control(s)");
 
     controls.sort(function(a, b) {
       return a._depth - b._depth;
@@ -241,6 +288,21 @@
     this.Runtime.flush();
   };
 
+  Application.prototype.DumpTree = function() {
+    var lines = [];
+    if (!this.MainPage) {
+      return "(no main page)";
+    }
+    appendTreeLines(this.MainPage, 0, lines);
+    return lines.join("\n");
+  };
+
+  Application.prototype.LogTree = function() {
+    if (global.console && typeof global.console.log === "function") {
+      global.console.log(this.DumpTree());
+    }
+  };
+
   Application.prototype._injectBaseStyles = function() {
     if (this._stylesInjected) {
       return;
@@ -264,9 +326,11 @@
       ".jog-window { position: absolute; border: 1px solid #cbd5e1; border-radius: 14px; background: #ffffff; box-shadow: 0 24px 50px rgba(15, 23, 42, 0.16); overflow: hidden; }",
       ".jog-window-titlebar { background: #f8fafc; color: #0f172a; padding: 12px 16px; font-weight: 600; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }",
       ".jog-window-content { position: relative; padding: 20px; background: #ffffff; }",
+      ".jog-window-resize-handle { position: absolute; width: 16px; height: 16px; right: 0; bottom: 0; cursor: nwse-resize; background: linear-gradient(135deg, transparent 0 45%, #94a3b8 45% 55%, transparent 55% 100%); }",
       ".jog-button { border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-size: 14px; }",
       ".jog-button:disabled { opacity: 0.6; cursor: default; }",
       ".jog-label { display: block; color: #475569; font-size: 14px; line-height: 1.45; }",
+      ".jog-label.jog-error-text { color: #b91c1c; font-size: 12px; line-height: 1.35; }",
       ".jog-textbox { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: #ffffff; }",
       ".jog-textarea { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: #ffffff; resize: vertical; min-height: 120px; }",
       ".jog-checkbox-row { display: flex; align-items: center; gap: 10px; color: #334155; font-size: 14px; }",
@@ -275,6 +339,8 @@
       ".jog-radio { width: 16px; height: 16px; }",
       ".jog-select { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: #ffffff; min-height: 42px; }",
       ".jog-listbox { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; font-size: 14px; background: #ffffff; min-height: 120px; }",
+      ".jog-textbox.jog-invalid, .jog-textarea.jog-invalid, .jog-select.jog-invalid, .jog-listbox.jog-invalid { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12); }",
+      ".jog-checkbox-row.jog-invalid, .jog-radio-row.jog-invalid { color: #b91c1c; }",
       ".jog-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.22); z-index: 1000; }"
     ].join("\n");
     document.head.appendChild(style);
@@ -320,6 +386,8 @@
       gap: null,
       cssClass: null,
       tooltip: null,
+      invalid: false,
+      errorText: "",
       children: []
     };
   };
@@ -354,6 +422,7 @@
     if (!this._runtime || this._lifecycle === "Disposed") {
       return;
     }
+    this._runtime.debugLog("Lifecycle", "Render " + controlDebugName(this));
     this._ensureMounted();
     this._applyStateToDom(this._previousState, this._state);
     this._previousState = cloneState(this._state);
@@ -371,6 +440,7 @@
     host.appendChild(this._domNode);
     this._bindDomEvents();
     this._lifecycle = this._state.visible ? "Shown" : "Hidden";
+    this._runtime.debugLog("Lifecycle", "Mounted " + controlDebugName(this));
   };
 
   Component.prototype._resolveHostNode = function() {
@@ -404,7 +474,13 @@
     this._domNode.style.maxHeight = isNumber(nextState.maxHeight) ? toCssPixels(nextState.maxHeight) : "";
     this._domNode.style.padding = toCssBox(nextState.padding);
     this._domNode.style.margin = toCssBox(nextState.margin);
-    this._domNode.title = nextState.tooltip || "";
+    this._domNode.title = nextState.errorText || nextState.tooltip || "";
+    this._domNode.classList.toggle("jog-invalid", !!nextState.invalid);
+    if (nextState.invalid) {
+      this._domNode.setAttribute("aria-invalid", "true");
+    } else {
+      this._domNode.removeAttribute("aria-invalid");
+    }
     if (nextState.cssClass) {
       this._domNode.classList.add(nextState.cssClass);
     }
@@ -420,6 +496,9 @@
   Component.prototype._raiseEvent = function(name, originalEvent, extras) {
     var handlers = ensureArray(this._eventHandlers[name]).slice();
     var eventArgs = new EventArgs(this, name, originalEvent, extras);
+    if (this._runtime) {
+      this._runtime.debugLog("Event", controlDebugName(this) + " -> " + name + " handlers=" + handlers.length);
+    }
     handlers.forEach(function(handler) {
       handler(eventArgs);
     });
@@ -446,6 +525,9 @@
   Component.prototype.Dispose = function() {
     if (this._lifecycle === "Disposed") {
       return;
+    }
+    if (this._runtime) {
+      this._runtime.debugLog("Lifecycle", "Dispose " + controlDebugName(this));
     }
     this._bindings.forEach(function(binding) {
       if (typeof binding.unsubscribe === "function") {
@@ -484,6 +566,30 @@
   Component.prototype.SetBounds = function(x, y, width, height) {
     this.Location(x, y);
     this.Size(width, height);
+  };
+
+  Component.prototype.SetError = function(message) {
+    this.ErrorText = message == null ? "" : String(message);
+    this.Invalid = !!this.ErrorText;
+  };
+
+  Component.prototype.ClearError = function() {
+    this.ErrorText = "";
+    this.Invalid = false;
+  };
+
+  Component.prototype.BindError = function(store, key) {
+    var control = this;
+    var listener = function(value) {
+      if (value) {
+        control.SetError(value);
+        return;
+      }
+      control.ClearError();
+    };
+    var unsubscribe = store.Subscribe(key, listener);
+    this._bindings.push({ unsubscribe: unsubscribe });
+    listener(store.Get(key));
   };
 
   Object.defineProperty(Component.prototype, "Name", {
@@ -558,6 +664,16 @@
   Object.defineProperty(Component.prototype, "Tooltip", {
     get: function() { return this._state.tooltip; },
     set: function(value) { this._setState("tooltip", value); }
+  });
+
+  Object.defineProperty(Component.prototype, "Invalid", {
+    get: function() { return !!this._state.invalid; },
+    set: function(value) { this._setState("invalid", !!value); }
+  });
+
+  Object.defineProperty(Component.prototype, "ErrorText", {
+    get: function() { return this._state.errorText; },
+    set: function(value) { this._setState("errorText", value == null ? "" : String(value)); }
   });
 
   Object.defineProperty(Component.prototype, "Padding", {
@@ -1118,7 +1234,7 @@
     var unsubscribe = store.Subscribe(key, listener);
     this._bindings.push({ unsubscribe: unsubscribe });
     listener(store.Get(key));
-    this.Change(function(eventArgs) {
+    this.OnChange(function(eventArgs) {
       store.Set(key, eventArgs.Value);
     });
   };
@@ -1229,7 +1345,7 @@
     var unsubscribe = store.Subscribe(key, listener);
     this._bindings.push({ unsubscribe: unsubscribe });
     listener(store.Get(key));
-    this.Change(function(eventArgs) {
+    this.OnChange(function(eventArgs) {
       store.Set(key, !!eventArgs.Value);
     });
   };
@@ -1306,7 +1422,7 @@
     var unsubscribe = store.Subscribe(key, listener);
     this._bindings.push({ unsubscribe: unsubscribe });
     listener(store.Get(key));
-    this.Change(function(eventArgs) {
+    this.OnChange(function(eventArgs) {
       if (control.Checked || eventArgs.Value === control.Value) {
         store.Set(key, control.Value);
       }
@@ -1381,7 +1497,7 @@
     var unsubscribe = store.Subscribe(key, listener);
     this._bindings.push({ unsubscribe: unsubscribe });
     listener(store.Get(key));
-    this.Change(function(eventArgs) {
+    this.OnChange(function(eventArgs) {
       store.Set(key, eventArgs.Value);
     });
   };
@@ -1462,7 +1578,7 @@
     var unsubscribe = store.Subscribe(key, listener);
     this._bindings.push({ unsubscribe: unsubscribe });
     listener(store.Get(key));
-    this.Change(function(eventArgs) {
+    this.OnChange(function(eventArgs) {
       store.Set(key, eventArgs.Value);
     });
   };
@@ -1477,6 +1593,7 @@
     this._state.closeButtonText = "Close";
     this._state.closeOnEscape = true;
     this._dragState = null;
+    this._resizeState = null;
     this._contentNode = null;
   }
 
@@ -1507,13 +1624,18 @@
     var content = doc.createElement("div");
     content.className = "jog-window-content";
 
+    var resizeHandle = doc.createElement("div");
+    resizeHandle.className = "jog-window-resize-handle";
+
     node.appendChild(titleBar);
     node.appendChild(content);
+    node.appendChild(resizeHandle);
 
     this._titleNode = titleText;
     this._closeNode = closeButton;
     this._contentNode = content;
     this._titleBarNode = titleBar;
+    this._resizeHandleNode = resizeHandle;
 
     return node;
   };
@@ -1536,6 +1658,7 @@
     this._domNode.style.height = isNumber(nextState.height) ? toCssPixels(nextState.height) : "";
     this._domNode.style.minWidth = isNumber(nextState.minWidth) ? toCssPixels(nextState.minWidth) : "";
     this._domNode.style.minHeight = isNumber(nextState.minHeight) ? toCssPixels(nextState.minHeight) : "";
+    this._resizeHandleNode.style.display = nextState.resizable ? "" : "none";
     this._domNode.style.zIndex = this._runtime.nextWindowZIndex();
     if (nextState.modal && nextState.visible) {
       this._runtime.showModalOverlay();
@@ -1546,6 +1669,12 @@
 
   Window.prototype._bindDomEvents = function() {
     var control = this;
+    var doc = this._runtime.document;
+
+    function detachDragListeners(onMove, onUp) {
+      doc.removeEventListener("mousemove", onMove);
+      doc.removeEventListener("mouseup", onUp);
+    }
 
     this._closeNode.addEventListener("click", function() {
       control.Close();
@@ -1561,6 +1690,7 @@
       if (!control._state.draggable) {
         return;
       }
+      control.BringToFront();
       control._dragState = {
         startX: event.clientX,
         startY: event.clientY,
@@ -1579,13 +1709,52 @@
       }
 
       function onUp() {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
+        detachDragListeners(onMove, onUp);
         control._dragState = null;
       }
 
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+      doc.addEventListener("mousemove", onMove);
+      doc.addEventListener("mouseup", onUp);
+    });
+
+    this._resizeHandleNode.addEventListener("mousedown", function(event) {
+      if (!control._state.resizable) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      control.BringToFront();
+      control._resizeState = {
+        startX: event.clientX,
+        startY: event.clientY,
+        width: control.Width || control._domNode.offsetWidth || 420,
+        height: control.Height || control._domNode.offsetHeight || 240
+      };
+
+      function onMove(moveEvent) {
+        var nextWidth;
+        var nextHeight;
+        if (!control._resizeState) {
+          return;
+        }
+        nextWidth = clamp(
+          control._resizeState.width + (moveEvent.clientX - control._resizeState.startX),
+          control.MinWidth || 220
+        );
+        nextHeight = clamp(
+          control._resizeState.height + (moveEvent.clientY - control._resizeState.startY),
+          control.MinHeight || 140
+        );
+        control.Size(nextWidth, nextHeight);
+      }
+
+      function onUp() {
+        detachDragListeners(onMove, onUp);
+        control._resizeState = null;
+      }
+
+      doc.addEventListener("mousemove", onMove);
+      doc.addEventListener("mouseup", onUp);
     });
   };
 
