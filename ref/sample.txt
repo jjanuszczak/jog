@@ -1,0 +1,39 @@
+   1. var MyObject = (function(){  
+   2.     /*private static (class) member*/  
+   3.     var counter = 0;  
+   4.     /*private static method.*/  
+   5.     function incrementCounter(){  
+   6.         return counter++;  
+   7.     };  
+   8.     /*class constructor.*/  
+   9.     function constructorFn(id){  
+  10.         this.id = id;  
+  11.         var self = this;  
+  12.         /*call private static (class) 
+  13.         method and assign the returned 
+  14.         index to a private instance member.*/  
+  15.         var index = incrementCounter();  
+  16.         /*privileged instance method.*/  
+  17.         this.getIndex = function(){  
+  18.             return index;  
+  19.         };  
+  20.     };  
+  21.     /*privileged static (class) method 
+  22.     (a property of the constructor)*/  
+  23.     constructorFn.getNoOfInsts = function(){  
+  24.         return counter;  
+  25.     };  
+  26.     /*public instance method privaliged at the 
+  27.     class level*/  
+  28.     constructorFn.prototype.pubInstMethod = function(){  
+  29.         ...  
+  30.     };  
+  31.     /*return the constructor.*/  
+  32.     return constructorFn;  
+  33. })(); //simultaneously define and call (one-off)!  
+  34.   
+  35. /*public static  member*/  
+  36. MyObject.pubStatic = "anything"  
+  37.   
+  38. /*public instance member*/  
+  39. MyObject.prototype.pubInstVar = 8;  
