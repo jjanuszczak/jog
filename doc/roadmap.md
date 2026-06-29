@@ -18,6 +18,7 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - control-level invalid state and error text
 - application diagnostics with debug logging and tree dump
 - zero-dependency Node test runner for core runtime regression checks
+- minified browser distribution build at `dist/JOG.min.js`
 
 ### Base Types
 
@@ -37,6 +38,8 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 ### Controls
 
 - `Label`
+- `ValidationMessage`
+- `ValidationSummary`
 - `Button`
 - `TextBox`
 - `TextArea`
@@ -48,12 +51,16 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 ### State and Binding
 
 - `Store`
+- `Label.BindText`
+- `ValidationMessage.BindMessage`
+- `ValidationSummary.BindSummary`
 - `TextBox.BindText`
 - `TextArea.BindText`
 - `CheckBox.BindChecked`
 - `RadioButton.BindSelectedValue`
 - `DropDownList.BindSelectedValue`
 - `ListBox.BindSelectedValue`
+- `BindVisible(store, key, transform)`
 - `SetError(message)`
 - `ClearError()`
 - `BindError(store, key)`
@@ -61,10 +68,12 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 ### Windows and Dialogs
 
 - draggable windows
-- resizable windows with lower-right resize handle
+- resizable windows with edge and corner handles
 - close button support
 - close-on-escape support
 - modal dialogs
+- stacked modal overlay behavior across multiple visible dialogs
+- window lifecycle hooks with `OnLoad`, `OnShow`, `OnHide`, and `OnClose`
 - configurable close button label
 
 ### Example Apps
@@ -73,19 +82,20 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - customer admin example
 - form demo with grid layout
 - form demo validation and inline error feedback
-- form demo validation summary and checkbox invalid-state feedback
+- form demo validation summary with reusable binding helpers
+- form demo checkbox and radio-group invalid-state feedback
+- opportunity board sample with CRM-style add, edit, and delete flows
 
 ### Tests
 
 - Node test runner at `test/run-v2-tests.js`
-- baseline coverage for store, container rules, diagnostics, error binding, and resizable window behavior
+- baseline coverage for store, container rules, diagnostics, error binding, lifecycle guards, richer window resize behavior, modal stacking, window lifecycle events, and example-level integration flows including customer selection, dialog close branches, and form reset behavior
 
 ## Partial
 
 ### Window System
 
-- modal support assumes one active modal overlay at a time
-- resizing currently uses a lower-right handle only
+No major known runtime gaps remain beyond normal hardening.
 
 ### Layout
 
@@ -103,12 +113,19 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - framework injects built-in styles
 - public theme API is not implemented yet
 
+### Packaging
+
+- release packaging is direct browser script usage, not npm runtime installation
+- minified distribution output exists, but there is no broader package-manager or CDN distribution story yet
+
 ### Validation
 
 - control-level validation exists
 - error-state binding from store to control now exists
+- page-level visibility and label text can now bind directly to store keys
+- first-class validation display controls now exist for inline messages and summary blocks
+- radio-group invalid styling can now be applied at the row-container level
 - app code must still orchestrate when validation runs
-- inline error labels and summary regions are still app concerns rather than first-class runtime constructs
 
 ## Next Recommended Work
 
@@ -116,26 +133,13 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 
 Build on the new validation surface:
 
-- more examples of reusable page-level validation patterns
-- consider whether radio-group level invalid styling should get a stronger built-in pattern
+- consider whether first-class validation summary or field-message controls are worth adding
 
-### 2. Window Maturity
+### 2. Packaging Maturity
 
-- improve modal stacking rules
-- add load/show/hide lifecycle events if needed
-- add richer resize affordances if needed beyond the lower-right handle
-
-### 3. Diagnostics Maturity
-
-- clearer runtime error formatting
-- optional category-based debug filtering
-- richer tree dump detail when needed
-
-### 4. Test Maturity
-
-- broaden unit coverage for property setters and lifecycle rules
-- add stronger integration coverage for dialog behavior and binding flows
-- add regression checks that mirror example app usage more closely
+- decide whether to keep GitHub Releases as the primary distribution path
+- consider a starter release bundle with `JOG.min.js`, a starter HTML file, and a minimal app example
+- decide later whether npm packaging is worth the maintenance cost
 
 ## Deferred
 

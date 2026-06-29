@@ -11,6 +11,58 @@
     store.Set("sidebarSelection", "Selected: " + name);
   }
 
+  function buildSelectedValidationSummary(store) {
+    var messages = [
+      store.Get("selectedNameError"),
+      store.Get("selectedStatusError")
+    ].filter(function(message) {
+      return !!message;
+    });
+
+    if (!messages.length) {
+      store.Set("selectedValidationSummary", "");
+      return;
+    }
+
+    store.Set("selectedValidationSummary", "Please fix: " + messages.join(" | "));
+  }
+
+  function setSelectedFieldError(store, key, message) {
+    store.Set(key, message);
+    buildSelectedValidationSummary(store);
+  }
+
+  function validateSelectedCustomer(store) {
+    var hasErrors = false;
+    var name = (store.Get("selectedName") || "").trim();
+    var status = (store.Get("selectedStatus") || "").trim();
+    var allowedStatuses = ["active", "pending", "inactive"];
+
+    if (name.length < 3) {
+      setSelectedFieldError(store, "selectedNameError", "Enter a customer name with at least 3 characters.");
+      hasErrors = true;
+    } else {
+      setSelectedFieldError(store, "selectedNameError", "");
+    }
+
+    if (!status) {
+      setSelectedFieldError(store, "selectedStatusError", "Enter a customer status.");
+      hasErrors = true;
+    } else if (allowedStatuses.indexOf(status.toLowerCase()) < 0) {
+      setSelectedFieldError(store, "selectedStatusError", "Status must be Active, Pending, or Inactive.");
+      hasErrors = true;
+    } else {
+      setSelectedFieldError(store, "selectedStatusError", "");
+    }
+
+    return !hasErrors;
+  }
+
+  function clearSelectedValidation(store) {
+    setSelectedFieldError(store, "selectedNameError", "");
+    setSelectedFieldError(store, "selectedStatusError", "");
+  }
+
   function persistSelectedCustomer(store) {
     var customerKey = store.Get("selectedCustomerKey");
     var name = store.Get("selectedName");
@@ -44,7 +96,11 @@
     layout.Spacing = 16;
 
     var header = new JOG.Label();
-    header.Text = "Update the selected customer record.";
+    header.Text = "Update the selected customer record. This dialog shares the same validation routine as the inline editor.";
+
+    var validationSection = new JOG.ValidationSummary();
+    validationSection.Name = "dialogValidationSection";
+    validationSection.BindSummary(store, "selectedValidationSummary");
 
     var nameLabel = new JOG.Label();
     nameLabel.Text = "Customer Name";
@@ -53,6 +109,11 @@
     nameInput.Name = "dialogCustomerName";
     nameInput.MinWidth = 320;
     nameInput.BindText(store, "selectedName");
+    nameInput.BindError(store, "selectedNameError");
+
+    var nameError = new JOG.ValidationMessage();
+    nameError.Name = "dialogCustomerNameError";
+    nameError.BindMessage(store, "selectedNameError");
 
     var statusLabel = new JOG.Label();
     statusLabel.Text = "Status";
@@ -61,6 +122,14 @@
     statusInput.Name = "dialogCustomerStatus";
     statusInput.MinWidth = 320;
     statusInput.BindText(store, "selectedStatus");
+    statusInput.BindError(store, "selectedStatusError");
+
+    var statusHint = new JOG.Label();
+    statusHint.Text = "Allowed values: Active, Pending, Inactive";
+
+    var statusError = new JOG.ValidationMessage();
+    statusError.Name = "dialogCustomerStatusError";
+    statusError.BindMessage(store, "selectedStatusError");
 
     var footer = new JOG.StackPanel();
     footer.Name = "editFooter";
@@ -70,6 +139,10 @@
     var saveButton = new JOG.Button();
     saveButton.Text = "Save Customer";
     saveButton.OnClick(function() {
+      if (!validateSelectedCustomer(store)) {
+        store.Set("message", "Validation failed. Fix the selected customer fields.");
+        return;
+      }
       persistSelectedCustomer(store);
       store.Set("message", "Saved " + store.Get("selectedName") + " as " + store.Get("selectedStatus"));
       this.Close();
@@ -85,10 +158,14 @@
     footer.Add(closeButton);
 
     layout.Add(header);
+    layout.Add(validationSection);
     layout.Add(nameLabel);
     layout.Add(nameInput);
+    layout.Add(nameError);
     layout.Add(statusLabel);
     layout.Add(statusInput);
+    layout.Add(statusHint);
+    layout.Add(statusError);
     layout.Add(footer);
 
     this.Add(layout);
@@ -115,7 +192,10 @@
       selectedStatus: "Active",
       selectedSummary: "Acme Trading - Active",
       sidebarSelection: "Selected: Acme Trading",
-      message: "Ready"
+      message: "Ready",
+      selectedValidationSummary: "",
+      selectedNameError: "",
+      selectedStatusError: ""
     });
 
     var shell = new JOG.DockPanel();
@@ -234,16 +314,29 @@
     inlineStatus.Name = "inlineSelectedStatus";
     inlineStatus.BindText(store, "selectedStatus");
     inlineStatus.Width = 280;
+    inlineStatus.BindError(store, "selectedStatusError");
 
     var applyInline = new JOG.Button();
     applyInline.Text = "Apply Inline Changes";
-    applyInline.OnClick(function() {
-      persistSelectedCustomer(store);
-      store.Set("message", "Inline changes staged for " + store.Get("selectedName"));
-    });
 
     var fieldLabel = new JOG.Label();
     fieldLabel.Text = "Quick Edit";
+
+    var inlineValidationSection = new JOG.ValidationSummary();
+    inlineValidationSection.Name = "inlineValidationSection";
+    inlineValidationSection.BindSummary(store, "selectedValidationSummary");
+
+    var inlineNameError = new JOG.ValidationMessage();
+    inlineNameError.Name = "inlineSelectedNameError";
+    inlineNameError.BindMessage(store, "selectedNameError");
+    inlineName.BindError(store, "selectedNameError");
+
+    var inlineStatusHint = new JOG.Label();
+    inlineStatusHint.Text = "Allowed values: Active, Pending, Inactive";
+
+    var inlineStatusError = new JOG.ValidationMessage();
+    inlineStatusError.Name = "inlineSelectedStatusError";
+    inlineStatusError.BindMessage(store, "selectedStatusError");
 
     var actions = new JOG.StackPanel();
     actions.Name = "detailActions";
@@ -256,8 +349,12 @@
     detailStack.Add(selectedSummary);
     detailStack.Add(selectedMarker);
     detailStack.Add(fieldLabel);
+    detailStack.Add(inlineValidationSection);
     detailStack.Add(inlineName);
+    detailStack.Add(inlineNameError);
     detailStack.Add(inlineStatus);
+    detailStack.Add(inlineStatusHint);
+    detailStack.Add(inlineStatusError);
     detailStack.Add(actions);
     detailStack.Add(message);
     detail.Add(detailStack);
@@ -265,8 +362,29 @@
     var editDialog = new EditCustomerDialog(store);
     editDialog.Hide();
 
+    applyInline.OnClick(function() {
+      if (!validateSelectedCustomer(store)) {
+        store.Set("message", "Validation failed. Fix the selected customer fields.");
+        return;
+      }
+      persistSelectedCustomer(store);
+      store.Set("message", "Inline changes staged for " + store.Get("selectedName"));
+    });
+
     editButton.OnClick(function() {
+      clearSelectedValidation(store);
       editDialog.ShowModal();
+    });
+
+    ["selectedName", "selectedStatus"].forEach(function(key) {
+      store.Subscribe(key, function() {
+        if (key === "selectedName" && store.Get("selectedNameError")) {
+          validateSelectedCustomer(store);
+        }
+        if (key === "selectedStatus" && store.Get("selectedStatusError")) {
+          validateSelectedCustomer(store);
+        }
+      });
     });
 
     shell.Add(topBar);

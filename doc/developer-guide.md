@@ -26,10 +26,10 @@ Implemented public surface in `v2/JOG.js`:
 - base types: `Component`, `Control`, `Container`
 - layout containers: `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, `Grid`
 - windows: `Window`, `Dialog`
-- controls: `Label`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
+- controls: `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
 - state: `Store`
 - event payload type: `EventArgs`
-- control-level validation state: `Invalid`, `ErrorText`, `SetError()`, `ClearError()`, `BindError()`
+- control-level validation state: `Invalid`, `ErrorText`, `SetError()`, `ClearError()`, `BindError()`, `ValidationMessage`, `ValidationSummary`
 - application diagnostics: `Debug`, `DumpTree()`, `LogTree()`
 
 Test entrypoint:
@@ -41,6 +41,13 @@ Example apps:
 - [v2/example.html](/Users/johnjanuszczak/Projects/jog/v2/example.html)
 - [v2/customer-admin.html](/Users/johnjanuszczak/Projects/jog/v2/customer-admin.html)
 - [v2/form-demo.html](/Users/johnjanuszczak/Projects/jog/v2/form-demo.html)
+- [v2/opportunity-board.html](/Users/johnjanuszczak/Projects/jog/v2/opportunity-board.html)
+
+Distribution build:
+
+- source runtime at [v2/JOG.js](/Users/johnjanuszczak/Projects/jog/v2/JOG.js)
+- minified browser artifact at `dist/JOG.min.js`
+- source map at `dist/JOG.min.js.map`
 
 ## Application Model
 
@@ -60,6 +67,25 @@ app.Run(page);
 
 `Page` is the root container. It also sets `document.title` from `page.Title`.
 
+## Install Model
+
+JOG V2 is currently a direct browser runtime, not an npm-installed application framework.
+
+The practical install story today is:
+
+1. ship `v2/JOG.js` as a readable development build, or ship `dist/JOG.min.js` as a release build
+2. include the runtime with a `<script>` tag
+3. load app code that constructs controls and calls `Application.Run(page)`
+
+Generate the minified distribution with:
+
+```bash
+npm install
+npm run build:dist
+```
+
+This is the appropriate release packaging model for the current state of the project. It keeps the browser delivery story simple while the runtime API continues to evolve.
+
 ## Control Model
 
 Every control is a JavaScript object with internal state. State changes do not write to the DOM immediately. Instead:
@@ -78,8 +104,11 @@ JOG now has a small built-in diagnostics layer on `Application`.
 Available surface:
 
 - `app.Debug = true`
+- `app.DebugTopics = ["event", "lifecycle"]`
 - `app.DumpTree()`
+- `app.DumpTree({ detailed: true })`
 - `app.LogTree()`
+- `app.LogTree({ detailed: true })`
 
 What `Debug = true` does today:
 
@@ -87,22 +116,37 @@ What `Debug = true` does today:
 - logs render and mount lifecycle work
 - logs event dispatch with handler counts
 
+What `DebugTopics` does today:
+
+- optionally limits debug logging to selected categories
+- accepted categories are `dirty`, `flush`, `lifecycle`, and `event`
+- accepts an array such as `["event", "lifecycle"]` or a comma-separated string such as `"event,lifecycle"`
+
+What runtime error formatting does today:
+
+- reports render failures with the control name and stack when available
+- reports event handler failures with the control name, event name, handler index, and stack when available
+- rethrows the original error after logging it
+
 What tree dump does:
 
 - prints the current control hierarchy
 - includes control type, control name or id, visible state, enabled state, lifecycle state, and basic size or position data when present
+- detailed mode also includes richer state such as title, text, placeholder, dock, grid coordinates, span, invalid state, error text, and child counts when relevant
 
 Typical usage:
 
 ```js
 var app = new JOG.Application();
 app.Debug = true;
+app.DebugTopics = ["event", "lifecycle"];
 app.Run(page);
 
 console.log(app.DumpTree());
+console.log(app.DumpTree({ detailed: true }));
 ```
 
-Use `LogTree()` when you just want the tree in the console without formatting it yourself.
+Use `LogTree()` when you just want the tree in the console without formatting it yourself. Pass `{ detailed: true }` when you need a richer state dump.
 
 ## Tests
 
@@ -118,9 +162,13 @@ What it covers today:
 
 - store subscription and unsubscribe behavior
 - duplicate child name protection
+- setter normalization and disposed-control lifecycle guards
 - error binding and disposal behavior
+- remove and clear disposal behavior
 - control tree dump output
-- resizable window handle behavior
+- richer window resize behavior
+- modal stacking and window lifecycle events
+- example-level integration flows for customer-admin selection, dialog editing, alternate dialog close paths, and form validation/reset bindings
 
 This is intentionally lightweight. It does not replace browser-level verification, but it does give the repo a fast regression check for core runtime behavior.
 
@@ -192,10 +240,12 @@ Current limitation: `Grid` is explicit placement only. There is no auto-layout e
 Current behaviors:
 
 - absolute positioning
-- draggable by title bar
 - modal overlay support
+- stacked modal overlay support across multiple visible dialogs
+- draggable by title bar
 - close button
 - escape-to-close when enabled
+- load, show, hide, and close lifecycle hooks
 - z-index stacking through the runtime
 
 `Dialog` is a `Window` that defaults `Modal = true`.
@@ -212,7 +262,7 @@ Useful window properties today:
 - `Width`, `Height`, `MinWidth`, `MinHeight`
 - `Left`, `Top`
 
-When `Resizable = true`, the window shows a lower-right resize handle. Resize behavior currently respects `MinWidth` and `MinHeight`.
+When `Resizable = true`, the window can be resized from edges and corners. Resize behavior currently respects `MinWidth` and `MinHeight`.
 
 ## Store and Binding Model
 
@@ -235,12 +285,16 @@ Available store methods:
 
 Current explicit binding helpers:
 
+- `Label.BindText(store, key, formatter)`
+- `ValidationMessage.BindMessage(store, key, formatter)`
+- `ValidationSummary.BindSummary(store, key, formatter)`
 - `TextBox.BindText(store, key)`
 - `TextArea.BindText(store, key)`
 - `CheckBox.BindChecked(store, key)`
 - `RadioButton.BindSelectedValue(store, key)`
 - `DropDownList.BindSelectedValue(store, key)`
 - `ListBox.BindSelectedValue(store, key)`
+- `Component.BindVisible(store, key, transform)`
 
 Binding is explicit and per-control. There is no expression language, selector syntax, derived store, or automatic form model.
 
@@ -255,6 +309,7 @@ Available on components and controls:
 - `SetError(message)`
 - `ClearError()`
 - `BindError(store, key)`
+- `BindVisible(store, key, transform)`
 
 What this does today:
 
@@ -262,6 +317,8 @@ What this does today:
 - sets `aria-invalid`
 - uses the error text as the control tooltip
 - can bind a control's error state directly to a store key
+- can bind page-level summary and inline error visibility directly to a store key
+- provides small first-class validation display controls for inline messages and summary blocks
 
 What it does not do:
 
@@ -278,7 +335,9 @@ The recommended pattern now is:
 3. have validation code set or clear that store key
 4. render inline error labels only where you want them
 
-You can also keep a separate summary key in the store when you want a page-level validation summary block above the form.
+You can also keep a separate summary key in the store when you want a page-level validation summary block above the form. `ValidationMessage` and `ValidationSummary` now remove most of the repeated wiring for those regions while keeping validation timing in app code.
+
+For radio-group validation, bind the error key to the `StackPanel` that owns the radio buttons. The built-in invalid styling now propagates from that row container to the radio captions.
 
 ## Events
 
@@ -306,6 +365,9 @@ Current event methods on `Control`:
 
 Window-specific:
 
+- `OnLoad(listener)`
+- `OnShow(listener)`
+- `OnHide(listener)`
 - `OnClose(listener)`
 
 Events receive a `JOG.EventArgs` instance with:
@@ -371,9 +433,23 @@ Calling setters on a disposed control throws.
 - explicit save-time validation
 - invalid control styling
 - `BindError()` for field-level invalid state
+- `Label.BindText()` and `BindVisible()` for reusable page-level validation wiring
 - inline error labels driven by store state
 - validation summary region driven by store state
-- checkbox validation with invalid-state styling
+- checkbox and radio-group validation with invalid-state styling
+
+[v2/CustomerAdminApp.js](/Users/johnjanuszczak/Projects/jog/v2/CustomerAdminApp.js) now also demonstrates:
+
+- one shared validation routine reused across inline save and modal save
+- field-level error binding on text inputs in both page and dialog contexts
+- summary-level validation messaging reused across multiple save entry points
+- live revalidation after an invalid edit begins to be corrected
+
+[v2/ExampleApp.js](/Users/johnjanuszczak/Projects/jog/v2/ExampleApp.js) now also demonstrates:
+
+- opening one modal dialog directly
+- opening a second modal on top of the first
+- verifying that the shared overlay stays between the top modal and lower modal windows
 
 ## Guidance for Developers
 

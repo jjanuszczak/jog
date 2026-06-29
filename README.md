@@ -16,13 +16,14 @@ The active implementation is `v2/`.
 JOG V2 is functional and actively evolving. It already includes:
 
 - application and page bootstrapping
-- controls such as `Label`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, and `ListBox`
+- controls such as `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, and `ListBox`
 - layout containers such as `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, and `Grid`
-- dialogs and windows with dragging, modal behavior, and lower-right resizing
+- dialogs and windows with dragging, stacked modal behavior, and lower-right resizing
 - explicit store-based binding
 - control-level validation state
 - runtime diagnostics
 - a zero-dependency Node test runner
+- a minified browser distribution build at `dist/JOG.min.js`
 
 It is not feature-complete. The roadmap in [doc/roadmap.md](/Users/johnjanuszczak/Projects/jog/doc/roadmap.md) is the living source for what is next.
 
@@ -52,12 +53,43 @@ Open these files directly in a browser:
 - [v2/example.html](/Users/johnjanuszczak/Projects/jog/v2/example.html)
 - [v2/customer-admin.html](/Users/johnjanuszczak/Projects/jog/v2/customer-admin.html)
 - [v2/form-demo.html](/Users/johnjanuszczak/Projects/jog/v2/form-demo.html)
+- [v2/opportunity-board.html](/Users/johnjanuszczak/Projects/jog/v2/opportunity-board.html)
 
 What they cover:
 
-- `example.html`: small runtime sanity check, modal window, resize behavior
-- `customer-admin.html`: CRUD-style page shell with edit dialog
-- `form-demo.html`: form layout, explicit store binding, validation, inline errors, validation summary
+- `example.html`: small runtime sanity check, stacked modal dialogs, resize behavior
+- `customer-admin.html`: CRUD-style page shell with shared inline and dialog validation
+- `form-demo.html`: form layout, explicit store binding, reusable validation summary wiring, inline errors, radio-group invalid state
+- `opportunity-board.html`: CRM-style opportunity rows with add, edit, delete, modal record editing, and derived sidebar metrics
+
+## Installing JOG Today
+
+JOG does not have an npm runtime package yet.
+
+Today, the install model is direct browser usage:
+
+1. copy [v2/JOG.js](/Users/johnjanuszczak/Projects/jog/v2/JOG.js) into your project for a readable source build, or build and copy `dist/JOG.min.js` for a minified release artifact
+2. load it with a normal `<script>` tag
+3. load your app code after it
+
+Example:
+
+```html
+<script src="JOG.min.js"></script>
+<script src="MyApp.js"></script>
+```
+
+To generate the minified distribution build:
+
+```bash
+npm install
+npm run build:dist
+```
+
+This writes:
+
+- `dist/JOG.min.js`
+- `dist/JOG.min.js.map`
 
 ## Running Tests
 
@@ -78,13 +110,15 @@ Typical usage:
 ```js
 var app = new JOG.Application();
 app.Debug = true;
+app.DebugTopics = ["event", "lifecycle"];
 app.Run(page);
 
 console.log(app.DumpTree());
+console.log(app.DumpTree({ detailed: true }));
 app.LogTree();
 ```
 
-`Debug = true` enables console logging for dirty queue work, render and mount lifecycle activity, and event dispatch. `DumpTree()` and `LogTree()` expose the current control tree.
+`Debug = true` enables console logging for dirty queue work, render and mount lifecycle activity, and event dispatch. `DebugTopics` can narrow that to categories such as `event`, `lifecycle`, `dirty`, and `flush`. Runtime render and event failures now log structured `[JOG][Error][...]` diagnostics before rethrowing. `DumpTree()` and `LogTree()` expose the current control tree, and `DumpTree({ detailed: true })` adds richer state when you need it.
 
 ## Development Rules
 
@@ -95,6 +129,7 @@ When you change `v2/`:
 - update [doc/developer-guide.md](/Users/johnjanuszczak/Projects/jog/doc/developer-guide.md) if the programming model changed
 - update [doc/api-reference.md](/Users/johnjanuszczak/Projects/jog/doc/api-reference.md) if the public surface changed
 - update [doc/roadmap.md](/Users/johnjanuszczak/Projects/jog/doc/roadmap.md) so status and next steps stay accurate
+- run `npm run build:dist` if the browser distribution should be refreshed for release
 
 Do that in the same change as the code.
 

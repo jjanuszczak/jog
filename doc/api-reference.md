@@ -12,20 +12,27 @@ Methods:
 
 - `Run(page)`
 - `DumpTree()`
+- `DumpTree(options)`
 - `LogTree()`
+- `LogTree(options)`
 
 Properties:
 
 - `Runtime`
 - `MainPage`
 - `Debug`
+- `DebugTopics`
 
 Notes:
 
 - `Run(page)` attaches to `document.body` and performs the first render.
 - `Debug = true` enables runtime console logging for dirty queue activity, lifecycle work, and event dispatch
+- `DebugTopics` optionally filters debug output to selected categories such as `event`, `lifecycle`, `dirty`, and `flush`
+- runtime render and event failures are logged with structured `[JOG][Error][...]` diagnostics before the original error is rethrown
 - `DumpTree()` returns a text representation of the current control tree
+- `DumpTree({ detailed: true })` includes richer control state such as text, title, docking, grid placement, validation state, and child counts when relevant
 - `LogTree()` writes that control tree to the console
+- `LogTree({ detailed: true })` writes the richer tree format to the console
 
 ### `JOG.Page`
 
@@ -86,6 +93,7 @@ Common methods:
 - `SetError(message)`
 - `ClearError()`
 - `BindError(store, key)`
+- `BindVisible(store, key, transform)`
 
 Notes:
 
@@ -94,6 +102,7 @@ Notes:
 - `SetError(message)` sets both `ErrorText` and `Invalid`
 - `ClearError()` clears both
 - `BindError(store, key)` binds control error state to a store key whose value is an error string or empty
+- `BindVisible(store, key, transform)` binds control visibility to a store key, with an optional mapper
 
 ### `JOG.Control`
 
@@ -217,12 +226,43 @@ Current limitation:
 
 Extends `JOG.Control`.
 
+Methods:
+
+- `BindText(store, key, formatter)`
+
 Common usage:
 
 ```js
 var label = new JOG.Label();
 label.Text = "Customer Name";
 ```
+
+### `JOG.ValidationMessage`
+
+Extends `JOG.Label`.
+
+Methods:
+
+- `BindMessage(store, key, formatter)`
+
+Notes:
+
+- defaults to the built-in error text styling
+- auto-hides when the bound message is empty
+
+### `JOG.ValidationSummary`
+
+Extends `JOG.SectionPanel`.
+
+Methods:
+
+- `BindSummary(store, key, formatter)`
+
+Notes:
+
+- defaults `Title` to `Validation Summary`
+- auto-hides when the bound summary is empty
+- manages one internal `ValidationMessage` child
 
 ### `JOG.Button`
 
@@ -315,6 +355,7 @@ Notes:
 
 - intended to be used in a group where each radio binds to the same store key
 - supports invalid styling through inherited `Invalid` and `ErrorText`
+- radio-group validation can be applied at the container level by binding the error key to the parent `StackPanel`
 
 ### `JOG.DropDownList`
 
@@ -383,13 +424,20 @@ Methods:
 - `ShowModal()`
 - `Close()`
 - `BringToFront()`
+- `OnLoad(listener)`
+- `OnShow(listener)`
+- `OnHide(listener)`
 - `OnClose(listener)`
 
 Notes:
 
-- `Resizable = true` enables a lower-right resize handle
+- `Resizable = true` enables edge and corner resize handles
 - resize behavior respects `MinWidth` and `MinHeight`
 - width defaults to `420px` if not set
+- visible modal windows share one overlay, which stays under the top modal and above lower modal windows
+- `OnLoad(listener)` fires once after the window mounts
+- `OnShow(listener)` fires when the rendered window becomes visible, including the first visible mount
+- `OnHide(listener)` fires when the rendered window becomes hidden, but not for an initially hidden mount
 
 ### `JOG.Dialog`
 

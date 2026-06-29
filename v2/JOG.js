@@ -98,6 +98,39 @@
     return Math.max(value, minValue);
   }
 
+  function resizeWindowFromState(state, deltaX, deltaY, minWidth, minHeight) {
+    var next = {
+      left: state.left,
+      top: state.top,
+      width: state.width,
+      height: state.height
+    };
+    var clampedWidth;
+    var clampedHeight;
+
+    if (state.direction.indexOf("e") >= 0) {
+      next.width = clamp(state.width + deltaX, minWidth);
+    }
+
+    if (state.direction.indexOf("s") >= 0) {
+      next.height = clamp(state.height + deltaY, minHeight);
+    }
+
+    if (state.direction.indexOf("w") >= 0) {
+      clampedWidth = clamp(state.width - deltaX, minWidth);
+      next.width = clampedWidth;
+      next.left = state.left + (state.width - clampedWidth);
+    }
+
+    if (state.direction.indexOf("n") >= 0) {
+      clampedHeight = clamp(state.height - deltaY, minHeight);
+      next.height = clampedHeight;
+      next.top = state.top + (state.height - clampedHeight);
+    }
+
+    return next;
+  }
+
   function controlDebugName(control) {
     if (!control || !control._state) {
       return "Unknown";
@@ -105,7 +138,51 @@
     return control._typeName + "(" + (control._state.name || control._state.id) + ")";
   }
 
-  function appendTreeLines(control, depth, lines) {
+  function normalizeTreeDumpOptions(options) {
+    if (options === true || options === "detailed" || options === "full") {
+      return { detailed: true };
+    }
+    if (!options) {
+      return { detailed: false };
+    }
+    return {
+      detailed: !!options.detailed
+    };
+  }
+
+  function appendDetailedTreeSummary(summary, control, state) {
+    var children = ensureArray(control._children);
+
+    if (state.text) {
+      summary.push('text="' + state.text + '"');
+    }
+    if (state.title) {
+      summary.push('title="' + state.title + '"');
+    }
+    if (state.placeholder) {
+      summary.push('placeholder="' + state.placeholder + '"');
+    }
+    if (state.dock && state.dock !== "none") {
+      summary.push("dock=" + state.dock);
+    }
+    if (state.gridColumn != null || state.gridRow != null) {
+      summary.push("grid=(" + (state.gridColumn != null ? state.gridColumn : "-") + "," + (state.gridRow != null ? state.gridRow : "-") + ")");
+    }
+    if ((state.columnSpan || 1) !== 1 || (state.rowSpan || 1) !== 1) {
+      summary.push("span=(" + (state.columnSpan || 1) + "," + (state.rowSpan || 1) + ")");
+    }
+    if (state.invalid) {
+      summary.push("invalid=true");
+    }
+    if (state.errorText) {
+      summary.push('error="' + state.errorText + '"');
+    }
+    if (children.length) {
+      summary.push("children=" + children.length);
+    }
+  }
+
+  function appendTreeLines(control, depth, lines, options) {
     var indent = new Array(depth + 1).join("  ");
     var state = control._state || {};
     var summary = [
@@ -121,11 +198,14 @@
     if (isNumber(state.width) || isNumber(state.height)) {
       summary.push("size=(" + (state.width || "auto") + "," + (state.height || "auto") + ")");
     }
+    if (options && options.detailed) {
+      appendDetailedTreeSummary(summary, control, state);
+    }
 
     lines.push(indent + summary.join(" "));
 
     ensureArray(control._children).forEach(function(child) {
-      appendTreeLines(child, depth + 1, lines);
+      appendTreeLines(child, depth + 1, lines, options);
     });
   }
 
@@ -145,6 +225,37 @@
     extras = extras || {};
     this.Value = extras.Value;
     this.Key = extras.Key;
+  }
+
+  function normalizeDebugTopics(value) {
+    var map = {};
+
+    if (value == null) {
+      return null;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(function(topic) {
+        if (topic == null) {
+          return;
+        }
+        map[String(topic).toLowerCase()] = true;
+      });
+      return map;
+    }
+
+    if (typeof value === "string") {
+      value.split(",").forEach(function(topic) {
+        var trimmed = String(topic).trim();
+        if (!trimmed) {
+          return;
+        }
+        map[trimmed.toLowerCase()] = true;
+      });
+      return map;
+    }
+
+    return null;
   }
 
   function Store(initialState) {
@@ -198,6 +309,7 @@
     this._scheduled = false;
     this._windowZIndex = 1000;
     this._activeModalOverlay = null;
+    this._modalWindows = [];
   }
 
   Runtime.prototype.attach = function(doc, rootHost) {
@@ -206,10 +318,49 @@
   };
 
   Runtime.prototype.debugLog = function(topic, message) {
+    var topics;
+
     if (!this.application || !this.application.Debug || !global.console || typeof global.console.log !== "function") {
       return;
     }
+    topics = this.application._debugTopics;
+    if (topics && !topics[String(topic).toLowerCase()]) {
+      return;
+    }
     global.console.log("[JOG][" + topic + "] " + message);
+  };
+
+  Runtime.prototype.reportError = function(phase, error, details) {
+    var message;
+    var lines;
+
+    if (!global.console || typeof global.console.error !== "function") {
+      return;
+    }
+
+    details = details || {};
+    lines = ["[JOG][Error][" + phase + "]"];
+
+    if (details.control) {
+      lines.push("Control: " + controlDebugName(details.control));
+    }
+
+    if (details.eventName) {
+      lines.push("Event: " + details.eventName);
+    }
+
+    if (details.handlerIndex != null) {
+      lines.push("Handler: #" + (details.handlerIndex + 1));
+    }
+
+    message = error && error.message ? error.message : String(error);
+    lines.push("Message: " + message);
+
+    if (error && error.stack) {
+      lines.push("Stack: " + error.stack);
+    }
+
+    global.console.error(lines.join("\n"));
   };
 
   Runtime.prototype.markDirty = function(control) {
@@ -243,13 +394,81 @@
     });
 
     for (var i = 0; i < controls.length; i += 1) {
-      controls[i]._renderIfNeeded();
+      try {
+        controls[i]._renderIfNeeded();
+      } catch (error) {
+        this.reportError("Render", error, { control: controls[i] });
+        throw error;
+      }
     }
   };
 
   Runtime.prototype.nextWindowZIndex = function() {
     this._windowZIndex += 1;
     return this._windowZIndex;
+  };
+
+  Runtime.prototype.assignWindowZIndex = function(windowControl) {
+    if (!windowControl) {
+      return;
+    }
+    windowControl._windowZIndex = this.nextWindowZIndex();
+    if (windowControl._domNode) {
+      windowControl._domNode.style.zIndex = windowControl._windowZIndex;
+    }
+    this.syncModalOverlay();
+  };
+
+  Runtime.prototype.updateModalWindow = function(windowControl, forceVisible) {
+    var isVisible = forceVisible;
+    var index;
+
+    if (!windowControl) {
+      this.syncModalOverlay();
+      return;
+    }
+
+    if (isVisible === undefined) {
+      isVisible = !!(windowControl.Modal && windowControl.Visible && windowControl._lifecycle !== "Disposed");
+    }
+
+    index = this._modalWindows.indexOf(windowControl);
+
+    if (isVisible) {
+      if (index < 0) {
+        this._modalWindows.push(windowControl);
+      }
+    } else if (index >= 0) {
+      this._modalWindows.splice(index, 1);
+    }
+
+    this.syncModalOverlay();
+  };
+
+  Runtime.prototype.syncModalOverlay = function() {
+    var topModal = null;
+    var topZIndex = -1;
+
+    this._modalWindows = this._modalWindows.filter(function(windowControl) {
+      return !!windowControl && windowControl._lifecycle !== "Disposed" && !!windowControl.Modal && !!windowControl.Visible;
+    });
+
+    this._modalWindows.forEach(function(windowControl) {
+      var zIndex = windowControl._windowZIndex || 0;
+      if (!windowControl._domNode || zIndex < topZIndex) {
+        return;
+      }
+      topModal = windowControl;
+      topZIndex = zIndex;
+    });
+
+    if (!topModal || !this.document || !this.document.body) {
+      this.hideModalOverlay();
+      return;
+    }
+
+    this.showModalOverlay();
+    this._activeModalOverlay.style.zIndex = String(Math.max(topZIndex - 1, 1000));
   };
 
   Runtime.prototype.showModalOverlay = function() {
@@ -277,6 +496,7 @@
     this.MainPage = null;
     this._stylesInjected = false;
     this.Debug = false;
+    this._debugTopics = null;
   }
 
   Application.prototype.Run = function(page) {
@@ -288,20 +508,26 @@
     this.Runtime.flush();
   };
 
-  Application.prototype.DumpTree = function() {
+  Application.prototype.DumpTree = function(options) {
     var lines = [];
+    var normalizedOptions = normalizeTreeDumpOptions(options);
     if (!this.MainPage) {
       return "(no main page)";
     }
-    appendTreeLines(this.MainPage, 0, lines);
+    appendTreeLines(this.MainPage, 0, lines, normalizedOptions);
     return lines.join("\n");
   };
 
-  Application.prototype.LogTree = function() {
+  Application.prototype.LogTree = function(options) {
     if (global.console && typeof global.console.log === "function") {
-      global.console.log(this.DumpTree());
+      global.console.log(this.DumpTree(options));
     }
   };
+
+  Object.defineProperty(Application.prototype, "DebugTopics", {
+    get: function() { return this._debugTopics; },
+    set: function(value) { this._debugTopics = normalizeDebugTopics(value); }
+  });
 
   Application.prototype._injectBaseStyles = function() {
     if (this._stylesInjected) {
@@ -326,7 +552,15 @@
       ".jog-window { position: absolute; border: 1px solid #cbd5e1; border-radius: 14px; background: #ffffff; box-shadow: 0 24px 50px rgba(15, 23, 42, 0.16); overflow: hidden; }",
       ".jog-window-titlebar { background: #f8fafc; color: #0f172a; padding: 12px 16px; font-weight: 600; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }",
       ".jog-window-content { position: relative; padding: 20px; background: #ffffff; }",
-      ".jog-window-resize-handle { position: absolute; width: 16px; height: 16px; right: 0; bottom: 0; cursor: nwse-resize; background: linear-gradient(135deg, transparent 0 45%, #94a3b8 45% 55%, transparent 55% 100%); }",
+      ".jog-window-resize-handle { position: absolute; z-index: 2; }",
+      ".jog-window-resize-handle.edge-top { top: -4px; left: 12px; right: 12px; height: 8px; cursor: ns-resize; }",
+      ".jog-window-resize-handle.edge-right { top: 12px; right: -4px; bottom: 12px; width: 8px; cursor: ew-resize; }",
+      ".jog-window-resize-handle.edge-bottom { left: 12px; right: 12px; bottom: -4px; height: 8px; cursor: ns-resize; }",
+      ".jog-window-resize-handle.edge-left { top: 12px; left: -4px; bottom: 12px; width: 8px; cursor: ew-resize; }",
+      ".jog-window-resize-handle.corner-top-left { top: -4px; left: -4px; width: 14px; height: 14px; cursor: nwse-resize; }",
+      ".jog-window-resize-handle.corner-top-right { top: -4px; right: -4px; width: 14px; height: 14px; cursor: nesw-resize; }",
+      ".jog-window-resize-handle.corner-bottom-left { bottom: -4px; left: -4px; width: 14px; height: 14px; cursor: nesw-resize; }",
+      ".jog-window-resize-handle.corner-bottom-right { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 0 45%, #94a3b8 45% 55%, transparent 55% 100%); }",
       ".jog-button { border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-size: 14px; }",
       ".jog-button:disabled { opacity: 0.6; cursor: default; }",
       ".jog-label { display: block; color: #475569; font-size: 14px; line-height: 1.45; }",
@@ -341,6 +575,7 @@
       ".jog-listbox { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; font-size: 14px; background: #ffffff; min-height: 120px; }",
       ".jog-textbox.jog-invalid, .jog-textarea.jog-invalid, .jog-select.jog-invalid, .jog-listbox.jog-invalid { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12); }",
       ".jog-checkbox-row.jog-invalid, .jog-radio-row.jog-invalid { color: #b91c1c; }",
+      ".jog-stack-panel.jog-invalid .jog-radio-row { color: #b91c1c; }",
       ".jog-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.22); z-index: 1000; }"
     ].join("\n");
     document.head.appendChild(style);
@@ -496,12 +731,24 @@
   Component.prototype._raiseEvent = function(name, originalEvent, extras) {
     var handlers = ensureArray(this._eventHandlers[name]).slice();
     var eventArgs = new EventArgs(this, name, originalEvent, extras);
+    var i;
     if (this._runtime) {
       this._runtime.debugLog("Event", controlDebugName(this) + " -> " + name + " handlers=" + handlers.length);
     }
-    handlers.forEach(function(handler) {
-      handler(eventArgs);
-    });
+    for (i = 0; i < handlers.length; i += 1) {
+      try {
+        handlers[i](eventArgs);
+      } catch (error) {
+        if (this._runtime) {
+          this._runtime.reportError("Event", error, {
+            control: this,
+            eventName: name,
+            handlerIndex: i
+          });
+        }
+        throw error;
+      }
+    }
     return eventArgs;
   };
 
@@ -586,6 +833,16 @@
         return;
       }
       control.ClearError();
+    };
+    var unsubscribe = store.Subscribe(key, listener);
+    this._bindings.push({ unsubscribe: unsubscribe });
+    listener(store.Get(key));
+  };
+
+  Component.prototype.BindVisible = function(store, key, transform) {
+    var control = this;
+    var listener = function(value) {
+      control.Visible = transform ? !!transform(value) : !!value;
     };
     var unsubscribe = store.Subscribe(key, listener);
     this._bindings.push({ unsubscribe: unsubscribe });
@@ -1138,6 +1395,52 @@
     }
   };
 
+  Label.prototype.BindText = function(store, key, formatter) {
+    var control = this;
+    var listener = function(value) {
+      var nextValue = formatter ? formatter(value) : value;
+      control.Text = nextValue == null ? "" : String(nextValue);
+    };
+    var unsubscribe = store.Subscribe(key, listener);
+    this._bindings.push({ unsubscribe: unsubscribe });
+    listener(store.Get(key));
+  };
+
+  function ValidationMessage() {
+    Label.call(this);
+    this._typeName = "ValidationMessage";
+    this.CssClass = "jog-error-text";
+    this.Visible = false;
+  }
+
+  ValidationMessage.prototype = Object.create(Label.prototype);
+  ValidationMessage.prototype.constructor = ValidationMessage;
+
+  ValidationMessage.prototype.BindMessage = function(store, key, formatter) {
+    this.BindText(store, key, formatter);
+    this.BindVisible(store, key);
+  };
+
+  function ValidationSummary() {
+    SectionPanel.call(this);
+    this._typeName = "ValidationSummary";
+    this.Title = "Validation Summary";
+    this.Padding = 14;
+    this.Visible = false;
+
+    this._messageLabel = new ValidationMessage();
+    this._messageLabel.Name = "validationSummaryMessage";
+    this.Add(this._messageLabel);
+  }
+
+  ValidationSummary.prototype = Object.create(SectionPanel.prototype);
+  ValidationSummary.prototype.constructor = ValidationSummary;
+
+  ValidationSummary.prototype.BindSummary = function(store, key, formatter) {
+    this._messageLabel.BindMessage(store, key, formatter);
+    this.BindVisible(store, key);
+  };
+
   function Button() {
     Control.call(this, "Button");
   }
@@ -1595,12 +1898,17 @@
     this._dragState = null;
     this._resizeState = null;
     this._contentNode = null;
+    this._windowZIndex = null;
+    this._hasRaisedLoad = false;
+    this._hasRenderedVisibility = false;
+    this._lastRenderedVisible = null;
   }
 
   Window.prototype = Object.create(Container.prototype);
   Window.prototype.constructor = Window;
 
   Window.prototype._createDomNode = function(doc) {
+    var resizeHandles = {};
     var node = doc.createElement("div");
     node.className = "jog-window";
 
@@ -1624,18 +1932,31 @@
     var content = doc.createElement("div");
     content.className = "jog-window-content";
 
-    var resizeHandle = doc.createElement("div");
-    resizeHandle.className = "jog-window-resize-handle";
+    function createResizeHandle(cssClass, direction) {
+      var handle = doc.createElement("div");
+      handle.className = "jog-window-resize-handle " + cssClass;
+      handle._resizeDirection = direction;
+      resizeHandles[direction] = handle;
+      return handle;
+    }
 
     node.appendChild(titleBar);
     node.appendChild(content);
-    node.appendChild(resizeHandle);
+    node.appendChild(createResizeHandle("edge-top", "n"));
+    node.appendChild(createResizeHandle("edge-right", "e"));
+    node.appendChild(createResizeHandle("edge-bottom", "s"));
+    node.appendChild(createResizeHandle("edge-left", "w"));
+    node.appendChild(createResizeHandle("corner-top-left", "nw"));
+    node.appendChild(createResizeHandle("corner-top-right", "ne"));
+    node.appendChild(createResizeHandle("corner-bottom-left", "sw"));
+    node.appendChild(createResizeHandle("corner-bottom-right", "se"));
 
     this._titleNode = titleText;
     this._closeNode = closeButton;
     this._contentNode = content;
     this._titleBarNode = titleBar;
-    this._resizeHandleNode = resizeHandle;
+    this._resizeHandleNode = resizeHandles.se;
+    this._resizeHandles = resizeHandles;
 
     return node;
   };
@@ -1658,12 +1979,35 @@
     this._domNode.style.height = isNumber(nextState.height) ? toCssPixels(nextState.height) : "";
     this._domNode.style.minWidth = isNumber(nextState.minWidth) ? toCssPixels(nextState.minWidth) : "";
     this._domNode.style.minHeight = isNumber(nextState.minHeight) ? toCssPixels(nextState.minHeight) : "";
-    this._resizeHandleNode.style.display = nextState.resizable ? "" : "none";
-    this._domNode.style.zIndex = this._runtime.nextWindowZIndex();
-    if (nextState.modal && nextState.visible) {
-      this._runtime.showModalOverlay();
-    } else if (!nextState.modal || !nextState.visible) {
-      this._runtime.hideModalOverlay();
+    Object.keys(this._resizeHandles).forEach(function(direction) {
+      this._resizeHandles[direction].style.display = nextState.resizable ? "" : "none";
+    }, this);
+
+    if (this._windowZIndex == null || (!prevState.visible && nextState.visible)) {
+      this._runtime.assignWindowZIndex(this);
+    } else {
+      this._domNode.style.zIndex = String(this._windowZIndex);
+    }
+
+    this._runtime.updateModalWindow(this);
+
+    if (!this._hasRaisedLoad) {
+      this._hasRaisedLoad = true;
+      this._raiseEvent("Load", null);
+    }
+
+    if (!this._hasRenderedVisibility) {
+      this._hasRenderedVisibility = true;
+      this._lastRenderedVisible = !!nextState.visible;
+      if (nextState.visible) {
+        this._raiseEvent("Show", null);
+      }
+      return;
+    }
+
+    if (this._lastRenderedVisible !== !!nextState.visible) {
+      this._lastRenderedVisible = !!nextState.visible;
+      this._raiseEvent(nextState.visible ? "Show" : "Hide", null);
     }
   };
 
@@ -1717,44 +2061,47 @@
       doc.addEventListener("mouseup", onUp);
     });
 
-    this._resizeHandleNode.addEventListener("mousedown", function(event) {
-      if (!control._state.resizable) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      control.BringToFront();
-      control._resizeState = {
-        startX: event.clientX,
-        startY: event.clientY,
-        width: control.Width || control._domNode.offsetWidth || 420,
-        height: control.Height || control._domNode.offsetHeight || 240
-      };
-
-      function onMove(moveEvent) {
-        var nextWidth;
-        var nextHeight;
-        if (!control._resizeState) {
+    Object.keys(this._resizeHandles).forEach(function(direction) {
+      control._resizeHandles[direction].addEventListener("mousedown", function(event) {
+        if (!control._state.resizable) {
           return;
         }
-        nextWidth = clamp(
-          control._resizeState.width + (moveEvent.clientX - control._resizeState.startX),
-          control.MinWidth || 220
-        );
-        nextHeight = clamp(
-          control._resizeState.height + (moveEvent.clientY - control._resizeState.startY),
-          control.MinHeight || 140
-        );
-        control.Size(nextWidth, nextHeight);
-      }
+        event.preventDefault();
+        event.stopPropagation();
+        control.BringToFront();
+        control._resizeState = {
+          direction: direction,
+          startX: event.clientX,
+          startY: event.clientY,
+          left: control.Left || 0,
+          top: control.Top || 0,
+          width: control.Width || control._domNode.offsetWidth || 420,
+          height: control.Height || control._domNode.offsetHeight || 240
+        };
 
-      function onUp() {
-        detachDragListeners(onMove, onUp);
-        control._resizeState = null;
-      }
+        function onMove(moveEvent) {
+          var nextBounds;
+          if (!control._resizeState) {
+            return;
+          }
+          nextBounds = resizeWindowFromState(
+            control._resizeState,
+            moveEvent.clientX - control._resizeState.startX,
+            moveEvent.clientY - control._resizeState.startY,
+            control.MinWidth || 220,
+            control.MinHeight || 140
+          );
+          control.SetBounds(nextBounds.left, nextBounds.top, nextBounds.width, nextBounds.height);
+        }
 
-      doc.addEventListener("mousemove", onMove);
-      doc.addEventListener("mouseup", onUp);
+        function onUp() {
+          detachDragListeners(onMove, onUp);
+          control._resizeState = null;
+        }
+
+        doc.addEventListener("mousemove", onMove);
+        doc.addEventListener("mouseup", onUp);
+      });
     });
   };
 
@@ -1766,16 +2113,23 @@
 
   Window.prototype.Close = function() {
     this.Hide();
-    if (this.Modal) {
-      this._runtime.hideModalOverlay();
+    if (this._runtime) {
+      this._runtime.updateModalWindow(this, false);
     }
     this._raiseEvent("Close", null);
   };
 
   Window.prototype.BringToFront = function() {
-    if (this._domNode) {
-      this._domNode.style.zIndex = this._runtime.nextWindowZIndex();
+    if (this._runtime) {
+      this._runtime.assignWindowZIndex(this);
     }
+  };
+
+  Window.prototype.Dispose = function() {
+    if (this._runtime) {
+      this._runtime.updateModalWindow(this, false);
+    }
+    Container.prototype.Dispose.call(this);
   };
 
   Object.defineProperty(Window.prototype, "Title", {
@@ -1817,6 +2171,18 @@
     this._registerEvent("Close", listener);
   };
 
+  Window.prototype.OnLoad = function(listener) {
+    this._registerEvent("Load", listener);
+  };
+
+  Window.prototype.OnShow = function(listener) {
+    this._registerEvent("Show", listener);
+  };
+
+  Window.prototype.OnHide = function(listener) {
+    this._registerEvent("Hide", listener);
+  };
+
   function Dialog() {
     Window.call(this);
     this.Modal = true;
@@ -1838,6 +2204,8 @@
   JOG.Window = Window;
   JOG.Dialog = Dialog;
   JOG.Label = Label;
+  JOG.ValidationMessage = ValidationMessage;
+  JOG.ValidationSummary = ValidationSummary;
   JOG.Button = Button;
   JOG.TextBox = TextBox;
   JOG.TextArea = TextArea;

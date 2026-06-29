@@ -16,6 +16,7 @@
   function buildValidationSummary(store) {
     var messages = [
       store.Get("customerNameError"),
+      store.Get("customerRegionError"),
       store.Get("customerActiveError"),
       store.Get("customerNotesError")
     ].filter(function(message) {
@@ -38,6 +39,7 @@
   function validateForm(store) {
     var hasErrors = false;
     var name = (store.Get("customerName") || "").trim();
+    var region = (store.Get("customerRegion") || "").trim();
     var notes = (store.Get("customerNotes") || "").trim();
 
     if (name.length < 3) {
@@ -54,6 +56,13 @@
       setFieldError(store, "customerNotesError", "");
     }
 
+    if (!region) {
+      setFieldError(store, "customerRegionError", "Select the customer region before saving this intake.");
+      hasErrors = true;
+    } else {
+      setFieldError(store, "customerRegionError", "");
+    }
+
     if (!store.Get("customerActive")) {
       setFieldError(store, "customerActiveError", "Confirm the customer is active before saving this intake.");
       hasErrors = true;
@@ -66,6 +75,7 @@
 
   function clearValidation(store) {
     setFieldError(store, "customerNameError", "");
+    setFieldError(store, "customerRegionError", "");
     setFieldError(store, "customerActiveError", "");
     setFieldError(store, "customerNotesError", "");
   }
@@ -79,7 +89,7 @@
     var store = new JOG.Store({
       customerName: "Atlas Bio",
       customerTier: "growth",
-      customerRegion: "sea",
+      customerRegion: "",
       customerOwner: "maya",
       customerActive: true,
       customerNotes: "Interested in a pilot rollout during Q4.",
@@ -87,6 +97,7 @@
       saveStatus: "Ready to save.",
       validationSummary: "",
       customerNameError: "",
+      customerRegionError: "",
       customerActiveError: "",
       customerNotesError: ""
     });
@@ -114,21 +125,9 @@
     formGrid.ColumnGap = 18;
     formGrid.RowGap = 12;
 
-    var validationSection = new JOG.SectionPanel();
+    var validationSection = new JOG.ValidationSummary();
     validationSection.Name = "validationSection";
-    validationSection.Title = "Validation Summary";
-    validationSection.Padding = 14;
-    validationSection.Visible = false;
-
-    var validationLabel = new JOG.Label();
-    validationLabel.CssClass = "jog-error-text";
-    validationLabel.Text = "";
-    store.Subscribe("validationSummary", function(value) {
-      validationLabel.Text = value || "";
-      validationSection.Visible = !!value;
-    });
-
-    validationSection.Add(validationLabel);
+    validationSection.BindSummary(store, "validationSummary");
 
     var nameLabel = new JOG.Label();
     nameLabel.Text = "Customer Name";
@@ -144,17 +143,11 @@
     nameInput.BindText(store, "customerName");
     nameInput.BindError(store, "customerNameError");
 
-    var nameError = new JOG.Label();
+    var nameError = new JOG.ValidationMessage();
     nameError.Name = "formCustomerNameError";
-    nameError.CssClass = "jog-error-text";
     nameError.GridColumn = 2;
     nameError.GridRow = 2;
-    nameError.Text = "";
-    store.Subscribe("customerNameError", function(value) {
-      nameError.Text = value || "";
-      nameError.Visible = !!value;
-    });
-    nameError.Visible = false;
+    nameError.BindMessage(store, "customerNameError");
 
     var tierLabel = new JOG.Label();
     tierLabel.Text = "Tier";
@@ -182,17 +175,11 @@
     activeCheck.BindChecked(store, "customerActive");
     activeCheck.BindError(store, "customerActiveError");
 
-    var activeError = new JOG.Label();
+    var activeError = new JOG.ValidationMessage();
     activeError.Name = "formCustomerActiveError";
-    activeError.CssClass = "jog-error-text";
     activeError.GridColumn = 2;
     activeError.GridRow = 5;
-    activeError.Text = "";
-    store.Subscribe("customerActiveError", function(value) {
-      activeError.Text = value || "";
-      activeError.Visible = !!value;
-    });
-    activeError.Visible = false;
+    activeError.BindMessage(store, "customerActiveError");
 
     var regionLabel = new JOG.Label();
     regionLabel.Text = "Region";
@@ -205,6 +192,7 @@
     regionRow.Gap = 14;
     regionRow.GridColumn = 2;
     regionRow.GridRow = 6;
+    regionRow.BindError(store, "customerRegionError");
 
     var seaRadio = new JOG.RadioButton();
     seaRadio.Name = "regionSea";
@@ -231,15 +219,21 @@
     regionRow.Add(menaRadio);
     regionRow.Add(euRadio);
 
+    var regionError = new JOG.ValidationMessage();
+    regionError.Name = "formCustomerRegionError";
+    regionError.GridColumn = 2;
+    regionError.GridRow = 7;
+    regionError.BindMessage(store, "customerRegionError");
+
     var ownerLabel = new JOG.Label();
     ownerLabel.Text = "Account Owner";
     ownerLabel.GridColumn = 1;
-    ownerLabel.GridRow = 7;
+    ownerLabel.GridRow = 8;
 
     var ownerList = new JOG.ListBox();
     ownerList.Name = "formCustomerOwner";
     ownerList.GridColumn = 2;
-    ownerList.GridRow = 7;
+    ownerList.GridRow = 8;
     ownerList.Width = 280;
     ownerList.MinWidth = 280;
     ownerList.SizeRows = 4;
@@ -254,12 +248,12 @@
     var notesLabel = new JOG.Label();
     notesLabel.Text = "Notes";
     notesLabel.GridColumn = 1;
-    notesLabel.GridRow = 8;
+    notesLabel.GridRow = 9;
 
     var notesInput = new JOG.TextArea();
     notesInput.Name = "formCustomerNotes";
     notesInput.GridColumn = 2;
-    notesInput.GridRow = 8;
+    notesInput.GridRow = 9;
     notesInput.Width = 520;
     notesInput.Height = 140;
     notesInput.MinWidth = 520;
@@ -268,24 +262,18 @@
     notesInput.BindText(store, "customerNotes");
     notesInput.BindError(store, "customerNotesError");
 
-    var notesError = new JOG.Label();
+    var notesError = new JOG.ValidationMessage();
     notesError.Name = "formCustomerNotesError";
-    notesError.CssClass = "jog-error-text";
     notesError.GridColumn = 2;
-    notesError.GridRow = 9;
-    notesError.Text = "";
-    store.Subscribe("customerNotesError", function(value) {
-      notesError.Text = value || "";
-      notesError.Visible = !!value;
-    });
-    notesError.Visible = false;
+    notesError.GridRow = 10;
+    notesError.BindMessage(store, "customerNotesError");
 
     var actions = new JOG.StackPanel();
     actions.Name = "formActions";
     actions.Orientation = "horizontal";
     actions.Gap = 10;
     actions.GridColumn = 2;
-    actions.GridRow = 10;
+    actions.GridRow = 11;
 
     var saveButton = new JOG.Button();
     saveButton.Text = "Save Form";
@@ -304,7 +292,7 @@
     resetButton.OnClick(function() {
       store.Set("customerName", "Atlas Bio");
       store.Set("customerTier", "growth");
-      store.Set("customerRegion", "sea");
+      store.Set("customerRegion", "");
       store.Set("customerOwner", "maya");
       store.Set("customerActive", true);
       store.Set("customerNotes", "Interested in a pilot rollout during Q4.");
@@ -323,20 +311,19 @@
     summarySection.Margin = { top: 8 };
 
     var summaryLabel = new JOG.Label();
-    summaryLabel.Text = store.Get("summary");
-    store.Subscribe("summary", function(value) {
-      summaryLabel.Text = value;
-    });
+    summaryLabel.BindText(store, "summary");
 
     var statusLabel = new JOG.Label();
-    statusLabel.Text = "Status: " + store.Get("saveStatus");
-    store.Subscribe("saveStatus", function(value) {
-      statusLabel.Text = "Status: " + value;
+    statusLabel.BindText(store, "saveStatus", function(value) {
+      return "Status: " + value;
     });
 
-    ["customerName", "customerActive", "customerNotes"].forEach(function(key) {
+    ["customerName", "customerRegion", "customerActive", "customerNotes"].forEach(function(key) {
       store.Subscribe(key, function() {
         if (key === "customerName" && store.Get("customerNameError")) {
+          validateForm(store);
+        }
+        if (key === "customerRegion" && store.Get("customerRegionError")) {
           validateForm(store);
         }
         if (key === "customerActive" && store.Get("customerActiveError")) {
@@ -368,6 +355,7 @@
     formGrid.Add(activeError);
     formGrid.Add(regionLabel);
     formGrid.Add(regionRow);
+    formGrid.Add(regionError);
     formGrid.Add(ownerLabel);
     formGrid.Add(ownerList);
     formGrid.Add(notesLabel);
