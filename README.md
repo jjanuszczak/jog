@@ -25,24 +25,24 @@ JOG V2 is functional and actively evolving. It already includes:
 - a zero-dependency Node test runner
 - a minified browser distribution build at `dist/JOG.min.js`
 
-It is not feature-complete. The roadmap in [doc/roadmap.md](/Users/johnjanuszczak/Projects/jog/doc/roadmap.md) is the living source for what is next.
+It is not feature-complete. The roadmap in [doc/roadmap.md](doc/roadmap.md) is the living source for what is next.
 
 ## Repo Layout
 
-- [v2](/Users/johnjanuszczak/Projects/jog/v2): active runtime and example apps
-- [test](/Users/johnjanuszczak/Projects/jog/test): Node-based regression checks
-- [doc](/Users/johnjanuszczak/Projects/jog/doc): living documentation
-- [v1](/Users/johnjanuszczak/Projects/jog/v1): earlier implementation kept for reference
-- [ref](/Users/johnjanuszczak/Projects/jog/ref): older reference material and experiments
+- [v2](v2): active runtime and example apps
+- [test](test): Node-based regression checks
+- [doc](doc): living documentation
+- [v1](v1): earlier implementation kept for reference
+- [ref](ref): older reference material and experiments
 
 ## Where To Start
 
 If you are new to the project, read these in order:
 
-1. [doc/developer-guide.md](/Users/johnjanuszczak/Projects/jog/doc/developer-guide.md)
-2. [doc/api-reference.md](/Users/johnjanuszczak/Projects/jog/doc/api-reference.md)
-3. [doc/roadmap.md](/Users/johnjanuszczak/Projects/jog/doc/roadmap.md)
-4. [AGENTS.md](/Users/johnjanuszczak/Projects/jog/AGENTS.md)
+1. [doc/developer-guide.md](doc/developer-guide.md)
+2. [doc/api-reference.md](doc/api-reference.md)
+3. [doc/roadmap.md](doc/roadmap.md)
+4. [AGENTS.md](AGENTS.md)
 
 The developer guide explains the runtime model. The API reference documents what exists now. The roadmap tells you what is implemented, what is partial, and what should happen next.
 
@@ -50,10 +50,10 @@ The developer guide explains the runtime model. The API reference documents what
 
 Open these files directly in a browser:
 
-- [v2/example.html](/Users/johnjanuszczak/Projects/jog/v2/example.html)
-- [v2/customer-admin.html](/Users/johnjanuszczak/Projects/jog/v2/customer-admin.html)
-- [v2/form-demo.html](/Users/johnjanuszczak/Projects/jog/v2/form-demo.html)
-- [v2/opportunity-board.html](/Users/johnjanuszczak/Projects/jog/v2/opportunity-board.html)
+- [v2/example.html](v2/example.html)
+- [v2/customer-admin.html](v2/customer-admin.html)
+- [v2/form-demo.html](v2/form-demo.html)
+- [v2/opportunity-board.html](v2/opportunity-board.html)
 
 What they cover:
 
@@ -68,7 +68,7 @@ JOG does not have an npm runtime package yet.
 
 Today, the install model is direct browser usage:
 
-1. copy [v2/JOG.js](/Users/johnjanuszczak/Projects/jog/v2/JOG.js) into your project for a readable source build, or build and copy `dist/JOG.min.js` for a minified release artifact
+1. copy [v2/JOG.js](v2/JOG.js) into your project for a readable source build, or build and copy `dist/JOG.min.js` for a minified release artifact
 2. load it with a normal `<script>` tag
 3. load your app code after it
 
@@ -126,9 +126,9 @@ This repo treats docs as part of the product.
 
 When you change `v2/`:
 
-- update [doc/developer-guide.md](/Users/johnjanuszczak/Projects/jog/doc/developer-guide.md) if the programming model changed
-- update [doc/api-reference.md](/Users/johnjanuszczak/Projects/jog/doc/api-reference.md) if the public surface changed
-- update [doc/roadmap.md](/Users/johnjanuszczak/Projects/jog/doc/roadmap.md) so status and next steps stay accurate
+- update [doc/developer-guide.md](doc/developer-guide.md) if the programming model changed
+- update [doc/api-reference.md](doc/api-reference.md) if the public surface changed
+- update [doc/roadmap.md](doc/roadmap.md) so status and next steps stay accurate
 - run `npm run build:dist` if the browser distribution should be refreshed for release
 
 Do that in the same change as the code.
@@ -145,4 +145,4 @@ The nearer target is narrower and more practical:
 - CRUD-style interfaces
 - developers who prefer a control-and-container mental model over a markup-first one
 
-That direction is described in more detail in [doc/v2-spec.md](/Users/johnjanuszczak/Projects/jog/doc/v2-spec.md).
+That direction is described in more detail in [doc/v2-spec.md](doc/v2-spec.md).

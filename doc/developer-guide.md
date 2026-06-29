@@ -38,14 +38,14 @@ Test entrypoint:
 
 Example apps:
 
-- [v2/example.html](/Users/johnjanuszczak/Projects/jog/v2/example.html)
-- [v2/customer-admin.html](/Users/johnjanuszczak/Projects/jog/v2/customer-admin.html)
-- [v2/form-demo.html](/Users/johnjanuszczak/Projects/jog/v2/form-demo.html)
-- [v2/opportunity-board.html](/Users/johnjanuszczak/Projects/jog/v2/opportunity-board.html)
+- [v2/example.html](../v2/example.html)
+- [v2/customer-admin.html](../v2/customer-admin.html)
+- [v2/form-demo.html](../v2/form-demo.html)
+- [v2/opportunity-board.html](../v2/opportunity-board.html)
 
 Distribution build:
 
-- source runtime at [v2/JOG.js](/Users/johnjanuszczak/Projects/jog/v2/JOG.js)
+- source runtime at [v2/JOG.js](../v2/JOG.js)
 - minified browser artifact at `dist/JOG.min.js`
 - source map at `dist/JOG.min.js.map`
 
@@ -402,7 +402,7 @@ Calling setters on a disposed control throws.
 
 ### Example App
 
-[v2/ExampleApp.js](/Users/johnjanuszczak/Projects/jog/v2/ExampleApp.js) demonstrates:
+[v2/ExampleApp.js](../v2/ExampleApp.js) demonstrates:
 
 - page boot
 - button and label usage
@@ -410,7 +410,7 @@ Calling setters on a disposed control throws.
 
 ### Customer Admin App
 
-[v2/CustomerAdminApp.js](/Users/johnjanuszczak/Projects/jog/v2/CustomerAdminApp.js) demonstrates:
+[v2/CustomerAdminApp.js](../v2/CustomerAdminApp.js) demonstrates:
 
 - `DockPanel` shell layout
 - `SectionPanel` regions
@@ -420,7 +420,7 @@ Calling setters on a disposed control throws.
 
 ### Form Demo
 
-[v2/FormApp.js](/Users/johnjanuszczak/Projects/jog/v2/FormApp.js) demonstrates:
+[v2/FormApp.js](../v2/FormApp.js) demonstrates:
 
 - `Grid` form layout
 - text input binding
@@ -438,14 +438,14 @@ Calling setters on a disposed control throws.
 - validation summary region driven by store state
 - checkbox and radio-group validation with invalid-state styling
 
-[v2/CustomerAdminApp.js](/Users/johnjanuszczak/Projects/jog/v2/CustomerAdminApp.js) now also demonstrates:
+[v2/CustomerAdminApp.js](../v2/CustomerAdminApp.js) now also demonstrates:
 
 - one shared validation routine reused across inline save and modal save
 - field-level error binding on text inputs in both page and dialog contexts
 - summary-level validation messaging reused across multiple save entry points
 - live revalidation after an invalid edit begins to be corrected
 
-[v2/ExampleApp.js](/Users/johnjanuszczak/Projects/jog/v2/ExampleApp.js) now also demonstrates:
+[v2/ExampleApp.js](../v2/ExampleApp.js) now also demonstrates:
 
 - opening one modal dialog directly
 - opening a second modal on top of the first
