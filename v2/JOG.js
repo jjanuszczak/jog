@@ -54,6 +54,16 @@
     return "";
   }
 
+  function toGridTrackList(value, fallback) {
+    if (Array.isArray(value)) {
+      return value.join(" ");
+    }
+    if (typeof value === "string" && value) {
+      return value;
+    }
+    return fallback || "";
+  }
+
   function normalizeBox(value) {
     if (value === null || value === undefined || value === "") {
       return { top: 0, right: 0, bottom: 0, left: 0 };
@@ -250,6 +260,7 @@
       ".jog-section { position: relative; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04); overflow: hidden; }",
       ".jog-section-header { padding: 14px 16px; font-size: 13px; font-weight: 600; color: #0f172a; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }",
       ".jog-section-body { position: relative; padding: 16px; }",
+      ".jog-grid-panel { position: relative; display: grid; align-items: start; }",
       ".jog-window { position: absolute; border: 1px solid #cbd5e1; border-radius: 14px; background: #ffffff; box-shadow: 0 24px 50px rgba(15, 23, 42, 0.16); overflow: hidden; }",
       ".jog-window-titlebar { background: #f8fafc; color: #0f172a; padding: 12px 16px; font-weight: 600; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }",
       ".jog-window-content { position: relative; padding: 20px; background: #ffffff; }",
@@ -260,7 +271,10 @@
       ".jog-textarea { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: #ffffff; resize: vertical; min-height: 120px; }",
       ".jog-checkbox-row { display: flex; align-items: center; gap: 10px; color: #334155; font-size: 14px; }",
       ".jog-checkbox { width: 16px; height: 16px; }",
+      ".jog-radio-row { display: flex; align-items: center; gap: 10px; color: #334155; font-size: 14px; }",
+      ".jog-radio { width: 16px; height: 16px; }",
       ".jog-select { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: #ffffff; min-height: 42px; }",
+      ".jog-listbox { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; font-size: 14px; background: #ffffff; min-height: 120px; }",
       ".jog-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.22); z-index: 1000; }"
     ].join("\n");
     document.head.appendChild(style);
@@ -288,17 +302,25 @@
       name: null,
       text: "",
       visible: true,
-      enabled: true,
-        width: null,
-        height: null,
-        top: null,
-        left: null,
-        padding: null,
-        margin: null,
-        gap: null,
-        cssClass: null,
-        tooltip: null,
-        children: []
+        enabled: true,
+      width: null,
+      height: null,
+      minWidth: null,
+      minHeight: null,
+      maxWidth: null,
+      maxHeight: null,
+      top: null,
+      left: null,
+      gridColumn: null,
+      gridRow: null,
+      columnSpan: 1,
+      rowSpan: 1,
+      padding: null,
+      margin: null,
+      gap: null,
+      cssClass: null,
+      tooltip: null,
+      children: []
     };
   };
 
@@ -376,6 +398,10 @@
     this._domNode.style.display = nextState.visible ? "" : "none";
     this._domNode.style.width = isNumber(nextState.width) ? toCssPixels(nextState.width) : "";
     this._domNode.style.height = isNumber(nextState.height) ? toCssPixels(nextState.height) : "";
+    this._domNode.style.minWidth = isNumber(nextState.minWidth) ? toCssPixels(nextState.minWidth) : "";
+    this._domNode.style.minHeight = isNumber(nextState.minHeight) ? toCssPixels(nextState.minHeight) : "";
+    this._domNode.style.maxWidth = isNumber(nextState.maxWidth) ? toCssPixels(nextState.maxWidth) : "";
+    this._domNode.style.maxHeight = isNumber(nextState.maxHeight) ? toCssPixels(nextState.maxHeight) : "";
     this._domNode.style.padding = toCssBox(nextState.padding);
     this._domNode.style.margin = toCssBox(nextState.margin);
     this._domNode.title = nextState.tooltip || "";
@@ -489,6 +515,26 @@
     set: function(value) { this._setState("height", value); }
   });
 
+  Object.defineProperty(Component.prototype, "MinWidth", {
+    get: function() { return this._state.minWidth; },
+    set: function(value) { this._setState("minWidth", value); }
+  });
+
+  Object.defineProperty(Component.prototype, "MinHeight", {
+    get: function() { return this._state.minHeight; },
+    set: function(value) { this._setState("minHeight", value); }
+  });
+
+  Object.defineProperty(Component.prototype, "MaxWidth", {
+    get: function() { return this._state.maxWidth; },
+    set: function(value) { this._setState("maxWidth", value); }
+  });
+
+  Object.defineProperty(Component.prototype, "MaxHeight", {
+    get: function() { return this._state.maxHeight; },
+    set: function(value) { this._setState("maxHeight", value); }
+  });
+
   Object.defineProperty(Component.prototype, "Top", {
     get: function() { return this._state.top; },
     set: function(value) { this._setState("top", value); }
@@ -529,6 +575,26 @@
     set: function(value) { this._setState("gap", value); }
   });
 
+  Object.defineProperty(Component.prototype, "GridColumn", {
+    get: function() { return this._state.gridColumn; },
+    set: function(value) { this._setState("gridColumn", value); }
+  });
+
+  Object.defineProperty(Component.prototype, "GridRow", {
+    get: function() { return this._state.gridRow; },
+    set: function(value) { this._setState("gridRow", value); }
+  });
+
+  Object.defineProperty(Component.prototype, "ColumnSpan", {
+    get: function() { return this._state.columnSpan; },
+    set: function(value) { this._setState("columnSpan", isNumber(value) && value > 0 ? value : 1); }
+  });
+
+  Object.defineProperty(Component.prototype, "RowSpan", {
+    get: function() { return this._state.rowSpan; },
+    set: function(value) { this._setState("rowSpan", isNumber(value) && value > 0 ? value : 1); }
+  });
+
   Object.defineProperty(Component.prototype, "Dock", {
     get: function() { return this._state.dock || "none"; },
     set: function(value) {
@@ -552,6 +618,8 @@
     this._domNode.style.position = this._usesFlowLayout() ? "" : "absolute";
     this._domNode.style.left = this._usesFlowLayout() ? "" : toCssPixels(nextState.left);
     this._domNode.style.top = this._usesFlowLayout() ? "" : toCssPixels(nextState.top);
+    this._domNode.style.gridColumn = nextState.gridColumn != null ? String(nextState.gridColumn) + " / span " + (nextState.columnSpan || 1) : "";
+    this._domNode.style.gridRow = nextState.gridRow != null ? String(nextState.gridRow) + " / span " + (nextState.rowSpan || 1) : "";
     if ("disabled" in this._domNode) {
       this._domNode.disabled = !nextState.enabled;
     }
@@ -882,6 +950,58 @@
     set: function(value) { this._setState("title", value == null ? "" : String(value)); }
   });
 
+  function Grid() {
+    Container.call(this, "Grid");
+    this._state.columns = "1fr";
+    this._state.rows = "";
+    this._state.columnGap = 12;
+    this._state.rowGap = 12;
+  }
+
+  Grid.prototype = Object.create(Container.prototype);
+  Grid.prototype.constructor = Grid;
+
+  Grid.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("div");
+    node.className = "jog-control jog-grid-panel";
+    return node;
+  };
+
+  Grid.prototype._applyStateToDom = function(prevState, nextState) {
+    Container.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (!this._domNode) {
+      return;
+    }
+    this._domNode.style.gridTemplateColumns = toGridTrackList(nextState.columns, "1fr");
+    this._domNode.style.gridTemplateRows = toGridTrackList(nextState.rows, "");
+    this._domNode.style.columnGap = toCssPixels(nextState.columnGap);
+    this._domNode.style.rowGap = toCssPixels(nextState.rowGap);
+  };
+
+  Grid.prototype._childUsesFlowLayout = function() {
+    return true;
+  };
+
+  Object.defineProperty(Grid.prototype, "Columns", {
+    get: function() { return this._state.columns; },
+    set: function(value) { this._setState("columns", value); }
+  });
+
+  Object.defineProperty(Grid.prototype, "Rows", {
+    get: function() { return this._state.rows; },
+    set: function(value) { this._setState("rows", value); }
+  });
+
+  Object.defineProperty(Grid.prototype, "ColumnGap", {
+    get: function() { return this._state.columnGap; },
+    set: function(value) { this._setState("columnGap", isNumber(value) ? value : 12); }
+  });
+
+  Object.defineProperty(Grid.prototype, "RowGap", {
+    get: function() { return this._state.rowGap; },
+    set: function(value) { this._setState("rowGap", isNumber(value) ? value : 12); }
+  });
+
   function Label() {
     Control.call(this, "Label");
   }
@@ -1114,6 +1234,85 @@
     });
   };
 
+  function RadioButton() {
+    Control.call(this, "RadioButton");
+    this._state.checked = false;
+    this._state.groupName = "";
+    this._state.value = "";
+  }
+
+  RadioButton.prototype = Object.create(Control.prototype);
+  RadioButton.prototype.constructor = RadioButton;
+
+  RadioButton.prototype._createDomNode = function(doc) {
+    var wrapper = doc.createElement("label");
+    wrapper.className = "jog-control jog-radio-row";
+
+    var input = doc.createElement("input");
+    input.type = "radio";
+    input.className = "jog-radio";
+
+    var text = doc.createElement("span");
+
+    wrapper.appendChild(input);
+    wrapper.appendChild(text);
+
+    this._inputNode = input;
+    this._captionNode = text;
+    return wrapper;
+  };
+
+  RadioButton.prototype._applyStateToDom = function(prevState, nextState) {
+    Control.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (!this._domNode) {
+      return;
+    }
+    this._inputNode.name = nextState.groupName || "";
+    this._inputNode.value = nextState.value || "";
+    this._inputNode.checked = !!nextState.checked;
+    this._inputNode.disabled = !nextState.enabled;
+    this._captionNode.textContent = nextState.text || "";
+  };
+
+  RadioButton.prototype._bindDomEvents = function() {
+    var control = this;
+    this._inputNode.addEventListener("change", function(event) {
+      control._state.checked = !!event.target.checked;
+      control._raiseEvent("Change", event, { Value: event.target.value });
+      control._previousState = cloneState(control._state);
+    });
+  };
+
+  Object.defineProperty(RadioButton.prototype, "Checked", {
+    get: function() { return !!this._state.checked; },
+    set: function(value) { this._setState("checked", !!value); }
+  });
+
+  Object.defineProperty(RadioButton.prototype, "GroupName", {
+    get: function() { return this._state.groupName; },
+    set: function(value) { this._setState("groupName", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(RadioButton.prototype, "Value", {
+    get: function() { return this._state.value; },
+    set: function(value) { this._setState("value", value == null ? "" : String(value)); }
+  });
+
+  RadioButton.prototype.BindSelectedValue = function(store, key) {
+    var control = this;
+    var listener = function(value) {
+      control.Checked = (String(value) === String(control.Value));
+    };
+    var unsubscribe = store.Subscribe(key, listener);
+    this._bindings.push({ unsubscribe: unsubscribe });
+    listener(store.Get(key));
+    this.Change(function(eventArgs) {
+      if (control.Checked || eventArgs.Value === control.Value) {
+        store.Set(key, control.Value);
+      }
+    });
+  };
+
   function DropDownList() {
     Control.call(this, "DropDownList");
     this._state.options = [];
@@ -1187,12 +1386,96 @@
     });
   };
 
+  function ListBox() {
+    Control.call(this, "ListBox");
+    this._state.options = [];
+    this._state.selectedValue = "";
+    this._state.size = 5;
+  }
+
+  ListBox.prototype = Object.create(Control.prototype);
+  ListBox.prototype.constructor = ListBox;
+
+  ListBox.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("select");
+    node.className = "jog-control jog-listbox";
+    node.size = 5;
+    return node;
+  };
+
+  ListBox.prototype._applyStateToDom = function(prevState, nextState) {
+    Control.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (!this._domNode) {
+      return;
+    }
+
+    var optionsChanged = prevState.options !== nextState.options;
+    if (optionsChanged) {
+      this._domNode.innerHTML = "";
+      ensureArray(nextState.options).forEach(function(option) {
+        var el = document.createElement("option");
+        if (typeof option === "object") {
+          el.value = option.value;
+          el.textContent = option.text;
+        } else {
+          el.value = option;
+          el.textContent = option;
+        }
+        this._domNode.appendChild(el);
+      }, this);
+    }
+
+    this._domNode.size = nextState.size || 5;
+    this._domNode.value = nextState.selectedValue || "";
+    this._domNode.disabled = !nextState.enabled;
+  };
+
+  ListBox.prototype._bindDomEvents = function() {
+    var control = this;
+    this._domNode.addEventListener("change", function(event) {
+      control._state.selectedValue = event.target.value;
+      control._raiseEvent("Change", event, { Value: event.target.value });
+      control._previousState = cloneState(control._state);
+    });
+  };
+
+  Object.defineProperty(ListBox.prototype, "Options", {
+    get: function() { return this._state.options.slice(); },
+    set: function(value) { this._setState("options", ensureArray(value).slice()); }
+  });
+
+  Object.defineProperty(ListBox.prototype, "SelectedValue", {
+    get: function() { return this._state.selectedValue; },
+    set: function(value) { this._setState("selectedValue", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(ListBox.prototype, "SizeRows", {
+    get: function() { return this._state.size; },
+    set: function(value) { this._setState("size", isNumber(value) ? value : 5); }
+  });
+
+  ListBox.prototype.BindSelectedValue = function(store, key) {
+    var control = this;
+    var listener = function(value) {
+      control.SelectedValue = value == null ? "" : String(value);
+    };
+    var unsubscribe = store.Subscribe(key, listener);
+    this._bindings.push({ unsubscribe: unsubscribe });
+    listener(store.Get(key));
+    this.Change(function(eventArgs) {
+      store.Set(key, eventArgs.Value);
+    });
+  };
+
   function Window() {
     Container.call(this, "Window");
     this._state.title = "";
     this._state.modal = false;
     this._state.draggable = true;
     this._state.resizable = false;
+    this._state.closeButtonVisible = true;
+    this._state.closeButtonText = "Close";
+    this._state.closeOnEscape = true;
     this._dragState = null;
     this._contentNode = null;
   }
@@ -1245,10 +1528,14 @@
       return;
     }
     this._titleNode.textContent = nextState.title || "";
+    this._closeNode.textContent = nextState.closeButtonText || "Close";
+    this._closeNode.style.display = nextState.closeButtonVisible ? "" : "none";
     this._domNode.style.left = toCssPixels(nextState.left);
     this._domNode.style.top = toCssPixels(nextState.top);
     this._domNode.style.width = isNumber(nextState.width) ? toCssPixels(nextState.width) : "420px";
     this._domNode.style.height = isNumber(nextState.height) ? toCssPixels(nextState.height) : "";
+    this._domNode.style.minWidth = isNumber(nextState.minWidth) ? toCssPixels(nextState.minWidth) : "";
+    this._domNode.style.minHeight = isNumber(nextState.minHeight) ? toCssPixels(nextState.minHeight) : "";
     this._domNode.style.zIndex = this._runtime.nextWindowZIndex();
     if (nextState.modal && nextState.visible) {
       this._runtime.showModalOverlay();
@@ -1262,6 +1549,12 @@
 
     this._closeNode.addEventListener("click", function() {
       control.Close();
+    });
+
+    this._domNode.addEventListener("keydown", function(event) {
+      if (event.key === "Escape" && control._state.closeOnEscape) {
+        control.Close();
+      }
     });
 
     this._titleBarNode.addEventListener("mousedown", function(event) {
@@ -1336,6 +1629,21 @@
     set: function(value) { this._setState("resizable", !!value); }
   });
 
+  Object.defineProperty(Window.prototype, "CloseButtonVisible", {
+    get: function() { return this._state.closeButtonVisible; },
+    set: function(value) { this._setState("closeButtonVisible", !!value); }
+  });
+
+  Object.defineProperty(Window.prototype, "CloseButtonText", {
+    get: function() { return this._state.closeButtonText; },
+    set: function(value) { this._setState("closeButtonText", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(Window.prototype, "CloseOnEscape", {
+    get: function() { return this._state.closeOnEscape; },
+    set: function(value) { this._setState("closeOnEscape", !!value); }
+  });
+
   Window.prototype.OnClose = function(listener) {
     this._registerEvent("Close", listener);
   };
@@ -1357,6 +1665,7 @@
   JOG.DockPanel = DockPanel;
   JOG.SectionPanel = SectionPanel;
   JOG.StackPanel = StackPanel;
+  JOG.Grid = Grid;
   JOG.Window = Window;
   JOG.Dialog = Dialog;
   JOG.Label = Label;
@@ -1364,7 +1673,9 @@
   JOG.TextBox = TextBox;
   JOG.TextArea = TextArea;
   JOG.CheckBox = CheckBox;
+  JOG.RadioButton = RadioButton;
   JOG.DropDownList = DropDownList;
+  JOG.ListBox = ListBox;
   JOG.Store = Store;
   JOG.EventArgs = EventArgs;
 

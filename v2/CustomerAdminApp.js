@@ -34,6 +34,9 @@
     this.Name = "editCustomerDialog";
     this.Title = "Edit Customer";
     this.SetBounds(260, 100, 440, 360);
+    this.MinWidth = 440;
+    this.MinHeight = 360;
+    this.CloseButtonText = "Done";
 
     var layout = new JOG.StackPanel();
     layout.Name = "editLayout";
@@ -48,6 +51,7 @@
 
     var nameInput = new JOG.TextBox();
     nameInput.Name = "dialogCustomerName";
+    nameInput.MinWidth = 320;
     nameInput.BindText(store, "selectedName");
 
     var statusLabel = new JOG.Label();
@@ -55,6 +59,7 @@
 
     var statusInput = new JOG.TextBox();
     statusInput.Name = "dialogCustomerStatus";
+    statusInput.MinWidth = 320;
     statusInput.BindText(store, "selectedStatus");
 
     var footer = new JOG.StackPanel();
