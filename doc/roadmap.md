@@ -45,6 +45,7 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - `MenuBar`
 - `ToolBar`
 - `StatusBar`
+- `TabControl`
 - `Label`
 - `ValidationMessage`
 - `ValidationSummary`
@@ -123,8 +124,9 @@ No major known runtime gaps remain beyond normal hardening.
 - `MenuBar` exists as a first minimal shell control with flat clickable items
 - `ToolBar` exists as a first minimal shell container for command controls
 - `StatusBar` exists as a first minimal shell container for status content
+- `TabControl` exists as a first minimal tabbed container with explicit `TabPage` children
 - nested menus, accelerators, and keyboard navigation are not implemented yet
-- toolbar overflow, separators, and richer status conventions are not implemented yet
+- toolbar overflow, separators, richer status conventions, closable tabs, and drag reordering are not implemented yet
 
 ### Events
 
@@ -158,7 +160,6 @@ No major known runtime gaps remain beyond normal hardening.
 ## Deferred
 
 - tool bar
-- tab control
 - data grid
 - tree view
 - arbitrary per-control style objects

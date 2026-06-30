@@ -195,6 +195,45 @@ Notes:
 - intended for composing `Label` and other lightweight readout controls
 - segmented regions, resize grips, and richer status conventions are not implemented yet
 
+### `JOG.TabPage`
+
+Extends `JOG.Container`.
+
+Properties:
+
+- `Title`
+- `TabKey`
+
+Notes:
+
+- intended only as a child of `JOG.TabControl`
+- hosts the content for one tab pane
+- child controls use normal flow layout inside the tab page
+
+### `JOG.TabControl`
+
+Extends `JOG.Container`.
+
+Properties:
+
+- `ActiveTab`
+
+Methods:
+
+- `Add(child)`
+- `Remove(child)`
+- `Clear()`
+- `OnTabChange(listener)`
+
+Notes:
+
+- accepts `JOG.TabPage` children only
+- renders one tab button per `TabPage`
+- derives each tab header from `TabPage.Title`, with fallback to `Name`
+- uses `TabPage.TabKey` or `Name` to identify the active tab
+- hides inactive tab pages
+- closable tabs, drag reordering, overflow handling, and docking behavior are not implemented yet
+
 ## Base Types
 
 ### `JOG.Component`

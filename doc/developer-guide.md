@@ -26,7 +26,7 @@ Implemented public surface in `v2/JOG.js`:
 - application runtime: `Application`, `Page`
 - base types: `Component`, `Control`, `Container`
 - layout containers: `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, `Grid`
-- shell controls: `MenuBar`, `ToolBar`, `StatusBar`
+- shell controls: `MenuBar`, `ToolBar`, `StatusBar`, `TabControl`, `TabPage`
 - windows: `Window`, `Dialog`
 - controls: `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
 - state: `Store`
@@ -191,6 +191,7 @@ JOG now includes a first minimal shell control:
 - `MenuBar`
 - `ToolBar`
 - `StatusBar`
+- `TabControl`
 
 `MenuBar` is a horizontal command strip for page-level application chrome. The current implementation is intentionally narrow:
 
@@ -227,6 +228,35 @@ menuBar.OnItemClick(function(args) {
 - uses flow layout for its children
 - provides shell styling for footer-style status content
 - does not yet implement grip areas, segmented regions, or automatic spring spacing
+
+`TabControl` is a page-region container for switching between multiple child panels. The current implementation uses explicit `TabPage` children rather than a loose item array:
+
+- `TabControl` hosts `TabPage` children only
+- each `TabPage` can define `Title` and `TabKey`
+- `ActiveTab` selects the visible page
+- `OnTabChange(listener)` reports user tab switches
+- inactive pages are hidden cleanly
+- closable tabs, drag reordering, overflow handling, and nested docking behavior are not implemented yet
+
+Example:
+
+```js
+var tabs = new JOG.TabControl();
+
+var detailsTab = new JOG.TabPage();
+detailsTab.TabKey = "details";
+detailsTab.Title = "Details";
+detailsTab.Add(detailsLayout);
+
+var activityTab = new JOG.TabPage();
+activityTab.TabKey = "activity";
+activityTab.Title = "Activity";
+activityTab.Add(activityLayout);
+
+tabs.Add(detailsTab);
+tabs.Add(activityTab);
+tabs.ActiveTab = "details";
+```
 
 ## Diagnostics
 
