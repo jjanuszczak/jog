@@ -127,6 +127,74 @@ Notes:
 - direct child controls use normal flow layout by default
 - `Window` and `Dialog` remain absolutely positioned when added directly to a page
 
+### `JOG.MenuBar`
+
+Extends `JOG.Control`.
+
+Properties:
+
+- `Items`
+
+Events:
+
+- `OnItemClick(listener)`
+
+Item shape supported now:
+
+- `key`
+- `text`
+- `enabled`
+
+Notes:
+
+- renders a horizontal strip of menu buttons
+- `Items` also accepts an array of strings, which become menu items with generated keys
+- click events expose the selected item through `args.Key` and `args.Value`
+- disabled items render but do not emit click events
+- nested submenus, keyboard navigation, and accelerators are not implemented yet
+
+### `JOG.ToolBar`
+
+Extends `JOG.Container`.
+
+Properties:
+
+- inherited container and component properties
+
+Methods:
+
+- `Add(child)`
+- `Remove(child)`
+- `Clear()`
+
+Notes:
+
+- renders a horizontal shell container for command controls
+- child controls use normal flow layout inside the toolbar
+- intended for composing `Button`, `Label`, and future command widgets
+- overflow handling, separators, and richer command metadata are not implemented yet
+
+### `JOG.StatusBar`
+
+Extends `JOG.Container`.
+
+Properties:
+
+- inherited container and component properties
+
+Methods:
+
+- `Add(child)`
+- `Remove(child)`
+- `Clear()`
+
+Notes:
+
+- renders a horizontal shell container for status content
+- child controls use normal flow layout inside the status bar
+- intended for composing `Label` and other lightweight readout controls
+- segmented regions, resize grips, and richer status conventions are not implemented yet
+
 ## Base Types
 
 ### `JOG.Component`

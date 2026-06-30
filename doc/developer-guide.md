@@ -26,6 +26,7 @@ Implemented public surface in `v2/JOG.js`:
 - application runtime: `Application`, `Page`
 - base types: `Component`, `Control`, `Container`
 - layout containers: `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, `Grid`
+- shell controls: `MenuBar`, `ToolBar`, `StatusBar`
 - windows: `Window`, `Dialog`
 - controls: `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
 - state: `Store`
@@ -182,6 +183,50 @@ Every control is a JavaScript object with internal state. State changes do not w
 4. each control applies current state to its DOM node
 
 This is the core architectural shift from V1. It separates control state from direct DOM mutation.
+
+## Shell Controls
+
+JOG now includes a first minimal shell control:
+
+- `MenuBar`
+- `ToolBar`
+- `StatusBar`
+
+`MenuBar` is a horizontal command strip for page-level application chrome. The current implementation is intentionally narrow:
+
+- items are provided through `menuBar.Items`
+- each item supports `key`, `text`, and `enabled`
+- click handling is exposed through `menuBar.OnItemClick(listener)`
+- nested menus, keyboard shortcuts, and dropdown popouts are not implemented yet
+
+Example:
+
+```js
+var menuBar = new JOG.MenuBar();
+menuBar.Items = [
+  { key: "file", text: "File" },
+  { key: "view", text: "View" },
+  { key: "help", text: "Help" }
+];
+
+menuBar.OnItemClick(function(args) {
+  console.log("Menu clicked:", args.Key);
+});
+```
+
+`ToolBar` is a horizontal container for existing controls such as buttons, labels, and future command widgets. The current implementation:
+
+- hosts ordinary JOG child controls directly
+- uses flow layout for its children
+- provides shell styling for command rows
+- does not yet implement overflow handling, separators, or icon conventions
+
+`StatusBar` is a horizontal container for low-priority application state and readouts. The current implementation:
+
+- hosts ordinary JOG child controls directly
+- uses flow layout for its children
+- provides shell styling for footer-style status content
+- does not yet implement grip areas, segmented regions, or automatic spring spacing
 
 ## Diagnostics
 

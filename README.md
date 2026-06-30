@@ -16,7 +16,7 @@ The active implementation is `v2/`.
 JOG V2 is functional and actively evolving. It already includes:
 
 - application and page bootstrapping
-- controls such as `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, and `ListBox`
+- controls such as `MenuBar`, `ToolBar`, `StatusBar`, `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, and `ListBox`
 - layout containers such as `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, and `Grid`
 - breakpoint-aware responsive overrides for `Grid`
 - responsive layout helpers for `StackPanel` and `DockPanel`
@@ -63,7 +63,7 @@ Open these files directly in a browser:
 What they cover:
 
 - `hello-world.html`: the smallest runnable JOG app, one page and one label
-- `example.html`: small runtime sanity check, default-versus-custom theme switching, stacked modal dialogs, resize behavior
+- `example.html`: small runtime sanity check, first `MenuBar`, `ToolBar`, and `StatusBar` usage, default-versus-custom theme switching, stacked modal dialogs, resize behavior
 - `customer-admin.html`: CRUD-style page shell with shared inline and dialog validation
 - `form-demo.html`: form layout, responsive grid collapse, explicit store binding, reusable validation summary wiring, inline errors, radio-group invalid state
 - `opportunity-board.html`: CRM-style opportunity rows with add, edit, delete, modal record editing, a responsive editor form, and a responsive board shell

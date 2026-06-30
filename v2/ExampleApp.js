@@ -154,6 +154,48 @@
     var helper = new JOG.Label();
     helper.Text = "Edit the customer name below, switch themes, then open the customer window and audit window to verify modal stacking under the active theme.";
 
+    var menuStatus = new JOG.Label();
+    menuStatus.Text = "Last menu action: none";
+
+    var shellStatus = new JOG.Label();
+    shellStatus.Text = "Dialogs ready";
+
+    var menuBar = new JOG.MenuBar();
+    menuBar.Name = "exampleMenuBar";
+    menuBar.Items = [
+      { key: "file", text: "File" },
+      { key: "view", text: "View" },
+      { key: "help", text: "Help" }
+    ];
+    menuBar.OnItemClick(function(args) {
+      menuStatus.Text = "Last menu action: " + args.Key;
+    });
+
+    var toolBar = new JOG.ToolBar();
+    toolBar.Name = "exampleToolBar";
+
+    var resetToolbarButton = new JOG.Button();
+    resetToolbarButton.Text = "Reset Theme";
+    resetToolbarButton.OnClick(function() {
+      JOG.SetTheme(defaultTheme);
+      menuStatus.Text = "Last menu action: toolbar-reset-theme";
+    });
+
+    var openToolbarDialogButton = new JOG.Button();
+    openToolbarDialogButton.Text = "Open Dialog";
+    openToolbarDialogButton.OnClick(function() {
+      customerWindow.ShowModal();
+      menuStatus.Text = "Last menu action: toolbar-open-dialog";
+    });
+
+    toolBar.Add(resetToolbarButton);
+    toolBar.Add(openToolbarDialogButton);
+
+    var statusBar = new JOG.StatusBar();
+    statusBar.Name = "exampleStatusBar";
+    statusBar.Add(menuStatus);
+    statusBar.Add(shellStatus);
+
     var themeRow = new JOG.StackPanel();
     themeRow.Name = "themeRow";
     themeRow.Orientation = "horizontal";
@@ -213,25 +255,31 @@
 
     openWindow.OnClick(function() {
       customerWindow.ShowModal();
+      shellStatus.Text = "Customer dialog open";
     });
 
     openAuditWindow.OnClick(function() {
       auditWindow.ShowModal();
+      shellStatus.Text = "Audit dialog open";
     });
 
     openStackedFlow.OnClick(function() {
       customerWindow.ShowModal();
       auditWindow.ShowModal();
+      shellStatus.Text = "Stacked dialogs open";
     });
 
     pageLayout.Add(hero);
     pageLayout.Add(helper);
+    pageLayout.Add(menuBar);
+    pageLayout.Add(toolBar);
     pageLayout.Add(themeRow);
     pageLayout.Add(customerName);
     pageLayout.Add(preview);
     pageLayout.Add(openWindow);
     pageLayout.Add(openAuditWindow);
     pageLayout.Add(openStackedFlow);
+    pageLayout.Add(statusBar);
 
     this.Add(pageSection);
     this.Add(customerWindow);

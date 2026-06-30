@@ -42,6 +42,9 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 
 ### Controls
 
+- `MenuBar`
+- `ToolBar`
+- `StatusBar`
 - `Label`
 - `ValidationMessage`
 - `ValidationSummary`
@@ -115,6 +118,14 @@ No major known runtime gaps remain beyond normal hardening.
 - `DockPanel` now supports responsive shell and child layout changes through inherited `ResponsiveLayout`
 - `SectionPanel` still has no dedicated responsive helper surface
 
+### Shell Controls
+
+- `MenuBar` exists as a first minimal shell control with flat clickable items
+- `ToolBar` exists as a first minimal shell container for command controls
+- `StatusBar` exists as a first minimal shell container for status content
+- nested menus, accelerators, and keyboard navigation are not implemented yet
+- toolbar overflow, separators, and richer status conventions are not implemented yet
+
 ### Events
 
 - shorthand aliases still exist alongside the preferred `OnX` style
@@ -146,9 +157,7 @@ No major known runtime gaps remain beyond normal hardening.
 
 ## Deferred
 
-- menu bar
 - tool bar
-- status bar
 - tab control
 - data grid
 - tree view
