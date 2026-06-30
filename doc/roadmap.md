@@ -15,6 +15,8 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - store subscription cleanup during control disposal
 - modal overlay support
 - window z-order management
+- base document style reset for full-viewport page rendering
+- page-level flow layout for direct child controls, with windows and dialogs remaining absolute
 - control-level invalid state and error text
 - application diagnostics with debug logging and tree dump
 - public theme API with global and per-application token overrides
@@ -40,6 +42,9 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 
 ### Controls
 
+- `MenuBar`
+- `ToolBar`
+- `StatusBar`
 - `Label`
 - `ValidationMessage`
 - `ValidationSummary`
@@ -82,6 +87,7 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 
 ### Example Apps
 
+- bare-bones hello world example
 - simple example app
 - customer admin example
 - form demo with grid layout
@@ -111,6 +117,14 @@ No major known runtime gaps remain beyond normal hardening.
 - `StackPanel` now has breakpoint-based orientation and spacing overrides
 - `DockPanel` now supports responsive shell and child layout changes through inherited `ResponsiveLayout`
 - `SectionPanel` still has no dedicated responsive helper surface
+
+### Shell Controls
+
+- `MenuBar` exists as a first minimal shell control with flat clickable items
+- `ToolBar` exists as a first minimal shell container for command controls
+- `StatusBar` exists as a first minimal shell container for status content
+- nested menus, accelerators, and keyboard navigation are not implemented yet
+- toolbar overflow, separators, and richer status conventions are not implemented yet
 
 ### Events
 
@@ -143,9 +157,7 @@ No major known runtime gaps remain beyond normal hardening.
 
 ## Deferred
 
-- menu bar
 - tool bar
-- status bar
 - tab control
 - data grid
 - tree view

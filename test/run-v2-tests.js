@@ -1331,6 +1331,87 @@ function testDebugTopicsFilterRuntimeLogs() {
   assert(capturedLogs[0].indexOf("[JOG][Event]") >= 0, "DebugTopics should keep matching event logs.");
 }
 
+function testMenuBarRendersItemsAndRaisesClickEvents() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var menuBar = new JOG.MenuBar();
+  var capturedKey = null;
+
+  menuBar.Items = [
+    { key: "file", text: "File" },
+    { key: "edit", text: "Edit", enabled: false },
+    { key: "help", text: "Help" }
+  ];
+  menuBar.OnItemClick(function(args) {
+    capturedKey = args.Key;
+  });
+
+  page.Add(menuBar);
+  app.Run(page);
+
+  assertEqual(menuBar._itemNodes.length, 3, "MenuBar should render one button per item.");
+  assertEqual(menuBar._itemNodes[0].textContent, "File", "MenuBar should render item text.");
+  assertEqual(menuBar._itemNodes[1].disabled, true, "MenuBar should disable disabled items.");
+
+  dispatchNodeClick(menuBar._itemNodes[0]);
+  assertEqual(capturedKey, "file", "MenuBar should raise item click events with the item key.");
+}
+
+function testToolBarUsesFlowLayoutForChildControls() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var toolBar = new JOG.ToolBar();
+  var button = new JOG.Button();
+
+  button.Text = "Run";
+  toolBar.Add(button);
+  page.Add(toolBar);
+  app.Run(page);
+
+  assertEqual(button._domNode.style.position, "", "ToolBar children should use flow layout.");
+  assert(button._domNode.parentNode === toolBar._domNode, "ToolBar should host child controls directly.");
+}
+
+function testStatusBarUsesFlowLayoutForChildControls() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var statusBar = new JOG.StatusBar();
+  var label = new JOG.Label();
+
+  label.Text = "Ready";
+  statusBar.Add(label);
+  page.Add(statusBar);
+  app.Run(page);
+
+  assertEqual(label._domNode.style.position, "", "StatusBar children should use flow layout.");
+  assert(label._domNode.parentNode === statusBar._domNode, "StatusBar should host child controls directly.");
+}
+
+function testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var label = new JOG.Label();
+  var win = new JOG.Window();
+
+  label.Name = "flowLabel";
+  label.Text = "Hello world from JOG.";
+
+  win.Name = "floatingWindow";
+  win.Title = "Floating";
+  win.SetBounds(40, 30, 320, 180);
+
+  page.Add(label);
+  page.Add(win);
+  app.Run(page);
+
+  assertEqual(label._domNode.style.position, "", "Direct page labels should use flow layout.");
+  assertEqual(win._domNode.style.position, "absolute", "Windows on a page should remain absolutely positioned.");
+}
+
 var tests = [
   { name: "store subscribe and unsubscribe", fn: testStoreSubscribeAndUnsubscribe },
   { name: "container rejects duplicate child names", fn: testContainerRejectsDuplicateChildNames },
@@ -1361,7 +1442,11 @@ var tests = [
   { name: "form demo validation and reset integration flow", fn: testFormDemoValidationAndResetIntegrationFlow },
   { name: "customer admin selection and dialog close paths", fn: testCustomerAdminSelectionAndDialogClosePaths },
   { name: "runtime formats event errors clearly", fn: testRuntimeFormatsEventErrorsClearly },
-  { name: "debug topics filter runtime logs", fn: testDebugTopicsFilterRuntimeLogs }
+  { name: "debug topics filter runtime logs", fn: testDebugTopicsFilterRuntimeLogs },
+  { name: "menu bar renders items and raises click events", fn: testMenuBarRendersItemsAndRaisesClickEvents },
+  { name: "tool bar uses flow layout for child controls", fn: testToolBarUsesFlowLayoutForChildControls },
+  { name: "status bar uses flow layout for child controls", fn: testStatusBarUsesFlowLayoutForChildControls },
+  { name: "page direct children use flow layout while windows remain absolute", fn: testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute }
 ];
 
 var failed = 0;

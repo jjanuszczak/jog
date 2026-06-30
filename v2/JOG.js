@@ -353,6 +353,27 @@
     return Object.keys(copy).length > 0 ? copy : null;
   }
 
+  function cloneMenuItems(items) {
+    return ensureArray(items).map(function(item, index) {
+      var normalized;
+
+      if (typeof item === "string") {
+        return {
+          key: "item-" + index,
+          text: item,
+          enabled: true
+        };
+      }
+
+      normalized = isPlainObject(item) ? item : {};
+      return {
+        key: normalized.key != null && normalized.key !== "" ? String(normalized.key) : "item-" + index,
+        text: normalized.text != null ? String(normalized.text) : "",
+        enabled: normalized.enabled !== false
+      };
+    });
+  }
+
   function themeVariablesFromTheme(theme) {
     return {
       "--jog-app-background": theme.colors.appBackground,
@@ -1014,12 +1035,19 @@
     var style = document.createElement("style");
     style.type = "text/css";
     style.textContent = [
+      "html, body { margin: 0; padding: 0; min-height: 100%; }",
       ".jog-root { position: relative; min-height: 100vh; font-family: var(--jog-font-family); font-size: var(--jog-font-size); background: var(--jog-app-background); color: var(--jog-text-strong); padding: var(--jog-page-padding); }",
       ".jog-page { position: relative; min-height: 100%; }",
       ".jog-control { box-sizing: border-box; }",
       ".jog-panel { position: relative; }",
       ".jog-dock-panel { position: relative; min-height: 100%; min-width: 100%; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-shell); box-shadow: var(--jog-shadow-shell); overflow: hidden; }",
       ".jog-stack-panel { position: relative; display: flex; }",
+      ".jog-menu-bar { position: relative; display: flex; align-items: center; gap: 4px; padding: 6px; background: var(--jog-surface-muted); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); }",
+      ".jog-menu-bar-button { border: 0; background: transparent; color: var(--jog-text); border-radius: calc(var(--jog-radius-control) - 2px); padding: 8px 10px; cursor: pointer; font-size: var(--jog-font-size); line-height: var(--jog-line-height); }",
+      ".jog-menu-bar-button:hover { background: rgba(15, 23, 42, 0.06); }",
+      ".jog-menu-bar-button:disabled { opacity: 0.5; cursor: default; }",
+      ".jog-tool-bar { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); box-shadow: var(--jog-shadow-section); }",
+      ".jog-status-bar { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 10px; background: var(--jog-surface-muted); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); color: var(--jog-text-muted); }",
       ".jog-stack-panel.vertical { flex-direction: column; }",
       ".jog-stack-panel.horizontal { flex-direction: row; align-items: center; }",
       ".jog-fill-width { width: 100%; }",
@@ -1687,6 +1715,10 @@
     return this._domNode;
   };
 
+  Page.prototype._childUsesFlowLayout = function() {
+    return true;
+  };
+
   Object.defineProperty(Page.prototype, "Title", {
     get: function() { return this._state.title; },
     set: function(value) { this._setState("title", value == null ? "" : String(value)); }
@@ -1858,6 +1890,97 @@
     get: function() { return this._state.responsive; },
     set: function(value) { this._setState("responsive", cloneResponsiveConfig(value, normalizeResponsiveStackBreakpoint)); }
   });
+
+  function MenuBar() {
+    Control.call(this, "MenuBar");
+    this._state.items = [];
+    this._itemNodes = [];
+  }
+
+  MenuBar.prototype = Object.create(Control.prototype);
+  MenuBar.prototype.constructor = MenuBar;
+
+  MenuBar.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("div");
+    node.className = "jog-control jog-menu-bar";
+    return node;
+  };
+
+  MenuBar.prototype._applyStateToDom = function(prevState, nextState) {
+    var control = this;
+
+    Control.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (!this._domNode || !this._runtime || !this._runtime.document) {
+      return;
+    }
+
+    while (this._domNode.children.length) {
+      this._domNode.removeChild(this._domNode.children[0]);
+    }
+    this._itemNodes = [];
+
+    ensureArray(nextState.items).forEach(function(item) {
+      var button = control._runtime.document.createElement("button");
+      button.className = "jog-menu-bar-button";
+      button.type = "button";
+      button.textContent = item.text;
+      button.disabled = item.enabled === false;
+      button.addEventListener("click", function(event) {
+        if (item.enabled === false) {
+          return;
+        }
+        control._raiseEvent("ItemClick", event, {
+          Key: item.key,
+          Value: item
+        });
+      });
+      control._domNode.appendChild(button);
+      control._itemNodes.push(button);
+    });
+  };
+
+  MenuBar.prototype.OnItemClick = function(listener) {
+    this._registerEvent("ItemClick", listener);
+  };
+
+  Object.defineProperty(MenuBar.prototype, "Items", {
+    get: function() { return cloneMenuItems(this._state.items); },
+    set: function(value) { this._setState("items", cloneMenuItems(value)); }
+  });
+
+  function ToolBar() {
+    Container.call(this, "ToolBar");
+  }
+
+  ToolBar.prototype = Object.create(Container.prototype);
+  ToolBar.prototype.constructor = ToolBar;
+
+  ToolBar.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("div");
+    node.className = "jog-control jog-tool-bar";
+    return node;
+  };
+
+  ToolBar.prototype._childUsesFlowLayout = function() {
+    return true;
+  };
+
+  function StatusBar() {
+    Container.call(this, "StatusBar");
+  }
+
+  StatusBar.prototype = Object.create(Container.prototype);
+  StatusBar.prototype.constructor = StatusBar;
+
+  StatusBar.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("div");
+    node.className = "jog-control jog-status-bar";
+    return node;
+  };
+
+  StatusBar.prototype._childUsesFlowLayout = function() {
+    return true;
+  };
 
   function SectionPanel() {
     Container.call(this, "SectionPanel");
@@ -2617,6 +2740,10 @@
     return this._contentNode || this._domNode;
   };
 
+  Window.prototype._usesFlowLayout = function() {
+    return false;
+  };
+
   Window.prototype._applyStateToDom = function(prevState, nextState) {
     Container.prototype._applyStateToDom.call(this, prevState, nextState);
     if (!this._domNode) {
@@ -2864,8 +2991,11 @@
   JOG.Page = Page;
   JOG.Panel = Panel;
   JOG.DockPanel = DockPanel;
-  JOG.SectionPanel = SectionPanel;
   JOG.StackPanel = StackPanel;
+  JOG.MenuBar = MenuBar;
+  JOG.ToolBar = ToolBar;
+  JOG.StatusBar = StatusBar;
+  JOG.SectionPanel = SectionPanel;
   JOG.Grid = Grid;
   JOG.Window = Window;
   JOG.Dialog = Dialog;

@@ -26,6 +26,7 @@ Implemented public surface in `v2/JOG.js`:
 - application runtime: `Application`, `Page`
 - base types: `Component`, `Control`, `Container`
 - layout containers: `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, `Grid`
+- shell controls: `MenuBar`, `ToolBar`, `StatusBar`
 - windows: `Window`, `Dialog`
 - controls: `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
 - state: `Store`
@@ -39,6 +40,7 @@ Test entrypoint:
 
 Example apps:
 
+- [v2/hello-world.html](../v2/hello-world.html)
 - [v2/example.html](../v2/example.html)
 - [v2/customer-admin.html](../v2/customer-admin.html)
 - [v2/form-demo.html](../v2/form-demo.html)
@@ -68,6 +70,27 @@ app.Run(page);
 `Application.Run(page)` attaches the runtime to `document.body`, injects framework styles, attaches the page to the runtime, marks the page dirty, and flushes the initial render.
 
 `Page` is the root container. It also sets `document.title` from `page.Title`.
+
+When the application starts, JOG also resets the browser's default document margin and padding so the page root can own the full viewport surface consistently.
+
+Direct children added to `Page` now use normal flow layout by default. That means a plain `Label`, `Button`, or `SectionPanel` added directly to the page will render like a normal block in document flow. `Window` and `Dialog` still render with absolute positioning so desktop-style floating surfaces continue to work.
+
+Smallest runnable example in this repo:
+
+```js
+var app = new JOG.Application();
+var page = new JOG.Page();
+var helloLabel = new JOG.Label();
+
+page.Title = "Hello World";
+helloLabel.Text = "Hello world from JOG.";
+
+page.Add(helloLabel);
+
+app.Run(page);
+```
+
+See [v2/HelloWorldApp.js](../v2/HelloWorldApp.js) and [v2/hello-world.html](../v2/hello-world.html).
 
 ## Theme Model
 
@@ -160,6 +183,50 @@ Every control is a JavaScript object with internal state. State changes do not w
 4. each control applies current state to its DOM node
 
 This is the core architectural shift from V1. It separates control state from direct DOM mutation.
+
+## Shell Controls
+
+JOG now includes a first minimal shell control:
+
+- `MenuBar`
+- `ToolBar`
+- `StatusBar`
+
+`MenuBar` is a horizontal command strip for page-level application chrome. The current implementation is intentionally narrow:
+
+- items are provided through `menuBar.Items`
+- each item supports `key`, `text`, and `enabled`
+- click handling is exposed through `menuBar.OnItemClick(listener)`
+- nested menus, keyboard shortcuts, and dropdown popouts are not implemented yet
+
+Example:
+
+```js
+var menuBar = new JOG.MenuBar();
+menuBar.Items = [
+  { key: "file", text: "File" },
+  { key: "view", text: "View" },
+  { key: "help", text: "Help" }
+];
+
+menuBar.OnItemClick(function(args) {
+  console.log("Menu clicked:", args.Key);
+});
+```
+
+`ToolBar` is a horizontal container for existing controls such as buttons, labels, and future command widgets. The current implementation:
+
+- hosts ordinary JOG child controls directly
+- uses flow layout for its children
+- provides shell styling for command rows
+- does not yet implement overflow handling, separators, or icon conventions
+
+`StatusBar` is a horizontal container for low-priority application state and readouts. The current implementation:
+
+- hosts ordinary JOG child controls directly
+- uses flow layout for its children
+- provides shell styling for footer-style status content
+- does not yet implement grip areas, segmented regions, or automatic spring spacing
 
 ## Diagnostics
 
