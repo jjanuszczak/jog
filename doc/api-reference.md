@@ -50,6 +50,7 @@ Properties:
 Notes:
 
 - `Run(page)` attaches to `document.body` and performs the first render.
+- `Run(page)` also injects the base document reset used by the runtime, including zeroing the default browser body margin and padding
 - `Debug = true` enables runtime console logging for dirty queue activity, lifecycle work, and event dispatch
 - `DebugTopics` optionally filters debug output to selected categories such as `event`, `lifecycle`, `dirty`, and `flush`
 - `Theme` accepts a partial theme object that overrides the global JOG theme for that application only
@@ -123,6 +124,8 @@ Notes:
 
 - root app container
 - updates `document.title`
+- direct child controls use normal flow layout by default
+- `Window` and `Dialog` remain absolutely positioned when added directly to a page
 
 ## Base Types
 

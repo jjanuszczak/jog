@@ -1014,6 +1014,7 @@
     var style = document.createElement("style");
     style.type = "text/css";
     style.textContent = [
+      "html, body { margin: 0; padding: 0; min-height: 100%; }",
       ".jog-root { position: relative; min-height: 100vh; font-family: var(--jog-font-family); font-size: var(--jog-font-size); background: var(--jog-app-background); color: var(--jog-text-strong); padding: var(--jog-page-padding); }",
       ".jog-page { position: relative; min-height: 100%; }",
       ".jog-control { box-sizing: border-box; }",
@@ -1685,6 +1686,10 @@
 
   Page.prototype._getChildHostNode = function() {
     return this._domNode;
+  };
+
+  Page.prototype._childUsesFlowLayout = function() {
+    return true;
   };
 
   Object.defineProperty(Page.prototype, "Title", {
@@ -2615,6 +2620,10 @@
 
   Window.prototype._getChildHostNode = function() {
     return this._contentNode || this._domNode;
+  };
+
+  Window.prototype._usesFlowLayout = function() {
+    return false;
   };
 
   Window.prototype._applyStateToDom = function(prevState, nextState) {

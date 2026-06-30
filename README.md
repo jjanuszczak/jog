@@ -54,6 +54,7 @@ The developer guide explains the runtime model. The API reference documents what
 
 Open these files directly in a browser:
 
+- [v2/hello-world.html](v2/hello-world.html)
 - [v2/example.html](v2/example.html)
 - [v2/customer-admin.html](v2/customer-admin.html)
 - [v2/form-demo.html](v2/form-demo.html)
@@ -61,6 +62,7 @@ Open these files directly in a browser:
 
 What they cover:
 
+- `hello-world.html`: the smallest runnable JOG app, one page and one label
 - `example.html`: small runtime sanity check, default-versus-custom theme switching, stacked modal dialogs, resize behavior
 - `customer-admin.html`: CRUD-style page shell with shared inline and dialog validation
 - `form-demo.html`: form layout, responsive grid collapse, explicit store binding, reusable validation summary wiring, inline errors, radio-group invalid state

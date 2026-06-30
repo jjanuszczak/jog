@@ -39,6 +39,7 @@ Test entrypoint:
 
 Example apps:
 
+- [v2/hello-world.html](../v2/hello-world.html)
 - [v2/example.html](../v2/example.html)
 - [v2/customer-admin.html](../v2/customer-admin.html)
 - [v2/form-demo.html](../v2/form-demo.html)
@@ -68,6 +69,27 @@ app.Run(page);
 `Application.Run(page)` attaches the runtime to `document.body`, injects framework styles, attaches the page to the runtime, marks the page dirty, and flushes the initial render.
 
 `Page` is the root container. It also sets `document.title` from `page.Title`.
+
+When the application starts, JOG also resets the browser's default document margin and padding so the page root can own the full viewport surface consistently.
+
+Direct children added to `Page` now use normal flow layout by default. That means a plain `Label`, `Button`, or `SectionPanel` added directly to the page will render like a normal block in document flow. `Window` and `Dialog` still render with absolute positioning so desktop-style floating surfaces continue to work.
+
+Smallest runnable example in this repo:
+
+```js
+var app = new JOG.Application();
+var page = new JOG.Page();
+var helloLabel = new JOG.Label();
+
+page.Title = "Hello World";
+helloLabel.Text = "Hello world from JOG.";
+
+page.Add(helloLabel);
+
+app.Run(page);
+```
+
+See [v2/HelloWorldApp.js](../v2/HelloWorldApp.js) and [v2/hello-world.html](../v2/hello-world.html).
 
 ## Theme Model
 

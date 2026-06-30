@@ -1331,6 +1331,28 @@ function testDebugTopicsFilterRuntimeLogs() {
   assert(capturedLogs[0].indexOf("[JOG][Event]") >= 0, "DebugTopics should keep matching event logs.");
 }
 
+function testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var label = new JOG.Label();
+  var win = new JOG.Window();
+
+  label.Name = "flowLabel";
+  label.Text = "Hello world from JOG.";
+
+  win.Name = "floatingWindow";
+  win.Title = "Floating";
+  win.SetBounds(40, 30, 320, 180);
+
+  page.Add(label);
+  page.Add(win);
+  app.Run(page);
+
+  assertEqual(label._domNode.style.position, "", "Direct page labels should use flow layout.");
+  assertEqual(win._domNode.style.position, "absolute", "Windows on a page should remain absolutely positioned.");
+}
+
 var tests = [
   { name: "store subscribe and unsubscribe", fn: testStoreSubscribeAndUnsubscribe },
   { name: "container rejects duplicate child names", fn: testContainerRejectsDuplicateChildNames },
@@ -1361,7 +1383,8 @@ var tests = [
   { name: "form demo validation and reset integration flow", fn: testFormDemoValidationAndResetIntegrationFlow },
   { name: "customer admin selection and dialog close paths", fn: testCustomerAdminSelectionAndDialogClosePaths },
   { name: "runtime formats event errors clearly", fn: testRuntimeFormatsEventErrorsClearly },
-  { name: "debug topics filter runtime logs", fn: testDebugTopicsFilterRuntimeLogs }
+  { name: "debug topics filter runtime logs", fn: testDebugTopicsFilterRuntimeLogs },
+  { name: "page direct children use flow layout while windows remain absolute", fn: testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute }
 ];
 
 var failed = 0;

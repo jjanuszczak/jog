@@ -15,6 +15,8 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - store subscription cleanup during control disposal
 - modal overlay support
 - window z-order management
+- base document style reset for full-viewport page rendering
+- page-level flow layout for direct child controls, with windows and dialogs remaining absolute
 - control-level invalid state and error text
 - application diagnostics with debug logging and tree dump
 - public theme API with global and per-application token overrides
@@ -82,6 +84,7 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 
 ### Example Apps
 
+- bare-bones hello world example
 - simple example app
 - customer admin example
 - form demo with grid layout
