@@ -1048,6 +1048,13 @@
       ".jog-menu-bar-button:disabled { opacity: 0.5; cursor: default; }",
       ".jog-tool-bar { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); box-shadow: var(--jog-shadow-section); }",
       ".jog-status-bar { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 10px; background: var(--jog-surface-muted); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); color: var(--jog-text-muted); }",
+      ".jog-tab-control { position: relative; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-section); box-shadow: var(--jog-shadow-section); overflow: hidden; }",
+      ".jog-tab-header { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 10px 0; background: var(--jog-surface-muted); border-bottom: 1px solid var(--jog-border-soft); }",
+      ".jog-tab-button { border: 1px solid transparent; background: transparent; color: var(--jog-text-muted); border-top-left-radius: var(--jog-radius-control); border-top-right-radius: var(--jog-radius-control); padding: 8px 12px; cursor: pointer; font-size: var(--jog-font-size); line-height: var(--jog-line-height); }",
+      ".jog-tab-button.active { background: var(--jog-surface); color: var(--jog-text); border-color: var(--jog-border-soft); border-bottom-color: var(--jog-surface); }",
+      ".jog-tab-button:disabled { opacity: 0.5; cursor: default; }",
+      ".jog-tab-body { position: relative; padding: 16px; }",
+      ".jog-tab-page { position: relative; }",
       ".jog-stack-panel.vertical { flex-direction: column; }",
       ".jog-stack-panel.horizontal { flex-direction: row; align-items: center; }",
       ".jog-fill-width { width: 100%; }",
@@ -1981,6 +1988,171 @@
   StatusBar.prototype._childUsesFlowLayout = function() {
     return true;
   };
+
+  function TabPage() {
+    Container.call(this, "TabPage");
+    this._state.title = "";
+    this._state.tabKey = "";
+  }
+
+  TabPage.prototype = Object.create(Container.prototype);
+  TabPage.prototype.constructor = TabPage;
+
+  TabPage.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("div");
+    node.className = "jog-control jog-tab-page";
+    return node;
+  };
+
+  TabPage.prototype._childUsesFlowLayout = function() {
+    return true;
+  };
+
+  Object.defineProperty(TabPage.prototype, "Title", {
+    get: function() { return this._state.title; },
+    set: function(value) { this._setState("title", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(TabPage.prototype, "TabKey", {
+    get: function() { return this._state.tabKey; },
+    set: function(value) { this._setState("tabKey", value == null ? "" : String(value)); }
+  });
+
+  function TabControl() {
+    Container.call(this, "TabControl");
+    this._state.activeTab = "";
+    this._headerNode = null;
+    this._bodyNode = null;
+    this._tabButtonNodes = [];
+    this._lastRenderedActiveTab = null;
+  }
+
+  TabControl.prototype = Object.create(Container.prototype);
+  TabControl.prototype.constructor = TabControl;
+
+  TabControl.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("div");
+    var header = doc.createElement("div");
+    var body = doc.createElement("div");
+
+    node.className = "jog-control jog-tab-control";
+    header.className = "jog-tab-header";
+    body.className = "jog-tab-body";
+
+    node.appendChild(header);
+    node.appendChild(body);
+
+    this._headerNode = header;
+    this._bodyNode = body;
+    return node;
+  };
+
+  TabControl.prototype._getChildHostNode = function() {
+    return this._bodyNode || this._domNode;
+  };
+
+  TabControl.prototype._childUsesFlowLayout = function() {
+    return true;
+  };
+
+  TabControl.prototype.Add = function(child) {
+    invariant(!!child && child._typeName === "TabPage", "TabControl only accepts TabPage children.");
+    Container.prototype.Add.call(this, child);
+  };
+
+  TabControl.prototype._getPageKey = function(page, index) {
+    var state = page && page._state ? page._state : {};
+    if (state.tabKey) {
+      return state.tabKey;
+    }
+    if (state.name) {
+      return state.name;
+    }
+    return "tab-" + index;
+  };
+
+  TabControl.prototype._getPageTitle = function(page, index) {
+    var state = page && page._state ? page._state : {};
+    if (state.title) {
+      return state.title;
+    }
+    if (state.name) {
+      return state.name;
+    }
+    return "Tab " + (index + 1);
+  };
+
+  TabControl.prototype._resolveActiveKey = function() {
+    var activeKey = this._state.activeTab;
+    var pages = this._children.slice();
+    var found = false;
+    var control = this;
+
+    pages.forEach(function(page, index) {
+      if (control._getPageKey(page, index) === activeKey) {
+        found = true;
+      }
+    });
+
+    if (found) {
+      return activeKey;
+    }
+    if (!pages.length) {
+      return "";
+    }
+    return this._getPageKey(pages[0], 0);
+  };
+
+  TabControl.prototype._applyStateToDom = function(prevState, nextState) {
+    var control = this;
+    var activeKey;
+
+    Container.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (!this._domNode || !this._headerNode || !this._runtime || !this._runtime.document) {
+      return;
+    }
+
+    activeKey = this._resolveActiveKey();
+
+    while (this._headerNode.children.length) {
+      this._headerNode.removeChild(this._headerNode.children[0]);
+    }
+    this._tabButtonNodes = [];
+
+    this._children.forEach(function(page, index) {
+      var pageKey = control._getPageKey(page, index);
+      var button = control._runtime.document.createElement("button");
+      var isActive = pageKey === activeKey;
+
+      button.className = "jog-tab-button" + (isActive ? " active" : "");
+      button.type = "button";
+      button.textContent = control._getPageTitle(page, index);
+      button.addEventListener("click", function(event) {
+        control.ActiveTab = pageKey;
+        control._raiseEvent("TabChange", event, {
+          Key: pageKey,
+          Value: page
+        });
+      });
+
+      control._headerNode.appendChild(button);
+      control._tabButtonNodes.push(button);
+
+      page.Visible = isActive;
+    });
+
+    this._headerNode.style.display = this._children.length ? "" : "none";
+    this._lastRenderedActiveTab = activeKey;
+  };
+
+  TabControl.prototype.OnTabChange = function(listener) {
+    this._registerEvent("TabChange", listener);
+  };
+
+  Object.defineProperty(TabControl.prototype, "ActiveTab", {
+    get: function() { return this._state.activeTab; },
+    set: function(value) { this._setState("activeTab", value == null ? "" : String(value)); }
+  });
 
   function SectionPanel() {
     Container.call(this, "SectionPanel");
@@ -2995,6 +3167,8 @@
   JOG.MenuBar = MenuBar;
   JOG.ToolBar = ToolBar;
   JOG.StatusBar = StatusBar;
+  JOG.TabPage = TabPage;
+  JOG.TabControl = TabControl;
   JOG.SectionPanel = SectionPanel;
   JOG.Grid = Grid;
   JOG.Window = Window;

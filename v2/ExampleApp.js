@@ -269,16 +269,51 @@
       shellStatus.Text = "Stacked dialogs open";
     });
 
+    var tabControl = new JOG.TabControl();
+    tabControl.Name = "exampleTabControl";
+    tabControl.ActiveTab = "themes";
+
+    var themesTab = new JOG.TabPage();
+    themesTab.Name = "themesTab";
+    themesTab.TabKey = "themes";
+    themesTab.Title = "Themes";
+
+    var themeTabLayout = new JOG.StackPanel();
+    themeTabLayout.Name = "themeTabLayout";
+    themeTabLayout.Orientation = "vertical";
+    themeTabLayout.Gap = 12;
+
+    themeTabLayout.Add(themeRow);
+    themeTabLayout.Add(customerName);
+    themeTabLayout.Add(preview);
+    themesTab.Add(themeTabLayout);
+
+    var dialogsTab = new JOG.TabPage();
+    dialogsTab.Name = "dialogsTab";
+    dialogsTab.TabKey = "dialogs";
+    dialogsTab.Title = "Dialogs";
+
+    var dialogTabLayout = new JOG.StackPanel();
+    dialogTabLayout.Name = "dialogTabLayout";
+    dialogTabLayout.Orientation = "vertical";
+    dialogTabLayout.Gap = 12;
+
+    dialogTabLayout.Add(openWindow);
+    dialogTabLayout.Add(openAuditWindow);
+    dialogTabLayout.Add(openStackedFlow);
+    dialogsTab.Add(dialogTabLayout);
+
+    tabControl.Add(themesTab);
+    tabControl.Add(dialogsTab);
+    tabControl.OnTabChange(function(args) {
+      shellStatus.Text = "Active tab: " + args.Key;
+    });
+
     pageLayout.Add(hero);
     pageLayout.Add(helper);
     pageLayout.Add(menuBar);
     pageLayout.Add(toolBar);
-    pageLayout.Add(themeRow);
-    pageLayout.Add(customerName);
-    pageLayout.Add(preview);
-    pageLayout.Add(openWindow);
-    pageLayout.Add(openAuditWindow);
-    pageLayout.Add(openStackedFlow);
+    pageLayout.Add(tabControl);
     pageLayout.Add(statusBar);
 
     this.Add(pageSection);

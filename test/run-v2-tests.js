@@ -1390,6 +1390,46 @@ function testStatusBarUsesFlowLayoutForChildControls() {
   assert(label._domNode.parentNode === statusBar._domNode, "StatusBar should host child controls directly.");
 }
 
+function testTabControlSwitchesVisiblePage() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var tabs = new JOG.TabControl();
+  var first = new JOG.TabPage();
+  var second = new JOG.TabPage();
+  var capturedKey = null;
+
+  first.TabKey = "first";
+  first.Title = "First";
+  first.Add(new JOG.Label());
+
+  second.TabKey = "second";
+  second.Title = "Second";
+  second.Add(new JOG.Label());
+
+  tabs.Add(first);
+  tabs.Add(second);
+  tabs.OnTabChange(function(args) {
+    capturedKey = args.Key;
+  });
+
+  page.Add(tabs);
+  app.Run(page);
+
+  assertEqual(tabs._tabButtonNodes.length, 2, "TabControl should render one tab button per TabPage.");
+  assertEqual(first._domNode.style.position, "", "TabPage children should use flow layout inside TabControl.");
+  assertEqual(first.Visible, true, "The first tab should be active by default.");
+  assertEqual(second.Visible, false, "Inactive tab pages should be hidden.");
+
+  dispatchNodeClick(tabs._tabButtonNodes[1]);
+  app.Runtime.flush();
+
+  assertEqual(tabs.ActiveTab, "second", "Clicking a tab button should update ActiveTab.");
+  assertEqual(first.Visible, false, "The previous tab page should be hidden after switching.");
+  assertEqual(second.Visible, true, "The selected tab page should become visible.");
+  assertEqual(capturedKey, "second", "TabControl should raise TabChange with the selected tab key.");
+}
+
 function testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute() {
   var JOG = loadJOG();
   var app = new JOG.Application();
@@ -1446,6 +1486,7 @@ var tests = [
   { name: "menu bar renders items and raises click events", fn: testMenuBarRendersItemsAndRaisesClickEvents },
   { name: "tool bar uses flow layout for child controls", fn: testToolBarUsesFlowLayoutForChildControls },
   { name: "status bar uses flow layout for child controls", fn: testStatusBarUsesFlowLayoutForChildControls },
+  { name: "tab control switches visible page", fn: testTabControlSwitchesVisiblePage },
   { name: "page direct children use flow layout while windows remain absolute", fn: testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute }
 ];
 
