@@ -11,25 +11,8 @@
     store.Set("sidebarSelection", "Selected: " + name);
   }
 
-  function buildSelectedValidationSummary(store) {
-    var messages = [
-      store.Get("selectedNameError"),
-      store.Get("selectedStatusError")
-    ].filter(function(message) {
-      return !!message;
-    });
-
-    if (!messages.length) {
-      store.Set("selectedValidationSummary", "");
-      return;
-    }
-
-    store.Set("selectedValidationSummary", "Please fix: " + messages.join(" | "));
-  }
-
   function setSelectedFieldError(store, key, message) {
     store.Set(key, message);
-    buildSelectedValidationSummary(store);
   }
 
   function validateSelectedCustomer(store) {
@@ -100,7 +83,10 @@
 
     var validationSection = new JOG.ValidationSummary();
     validationSection.Name = "dialogValidationSection";
-    validationSection.BindSummary(store, "selectedValidationSummary");
+    validationSection.BindErrors(store, [
+      "selectedNameError",
+      "selectedStatusError"
+    ]);
 
     var nameLabel = new JOG.Label();
     nameLabel.Text = "Customer Name";
@@ -193,7 +179,6 @@
       selectedSummary: "Acme Trading - Active",
       sidebarSelection: "Selected: Acme Trading",
       message: "Ready",
-      selectedValidationSummary: "",
       selectedNameError: "",
       selectedStatusError: ""
     });
@@ -324,7 +309,10 @@
 
     var inlineValidationSection = new JOG.ValidationSummary();
     inlineValidationSection.Name = "inlineValidationSection";
-    inlineValidationSection.BindSummary(store, "selectedValidationSummary");
+    inlineValidationSection.BindErrors(store, [
+      "selectedNameError",
+      "selectedStatusError"
+    ]);
 
     var inlineNameError = new JOG.ValidationMessage();
     inlineNameError.Name = "inlineSelectedNameError";

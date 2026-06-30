@@ -6,6 +6,29 @@ This reference covers the implemented public API in [v2/JOG.js](../v2/JOG.js). I
 
 ## Application Types
 
+### `JOG.SetTheme(theme)`
+
+Sets the global default theme for JOG applications.
+
+Notes:
+
+- accepts a partial token object
+- merges with the built-in default theme
+- updates already-running applications that do not supply an overriding `app.Theme`
+
+### `JOG.GetTheme()`
+
+Returns the current merged global theme object.
+
+### `JOG.Theme`
+
+Alias property for the global theme.
+
+Notes:
+
+- reading `JOG.Theme` returns the current merged global theme
+- assigning `JOG.Theme = {...}` is equivalent to calling `JOG.SetTheme({...})`
+
 ### `JOG.Application`
 
 Methods:
@@ -22,17 +45,70 @@ Properties:
 - `MainPage`
 - `Debug`
 - `DebugTopics`
+- `Theme`
 
 Notes:
 
 - `Run(page)` attaches to `document.body` and performs the first render.
 - `Debug = true` enables runtime console logging for dirty queue activity, lifecycle work, and event dispatch
 - `DebugTopics` optionally filters debug output to selected categories such as `event`, `lifecycle`, `dirty`, and `flush`
+- `Theme` accepts a partial theme object that overrides the global JOG theme for that application only
 - runtime render and event failures are logged with structured `[JOG][Error][...]` diagnostics before the original error is rethrown
 - `DumpTree()` returns a text representation of the current control tree
 - `DumpTree({ detailed: true })` includes richer control state such as text, title, docking, grid placement, validation state, and child counts when relevant
 - `LogTree()` writes that control tree to the console
 - `LogTree({ detailed: true })` writes the richer tree format to the console
+
+Theme token groups supported now:
+
+- `colors`
+- `typography`
+- `radius`
+- `spacing`
+- `shadow`
+
+Current token keys:
+
+- `colors.appBackground`
+- `colors.surface`
+- `colors.surfaceMuted`
+- `colors.text`
+- `colors.textMuted`
+- `colors.textStrong`
+- `colors.border`
+- `colors.borderSoft`
+- `colors.primary`
+- `colors.primaryText`
+- `colors.danger`
+- `colors.dangerText`
+- `colors.overlay`
+- `colors.resizeGrip`
+- `typography.fontFamily`
+- `typography.fontSize`
+- `typography.captionSize`
+- `typography.titleSize`
+- `typography.lineHeight`
+- `radius.control`
+- `radius.section`
+- `radius.shell`
+- `radius.window`
+- `spacing.pagePadding`
+- `spacing.sectionHeaderX`
+- `spacing.sectionHeaderY`
+- `spacing.sectionBody`
+- `spacing.windowContent`
+- `spacing.controlPaddingX`
+- `spacing.controlPaddingY`
+- `spacing.closeButtonX`
+- `spacing.closeButtonY`
+- `spacing.fieldGap`
+- `spacing.listPadding`
+- `shadow.shell`
+- `shadow.section`
+- `shadow.window`
+- `shadow.invalidRing`
+
+The built-in stylesheet consumes these tokens for page chrome, panels, windows, buttons, inputs, validation styling, and modal overlay styling.
 
 ### `JOG.Page`
 
@@ -74,11 +150,14 @@ Common properties:
 - `Padding`
 - `Margin`
 - `Gap`
+- `ResponsiveLayout`
 - `GridColumn`
 - `GridRow`
+- `ResponsiveGrid`
 - `ColumnSpan`
 - `RowSpan`
 - `Dock`
+- `ThemePreset`
 
 Common methods:
 
@@ -98,6 +177,11 @@ Common methods:
 Notes:
 
 - `Dock` accepts `none`, `top`, `bottom`, `left`, `right`, `fill`
+- `ResponsiveLayout` accepts breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
+- `ResponsiveLayout` breakpoint values can override `width`, `height`, `minWidth`, `minHeight`, `maxWidth`, `maxHeight`, `left`, `top`, `padding`, `margin`, `gap`, and `dock`
+- `ResponsiveGrid` accepts breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
+- `ResponsiveGrid` breakpoint values can override `column`, `row`, `area`, `columnSpan`, and `rowSpan`
+- `ThemePreset` is a small built-in presentation hook, not an arbitrary style object
 - `ColumnSpan` and `RowSpan` default to `1`
 - `SetError(message)` sets both `ErrorText` and `Invalid`
 - `ClearError()` clears both
@@ -170,6 +254,11 @@ Uses child `Dock` values and respects:
 - child `Margin`
 - explicit child `Width` and `Height` where relevant
 
+Responsive support:
+
+- container-level changes can use inherited `ResponsiveLayout`
+- child dock, width, height, and margin changes can also use inherited `ResponsiveLayout`
+
 ### `JOG.StackPanel`
 
 Extends `JOG.Container`.
@@ -178,12 +267,15 @@ Properties:
 
 - `Orientation`
 - `Spacing`
+- `Responsive`
 
 Notes:
 
 - `Orientation` accepts `vertical` or `horizontal`
 - `Gap` also works because it comes from `Component`
 - render implementation prefers `Gap` when both are set
+- `Responsive` uses breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
+- `Responsive` breakpoint values can override `orientation`, `spacing`, and `gap`
 
 ### `JOG.SectionPanel`
 
@@ -197,6 +289,7 @@ Notes:
 
 - creates a titled frame with an internal body region
 - children are added to the body area, not the outer node
+- `ThemePreset` supports `primary` and `muted`
 
 ### `JOG.Grid`
 
@@ -206,19 +299,44 @@ Properties:
 
 - `Columns`
 - `Rows`
+- `Areas`
+- `AutoRows`
+- `AutoFlow`
 - `ColumnGap`
 - `RowGap`
+- `Responsive`
 
 Child placement:
 
 - `GridColumn`
 - `GridRow`
+- `GridArea`
 - `ColumnSpan`
 - `RowSpan`
+- `ResponsiveGrid`
 
-Current limitation:
+Responsive breakpoints:
 
-- explicit placement only
+- `base`
+- `sm` at `640px`
+- `md` at `768px`
+- `lg` at `1024px`
+- `xl` at `1280px`
+
+`Responsive` breakpoint values can override:
+
+- `columns`
+- `rows`
+- `areas`
+- `autoRows`
+- `autoFlow`
+- `columnGap`
+- `rowGap`
+
+Current limitations:
+
+- no container-query model
+- no responsive helper surface yet for `SectionPanel`
 
 ## Controls
 
@@ -236,6 +354,11 @@ Common usage:
 var label = new JOG.Label();
 label.Text = "Customer Name";
 ```
+
+Preset support:
+
+- `ThemePreset = "primary"`
+- `ThemePreset = "strong"`
 
 ### `JOG.ValidationMessage`
 
@@ -257,11 +380,13 @@ Extends `JOG.SectionPanel`.
 Methods:
 
 - `BindSummary(store, key, formatter)`
+- `BindErrors(store, keys, formatter)`
 
 Notes:
 
 - defaults `Title` to `Validation Summary`
 - auto-hides when the bound summary is empty
+- can derive a summary message directly from multiple error keys
 - manages one internal `ValidationMessage` child
 
 ### `JOG.Button`
@@ -277,6 +402,12 @@ button.OnClick(function() {
   // handler
 });
 ```
+
+Preset support:
+
+- `ThemePreset = "primary"`
+- `ThemePreset = "danger"`
+- `ThemePreset = "quiet"`
 
 ### `JOG.TextBox`
 

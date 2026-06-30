@@ -13,27 +13,8 @@
     store.Set("summary", summary);
   }
 
-  function buildValidationSummary(store) {
-    var messages = [
-      store.Get("customerNameError"),
-      store.Get("customerRegionError"),
-      store.Get("customerActiveError"),
-      store.Get("customerNotesError")
-    ].filter(function(message) {
-      return !!message;
-    });
-
-    if (!messages.length) {
-      store.Set("validationSummary", "");
-      return;
-    }
-
-    store.Set("validationSummary", "Please fix: " + messages.join(" | "));
-  }
-
   function setFieldError(store, key, message) {
     store.Set(key, message);
-    buildValidationSummary(store);
   }
 
   function validateForm(store) {
@@ -95,7 +76,6 @@
       customerNotes: "Interested in a pilot rollout during Q4.",
       summary: "",
       saveStatus: "Ready to save.",
-      validationSummary: "",
       customerNameError: "",
       customerRegionError: "",
       customerActiveError: "",
@@ -107,8 +87,7 @@
     var shell = new JOG.SectionPanel();
     shell.Name = "formShell";
     shell.Title = "New Customer Intake";
-    shell.Width = 760;
-    shell.MinWidth = 760;
+    shell.MaxWidth = 760;
     shell.Padding = 18;
 
     var layout = new JOG.StackPanel();
@@ -124,48 +103,79 @@
     formGrid.Columns = ["160px", "1fr"];
     formGrid.ColumnGap = 18;
     formGrid.RowGap = 12;
+    formGrid.Responsive = {
+      base: {
+        columns: ["1fr"],
+        columnGap: 10
+      },
+      md: {
+        columns: ["160px", "1fr"],
+        columnGap: 18
+      }
+    };
+
+    function setResponsiveFieldPlacement(control, mobileRow, desktopColumn, desktopRow) {
+      control.ResponsiveGrid = {
+        base: {
+          column: 1,
+          row: mobileRow
+        },
+        md: {
+          column: desktopColumn,
+          row: desktopRow
+        }
+      };
+    }
 
     var validationSection = new JOG.ValidationSummary();
     validationSection.Name = "validationSection";
-    validationSection.BindSummary(store, "validationSummary");
+    validationSection.BindErrors(store, [
+      "customerNameError",
+      "customerRegionError",
+      "customerActiveError",
+      "customerNotesError"
+    ]);
 
     var nameLabel = new JOG.Label();
     nameLabel.Text = "Customer Name";
     nameLabel.GridColumn = 1;
     nameLabel.GridRow = 1;
+    setResponsiveFieldPlacement(nameLabel, 1, 1, 1);
 
     var nameInput = new JOG.TextBox();
     nameInput.Name = "formCustomerName";
     nameInput.GridColumn = 2;
     nameInput.GridRow = 1;
-    nameInput.Width = 360;
-    nameInput.MinWidth = 360;
+    nameInput.CssClass = "jog-fill-width";
     nameInput.BindText(store, "customerName");
     nameInput.BindError(store, "customerNameError");
+    setResponsiveFieldPlacement(nameInput, 2, 2, 1);
 
     var nameError = new JOG.ValidationMessage();
     nameError.Name = "formCustomerNameError";
     nameError.GridColumn = 2;
     nameError.GridRow = 2;
     nameError.BindMessage(store, "customerNameError");
+    setResponsiveFieldPlacement(nameError, 3, 2, 2);
 
     var tierLabel = new JOG.Label();
     tierLabel.Text = "Tier";
     tierLabel.GridColumn = 1;
     tierLabel.GridRow = 3;
+    setResponsiveFieldPlacement(tierLabel, 4, 1, 3);
 
     var tierSelect = new JOG.DropDownList();
     tierSelect.Name = "formCustomerTier";
     tierSelect.GridColumn = 2;
     tierSelect.GridRow = 3;
-    tierSelect.Width = 240;
-    tierSelect.MinWidth = 240;
+    tierSelect.CssClass = "jog-fill-width";
     tierSelect.Options = [
       { value: "enterprise", text: "Enterprise" },
       { value: "growth", text: "Growth" },
       { value: "starter", text: "Starter" }
     ];
     tierSelect.BindSelectedValue(store, "customerTier");
+    setResponsiveFieldPlacement(tierSelect, 5, 2, 3);
 
     var activeCheck = new JOG.CheckBox();
     activeCheck.Name = "formCustomerActive";
@@ -174,17 +184,20 @@
     activeCheck.GridRow = 4;
     activeCheck.BindChecked(store, "customerActive");
     activeCheck.BindError(store, "customerActiveError");
+    setResponsiveFieldPlacement(activeCheck, 6, 2, 4);
 
     var activeError = new JOG.ValidationMessage();
     activeError.Name = "formCustomerActiveError";
     activeError.GridColumn = 2;
     activeError.GridRow = 5;
     activeError.BindMessage(store, "customerActiveError");
+    setResponsiveFieldPlacement(activeError, 7, 2, 5);
 
     var regionLabel = new JOG.Label();
     regionLabel.Text = "Region";
     regionLabel.GridColumn = 1;
     regionLabel.GridRow = 6;
+    setResponsiveFieldPlacement(regionLabel, 8, 1, 6);
 
     var regionRow = new JOG.StackPanel();
     regionRow.Name = "regionRow";
@@ -193,6 +206,7 @@
     regionRow.GridColumn = 2;
     regionRow.GridRow = 6;
     regionRow.BindError(store, "customerRegionError");
+    setResponsiveFieldPlacement(regionRow, 9, 2, 6);
 
     var seaRadio = new JOG.RadioButton();
     seaRadio.Name = "regionSea";
@@ -224,18 +238,19 @@
     regionError.GridColumn = 2;
     regionError.GridRow = 7;
     regionError.BindMessage(store, "customerRegionError");
+    setResponsiveFieldPlacement(regionError, 10, 2, 7);
 
     var ownerLabel = new JOG.Label();
     ownerLabel.Text = "Account Owner";
     ownerLabel.GridColumn = 1;
     ownerLabel.GridRow = 8;
+    setResponsiveFieldPlacement(ownerLabel, 11, 1, 8);
 
     var ownerList = new JOG.ListBox();
     ownerList.Name = "formCustomerOwner";
     ownerList.GridColumn = 2;
     ownerList.GridRow = 8;
-    ownerList.Width = 280;
-    ownerList.MinWidth = 280;
+    ownerList.CssClass = "jog-fill-width";
     ownerList.SizeRows = 4;
     ownerList.Options = [
       { value: "maya", text: "Maya Santos" },
@@ -244,29 +259,32 @@
       { value: "john", text: "John Januszczak" }
     ];
     ownerList.BindSelectedValue(store, "customerOwner");
+    setResponsiveFieldPlacement(ownerList, 12, 2, 8);
 
     var notesLabel = new JOG.Label();
     notesLabel.Text = "Notes";
     notesLabel.GridColumn = 1;
     notesLabel.GridRow = 9;
+    setResponsiveFieldPlacement(notesLabel, 13, 1, 9);
 
     var notesInput = new JOG.TextArea();
     notesInput.Name = "formCustomerNotes";
     notesInput.GridColumn = 2;
     notesInput.GridRow = 9;
-    notesInput.Width = 520;
     notesInput.Height = 140;
-    notesInput.MinWidth = 520;
+    notesInput.CssClass = "jog-fill-width";
     notesInput.MinHeight = 140;
     notesInput.Placeholder = "Enter customer notes";
     notesInput.BindText(store, "customerNotes");
     notesInput.BindError(store, "customerNotesError");
+    setResponsiveFieldPlacement(notesInput, 14, 2, 9);
 
     var notesError = new JOG.ValidationMessage();
     notesError.Name = "formCustomerNotesError";
     notesError.GridColumn = 2;
     notesError.GridRow = 10;
     notesError.BindMessage(store, "customerNotesError");
+    setResponsiveFieldPlacement(notesError, 15, 2, 10);
 
     var actions = new JOG.StackPanel();
     actions.Name = "formActions";
@@ -274,6 +292,7 @@
     actions.Gap = 10;
     actions.GridColumn = 2;
     actions.GridRow = 11;
+    setResponsiveFieldPlacement(actions, 16, 2, 11);
 
     var saveButton = new JOG.Button();
     saveButton.Text = "Save Form";

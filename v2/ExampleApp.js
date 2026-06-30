@@ -1,6 +1,52 @@
 (function(global) {
   "use strict";
 
+  var harborTheme = {
+    colors: {
+      appBackground: "#e7efe8",
+      surface: "#fbf8f1",
+      surfaceMuted: "#f1ece1",
+      text: "#173125",
+      textMuted: "#4f665b",
+      textStrong: "#1d2f27",
+      border: "#9db2a6",
+      borderSoft: "#cfd8d1",
+      primary: "#244e41",
+      primaryText: "#f5fbf8",
+      danger: "#b54d2b",
+      dangerText: "#8b3317",
+      overlay: "rgba(13, 31, 24, 0.28)",
+      resizeGrip: "#6f8c80"
+    },
+    typography: {
+      fontFamily: "\"Trebuchet MS\", Arial, sans-serif"
+    }
+  };
+
+  var ledgerTheme = {
+    colors: {
+      appBackground: "#f4efe2",
+      surface: "#fffdf8",
+      surfaceMuted: "#f3ead7",
+      text: "#3d2415",
+      textMuted: "#6e584b",
+      textStrong: "#44291a",
+      border: "#c7b49d",
+      borderSoft: "#dfd2c1",
+      primary: "#8a4b2a",
+      primaryText: "#fff8f1",
+      danger: "#b54d2b",
+      dangerText: "#8b3317",
+      overlay: "rgba(56, 33, 18, 0.24)",
+      resizeGrip: "#9d7f67"
+    },
+    typography: {
+      fontFamily: "Georgia, serif"
+    }
+  };
+
+  var defaultTheme = null;
+
   function CustomerWindow(store) {
     JOG.Dialog.call(this);
 
@@ -81,7 +127,7 @@
   function MainPage() {
     JOG.Page.call(this);
 
-    this.Title = "JOG V2 Example";
+    this.Title = "JOG V2 Theme Example";
     this.Name = "mainPage";
 
     var state = new JOG.Store({
@@ -103,10 +149,40 @@
     pageSection.Add(pageLayout);
 
     var hero = new JOG.Label();
-    hero.Text = "JOG V2 example. This page is intentionally sparse so the runtime is easier to evaluate.";
+    hero.Text = "JOG V2 theme example. Switch the palette live, then open the dialogs to verify the theme flows through page chrome, controls, and modal overlay.";
 
     var helper = new JOG.Label();
-    helper.Text = "Edit the customer name below, then open the customer window and the audit window to verify modal stacking. Resize the customer window from any edge or corner.";
+    helper.Text = "Edit the customer name below, switch themes, then open the customer window and audit window to verify modal stacking under the active theme.";
+
+    var themeRow = new JOG.StackPanel();
+    themeRow.Name = "themeRow";
+    themeRow.Orientation = "horizontal";
+    themeRow.Gap = 12;
+
+    var harborButton = new JOG.Button();
+    harborButton.Name = "harborThemeButton";
+    harborButton.Text = "Use Harbor Theme";
+    harborButton.OnClick(function() {
+      JOG.SetTheme(harborTheme);
+    });
+
+    var ledgerButton = new JOG.Button();
+    ledgerButton.Name = "ledgerThemeButton";
+    ledgerButton.Text = "Use Ledger Theme";
+    ledgerButton.OnClick(function() {
+      JOG.SetTheme(ledgerTheme);
+    });
+
+    var defaultButton = new JOG.Button();
+    defaultButton.Name = "defaultThemeButton";
+    defaultButton.Text = "Use Default Theme";
+    defaultButton.OnClick(function() {
+      JOG.SetTheme(defaultTheme);
+    });
+
+    themeRow.Add(harborButton);
+    themeRow.Add(ledgerButton);
+    themeRow.Add(defaultButton);
 
     var customerName = new JOG.TextBox();
     customerName.Name = "customerNameInline";
@@ -150,6 +226,7 @@
 
     pageLayout.Add(hero);
     pageLayout.Add(helper);
+    pageLayout.Add(themeRow);
     pageLayout.Add(customerName);
     pageLayout.Add(preview);
     pageLayout.Add(openWindow);
@@ -166,6 +243,7 @@
 
   function boot() {
     var app = new JOG.Application();
+    defaultTheme = JOG.GetTheme();
     app.Run(new MainPage());
   }
 

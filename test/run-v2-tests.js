@@ -34,10 +34,15 @@ function createClassList(node) {
 }
 
 function createNode(tagName) {
+  var style = {
+    setProperty: function(name, value) {
+      this[name] = value;
+    }
+  };
   var node = {
     tagName: tagName.toUpperCase(),
     children: [],
-    style: {},
+    style: style,
     attributes: {},
     parentNode: null,
     textContent: "",
@@ -138,10 +143,14 @@ function createJOGSandbox(options) {
   var document = createDocument();
   var windowEventListeners = {};
   options = options || {};
+  if (options.innerWidth) {
+    document.body.clientWidth = options.innerWidth;
+  }
   var sandbox = {
     console: options.console || console,
     document: document,
     window: null,
+    innerWidth: options.innerWidth || 1280,
     queueMicrotask: queueMicrotask,
     Promise: Promise,
     setTimeout: setTimeout,
@@ -255,6 +264,16 @@ function dispatchNodeKeyDown(node, key) {
 
   assertEqual(listeners.length > 0, true, "Node should expose a keydown listener.");
   listeners[0]({ target: node, key: key });
+}
+
+function dispatchWindowResize(sandbox, width) {
+  var listeners = (sandbox && sandbox._windowEventListeners && sandbox._windowEventListeners.resize) || [];
+
+  sandbox.innerWidth = width;
+  sandbox.document.body.clientWidth = width;
+  listeners.forEach(function(listener) {
+    listener({ target: sandbox.window });
+  });
 }
 
 function assert(condition, message) {
@@ -385,6 +404,29 @@ function testValidationSummaryBindsSummaryAndVisibility() {
   assertEqual(summary.Children[0].Text, "Please fix: Required", "ValidationSummary should bind message text.");
 }
 
+function testValidationSummaryCanBuildSummaryFromErrorKeys() {
+  var JOG = loadJOG();
+  var store = new JOG.Store({
+    nameError: "",
+    stageError: ""
+  });
+  var summary = new JOG.ValidationSummary();
+
+  summary.BindErrors(store, ["nameError", "stageError"]);
+  assertEqual(summary.Visible, false, "BindErrors should start hidden when all errors are empty.");
+
+  store.Set("nameError", "Enter a name");
+  assertEqual(summary.Visible, true, "BindErrors should show when any error exists.");
+  assertEqual(summary.Children[0].Text, "Please fix: Enter a name", "BindErrors should use the default summary format.");
+
+  store.Set("stageError", "Select a stage");
+  assertEqual(summary.Children[0].Text, "Please fix: Enter a name | Select a stage", "BindErrors should combine multiple error messages.");
+
+  store.Set("nameError", "");
+  store.Set("stageError", "");
+  assertEqual(summary.Visible, false, "BindErrors should hide again when all errors clear.");
+}
+
 function testApplicationDumpTree() {
   var JOG = loadJOG();
   var app = new JOG.Application();
@@ -441,6 +483,245 @@ function testApplicationDetailedDumpTreeShowsRicherState() {
   assert(dump.indexOf("span=(2,1)") >= 0, "Detailed tree dump should include span values.");
   assert(dump.indexOf("invalid=true") >= 0, "Detailed tree dump should include invalid state.");
   assert(dump.indexOf('error="Required"') >= 0, "Detailed tree dump should include error text.");
+}
+
+function testGridSupportsNamedAreasAndAutoRows() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var grid = new JOG.Grid();
+  var title = new JOG.Label();
+  var sidebar = new JOG.SectionPanel();
+
+  grid.Name = "dashboardGrid";
+  grid.Columns = ["220px", "1fr"];
+  grid.Areas = '"sidebar title"';
+  grid.AutoRows = "minmax(48px, auto)";
+  grid.AutoFlow = "row dense";
+
+  title.Name = "dashboardTitle";
+  title.GridArea = "title";
+  title.Text = "Revenue";
+
+  sidebar.Name = "dashboardSidebar";
+  sidebar.GridArea = "sidebar";
+  sidebar.Title = "Filters";
+
+  grid.Add(sidebar);
+  grid.Add(title);
+  page.Add(grid);
+  app.Run(page);
+
+  assertEqual(grid._domNode.style.gridTemplateAreas, '"sidebar title"', "Grid should render named areas.");
+  assertEqual(grid._domNode.style.gridAutoRows, "minmax(48px, auto)", "Grid should render automatic row sizing.");
+  assertEqual(grid._domNode.style.gridAutoFlow, "row dense", "Grid should render automatic flow mode.");
+  assertEqual(title._domNode.style.gridArea, "title", "Child should render named grid area placement.");
+  assertEqual(title._domNode.style.gridColumn, "", "Named area placement should clear explicit grid columns.");
+}
+
+function testGridResponsiveBreakpointsApplyOnMountAndResize() {
+  var sandbox = createJOGSandbox({ innerWidth: 540 });
+  var JOG = sandbox.JOG;
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var grid = new JOG.Grid();
+  var label = new JOG.Label();
+  var input = new JOG.TextBox();
+
+  grid.Name = "responsiveGrid";
+  grid.Columns = ["160px", "1fr"];
+  grid.ColumnGap = 18;
+  grid.Responsive = {
+    base: { columns: ["1fr"], columnGap: 10 },
+    md: { columns: ["160px", "1fr"], columnGap: 18 }
+  };
+
+  label.Name = "responsiveLabel";
+  label.Text = "Name";
+  label.GridColumn = 1;
+  label.GridRow = 1;
+
+  input.Name = "responsiveInput";
+  input.GridColumn = 2;
+  input.GridRow = 1;
+  input.ResponsiveGrid = {
+    base: { column: 1, row: 2 },
+    md: { column: 2, row: 1 }
+  };
+
+  grid.Add(label);
+  grid.Add(input);
+  page.Add(grid);
+  app.Run(page);
+
+  assertEqual(grid._domNode.style.gridTemplateColumns, "1fr", "Responsive grid should use base columns on narrow mount.");
+  assertEqual(grid._domNode.style.columnGap, "10px", "Responsive grid should use base gap on narrow mount.");
+  assertEqual(input._domNode.style.gridColumn, "1 / span 1", "Responsive child should move into the single mobile column.");
+  assertEqual(input._domNode.style.gridRow, "2 / span 1", "Responsive child should move to the stacked mobile row.");
+
+  dispatchWindowResize(sandbox, 960);
+  app.Runtime.flush();
+
+  assertEqual(grid._domNode.style.gridTemplateColumns, "160px 1fr", "Responsive grid should restore desktop columns after resize.");
+  assertEqual(grid._domNode.style.columnGap, "18px", "Responsive grid should restore desktop gap after resize.");
+  assertEqual(input._domNode.style.gridColumn, "2 / span 1", "Responsive child should return to desktop column placement.");
+  assertEqual(input._domNode.style.gridRow, "1 / span 1", "Responsive child should return to desktop row placement.");
+}
+
+function testResponsiveDockAndStackLayoutsApplyOnMountAndResize() {
+  var sandbox = createJOGSandbox({ innerWidth: 540 });
+  var JOG = sandbox.JOG;
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var shell = new JOG.DockPanel();
+  var sidebar = new JOG.SectionPanel();
+  var content = new JOG.SectionPanel();
+  var actionRow = new JOG.StackPanel();
+
+  shell.Width = 900;
+  shell.Height = 600;
+  shell.Padding = 24;
+  shell.ResponsiveLayout = {
+    base: { padding: 12 },
+    md: { padding: 24 }
+  };
+
+  sidebar.Title = "Sidebar";
+  sidebar.Dock = "left";
+  sidebar.Width = 220;
+  sidebar.ResponsiveLayout = {
+    base: { dock: "top", width: null, height: 120, margin: { bottom: 10 } },
+    md: { dock: "left", width: 220, height: null, margin: { top: 0, right: 20, bottom: 0, left: 0 } }
+  };
+
+  content.Title = "Content";
+  content.Dock = "fill";
+
+  actionRow.Name = "responsiveActionRow";
+  actionRow.Orientation = "horizontal";
+  actionRow.Responsive = {
+    base: { orientation: "vertical", gap: 12 },
+    md: { orientation: "horizontal", gap: 8 }
+  };
+  actionRow.Add(new JOG.Button());
+  actionRow.Add(new JOG.Button());
+
+  content.Add(actionRow);
+  shell.Add(sidebar);
+  shell.Add(content);
+  page.Add(shell);
+  app.Run(page);
+
+  assertEqual(sidebar._domNode.style.top, "12px", "Responsive dock child should dock to the top on narrow mount.");
+  assertEqual(sidebar._domNode.style.height, "120px", "Responsive dock child should use mobile height on narrow mount.");
+  assertEqual(actionRow._domNode.className.indexOf("vertical") >= 0, true, "Responsive StackPanel should switch to vertical on narrow mount.");
+  assertEqual(actionRow._domNode.style.gap, "12px", "Responsive StackPanel should use its mobile gap on narrow mount.");
+
+  dispatchWindowResize(sandbox, 980);
+  app.Runtime.flush();
+
+  assertEqual(sidebar._domNode.style.left, "24px", "Responsive dock child should dock left on wider resize.");
+  assertEqual(sidebar._domNode.style.width, "220px", "Responsive dock child should restore desktop width on wider resize.");
+  assertEqual(actionRow._domNode.className.indexOf("horizontal") >= 0, true, "Responsive StackPanel should return to horizontal on wider resize.");
+  assertEqual(actionRow._domNode.style.gap, "8px", "Responsive StackPanel should restore desktop gap on wider resize.");
+}
+
+function testThemePresetsApplyPresetClasses() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var section = new JOG.SectionPanel();
+  var label = new JOG.Label();
+  var primaryButton = new JOG.Button();
+  var dangerButton = new JOG.Button();
+
+  section.ThemePreset = "primary";
+  section.Title = "Summary";
+
+  label.ThemePreset = "strong";
+  label.Text = "Top Line";
+
+  primaryButton.ThemePreset = "primary";
+  primaryButton.Text = "Save";
+
+  dangerButton.ThemePreset = "danger";
+  dangerButton.Text = "Delete";
+
+  section.Add(label);
+  section.Add(primaryButton);
+  section.Add(dangerButton);
+  page.Add(section);
+  app.Run(page);
+
+  assertEqual(section._domNode.className.indexOf("jog-theme-preset-primary") >= 0, true, "Section preset should add its preset class.");
+  assertEqual(label._domNode.className.indexOf("jog-theme-preset-strong") >= 0, true, "Label preset should add its preset class.");
+  assertEqual(primaryButton._domNode.className.indexOf("jog-theme-preset-primary") >= 0, true, "Primary button preset should add its preset class.");
+  assertEqual(dangerButton._domNode.className.indexOf("jog-theme-preset-danger") >= 0, true, "Danger button preset should add its preset class.");
+}
+
+function testGlobalThemeAppliesToMountedApplications() {
+  var JOG = loadJOG();
+  var firstApp = new JOG.Application();
+  var firstPage = new JOG.Page();
+  var secondApp = new JOG.Application();
+  var secondPage = new JOG.Page();
+  var dialog = new JOG.Dialog();
+
+  firstPage.Title = "First";
+  secondPage.Title = "Second";
+  secondPage.Add(dialog);
+
+  firstApp.Run(firstPage);
+  secondApp.Run(secondPage);
+
+  JOG.SetTheme({
+    colors: {
+      appBackground: "#101820",
+      overlay: "rgba(1, 2, 3, 0.7)"
+    },
+    typography: {
+      fontFamily: "Georgia, serif"
+    }
+  });
+
+  dialog.ShowModal();
+  secondApp.Runtime.flush();
+
+  assertEqual(firstPage._domNode.style["--jog-app-background"], "#101820", "Global theme should update mounted page roots.");
+  assertEqual(secondPage._domNode.style["--jog-font-family"], "Georgia, serif", "Global theme should update typography tokens.");
+  assertEqual(secondApp.Runtime._activeModalOverlay.style.background, "rgba(1, 2, 3, 0.7)", "Global theme should update modal overlay styling.");
+  assertEqual(JOG.GetTheme().colors.appBackground, "#101820", "GetTheme should return the merged global theme.");
+}
+
+function testApplicationThemeOverridesGlobalTheme() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var win = new JOG.Window();
+
+  JOG.SetTheme({
+    colors: {
+      primary: "#112233",
+      primaryText: "#f0f0f0",
+      appBackground: "#ddeeff"
+    }
+  });
+
+  app.Theme = {
+    colors: {
+      primary: "#aa5500",
+      primaryText: "#fff4cc",
+      appBackground: "#fff7ed"
+    }
+  };
+
+  page.Add(win);
+  app.Run(page);
+
+  assertEqual(page._domNode.style["--jog-primary"], "#aa5500", "Application theme should override global primary color.");
+  assertEqual(page._domNode.style["--jog-primary-text"], "#fff4cc", "Application theme should override global primary text.");
+  assertEqual(page._domNode.style["--jog-app-background"], "#fff7ed", "Application theme should override global page background.");
+  assertEqual(win._closeNode.className.indexOf("jog-window-close") >= 0, true, "Window close button should use the themed window-close class.");
 }
 
 function testResizableWindowShowsHandle() {
@@ -586,6 +867,33 @@ function testWindowLifecycleEventsTrackLoadShowAndHide() {
   win.Show();
   app.Runtime.flush();
   assertEqual(events.join(","), "load,show,hide,show", "Show should fire again on later visibility changes.");
+}
+
+function testExampleAppThemeSwitchingFlow() {
+  var example = loadExampleApp("ExampleApp.js");
+  var page = example.page;
+  var harborButton = findControl(page, function(control) {
+    return control && control.Name === "harborThemeButton";
+  });
+  var ledgerButton = findControl(page, function(control) {
+    return control && control.Name === "ledgerThemeButton";
+  });
+  var defaultButton = findControl(page, function(control) {
+    return control && control.Name === "defaultThemeButton";
+  });
+
+  assertEqual(page.Title, "JOG V2 Theme Example", "Example app should expose the theme-focused title.");
+  assert(!!harborButton && !!ledgerButton && !!defaultButton, "Example app should expose the theme switch buttons.");
+  assertEqual(page._domNode.style["--jog-primary"], "#0f172a", "Example app should boot with the built-in default theme.");
+
+  dispatchNodeClick(ledgerButton._domNode);
+  assertEqual(page._domNode.style["--jog-primary"], "#8a4b2a", "Ledger theme button should update the mounted app theme.");
+
+  dispatchNodeClick(harborButton._domNode);
+  assertEqual(page._domNode.style["--jog-primary"], "#244e41", "Harbor theme button should restore the original theme.");
+
+  dispatchNodeClick(defaultButton._domNode);
+  assertEqual(page._domNode.style["--jog-primary"], "#0f172a", "Default theme button should restore the built-in theme.");
 }
 
 function testPropertySettersNormalizeState() {
@@ -1031,12 +1339,20 @@ var tests = [
   { name: "BindVisible tracks store and disposes cleanly", fn: testBindVisibleTracksStoreAndDisposesCleanly },
   { name: "ValidationMessage binds text and visibility", fn: testValidationMessageBindsTextAndVisibility },
   { name: "ValidationSummary binds summary and visibility", fn: testValidationSummaryBindsSummaryAndVisibility },
+  { name: "ValidationSummary can build summary from error keys", fn: testValidationSummaryCanBuildSummaryFromErrorKeys },
   { name: "application tree dump reports hierarchy", fn: testApplicationDumpTree },
   { name: "application detailed tree dump shows richer state", fn: testApplicationDetailedDumpTreeShowsRicherState },
+  { name: "Grid supports named areas and auto rows", fn: testGridSupportsNamedAreasAndAutoRows },
+  { name: "Grid responsive breakpoints apply on mount and resize", fn: testGridResponsiveBreakpointsApplyOnMountAndResize },
+  { name: "responsive dock and stack layouts apply on mount and resize", fn: testResponsiveDockAndStackLayoutsApplyOnMountAndResize },
+  { name: "theme presets apply preset classes", fn: testThemePresetsApplyPresetClasses },
+  { name: "global theme applies to mounted applications", fn: testGlobalThemeAppliesToMountedApplications },
+  { name: "application theme overrides global theme", fn: testApplicationThemeOverridesGlobalTheme },
   { name: "resizable window shows resize handle", fn: testResizableWindowShowsHandle },
   { name: "resizable window supports edge resize", fn: testResizableWindowSupportsEdgeResize },
   { name: "modal windows share overlay and close in stack order", fn: testModalWindowsShareOverlayAndCloseInStackOrder },
   { name: "window lifecycle events track load show and hide", fn: testWindowLifecycleEventsTrackLoadShowAndHide },
+  { name: "example app theme switching flow", fn: testExampleAppThemeSwitchingFlow },
   { name: "property setters normalize state", fn: testPropertySettersNormalizeState },
   { name: "SetError and ClearError toggle invalid state", fn: testSetErrorAndClearErrorToggleInvalidState },
   { name: "container remove and clear dispose children", fn: testContainerRemoveAndClearDisposeChildren },

@@ -4,6 +4,66 @@
   var JOG = {};
 
   var nextControlId = 0;
+  var runningApplications = [];
+  var responsiveBreakpointOrder = ["base", "sm", "md", "lg", "xl"];
+  var responsiveBreakpointMinWidths = {
+    base: 0,
+    sm: 640,
+    md: 768,
+    lg: 1024,
+    xl: 1280
+  };
+  var defaultTheme = {
+    colors: {
+      appBackground: "#f3f4f6",
+      surface: "#ffffff",
+      surfaceMuted: "#f8fafc",
+      text: "#0f172a",
+      textMuted: "#475569",
+      textStrong: "#1e293b",
+      border: "#cbd5e1",
+      borderSoft: "#e2e8f0",
+      primary: "#0f172a",
+      primaryText: "#f8fafc",
+      danger: "#dc2626",
+      dangerText: "#b91c1c",
+      overlay: "rgba(15, 23, 42, 0.22)",
+      resizeGrip: "#94a3b8"
+    },
+    typography: {
+      fontFamily: "Arial, sans-serif",
+      fontSize: "14px",
+      captionSize: "12px",
+      titleSize: "13px",
+      lineHeight: "1.45"
+    },
+    radius: {
+      control: "8px",
+      section: "14px",
+      shell: "16px",
+      window: "14px"
+    },
+    spacing: {
+      pagePadding: "32px",
+      sectionHeaderX: "16px",
+      sectionHeaderY: "14px",
+      sectionBody: "16px",
+      windowContent: "20px",
+      controlPaddingX: "12px",
+      controlPaddingY: "10px",
+      closeButtonX: "10px",
+      closeButtonY: "4px",
+      fieldGap: "10px",
+      listPadding: "8px"
+    },
+    shadow: {
+      shell: "0 14px 34px rgba(15, 23, 42, 0.06)",
+      section: "0 8px 20px rgba(15, 23, 42, 0.04)",
+      window: "0 24px 50px rgba(15, 23, 42, 0.16)",
+      invalidRing: "0 0 0 3px rgba(220, 38, 38, 0.12)"
+    }
+  };
+  var activeGlobalTheme = cloneTheme(defaultTheme);
 
   function cloneState(state) {
     var copy = {};
@@ -21,6 +81,347 @@
       copy[key] = state[key];
     }
     return copy;
+  }
+
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function cloneResponsiveConfig(value, normalizer) {
+    var copy = {};
+    var breakpoint;
+    var normalizedBreakpoint;
+
+    if (!isPlainObject(value)) {
+      return null;
+    }
+
+    responsiveBreakpointOrder.forEach(function(name) {
+      if (!isPlainObject(value[name])) {
+        return;
+      }
+      normalizedBreakpoint = normalizer(value[name]);
+      if (normalizedBreakpoint) {
+        copy[name] = normalizedBreakpoint;
+      }
+    });
+
+    for (breakpoint in copy) {
+      if (Object.prototype.hasOwnProperty.call(copy, breakpoint)) {
+        return copy;
+      }
+    }
+
+    return null;
+  }
+
+  function normalizeGridResponsiveBreakpoint(value) {
+    var normalized = {};
+
+    if (!isPlainObject(value)) {
+      return null;
+    }
+    if (value.columns !== undefined) {
+      normalized.columns = value.columns;
+    }
+    if (value.rows !== undefined) {
+      normalized.rows = value.rows;
+    }
+    if (value.areas !== undefined) {
+      normalized.areas = value.areas == null ? "" : String(value.areas);
+    }
+    if (value.autoRows !== undefined) {
+      normalized.autoRows = value.autoRows == null ? "" : String(value.autoRows);
+    }
+    if (value.autoFlow !== undefined) {
+      normalized.autoFlow = String(value.autoFlow);
+    }
+    if (value.columnGap !== undefined && isNumber(value.columnGap)) {
+      normalized.columnGap = value.columnGap;
+    }
+    if (value.rowGap !== undefined && isNumber(value.rowGap)) {
+      normalized.rowGap = value.rowGap;
+    }
+
+    return Object.keys(normalized).length ? normalized : null;
+  }
+
+  function normalizeResponsivePlacementBreakpoint(value) {
+    var normalized = {};
+
+    if (!isPlainObject(value)) {
+      return null;
+    }
+    if (value.column !== undefined) {
+      normalized.gridColumn = value.column;
+    }
+    if (value.row !== undefined) {
+      normalized.gridRow = value.row;
+    }
+    if (value.area !== undefined) {
+      normalized.gridArea = value.area == null ? null : String(value.area);
+    }
+    if (value.columnSpan !== undefined && isNumber(value.columnSpan) && value.columnSpan > 0) {
+      normalized.columnSpan = value.columnSpan;
+    }
+    if (value.rowSpan !== undefined && isNumber(value.rowSpan) && value.rowSpan > 0) {
+      normalized.rowSpan = value.rowSpan;
+    }
+
+    return Object.keys(normalized).length ? normalized : null;
+  }
+
+  function normalizeResponsiveLayoutBreakpoint(value) {
+    var normalized = {};
+    var allowedDocks = ["none", "top", "bottom", "left", "right", "fill"];
+
+    if (!isPlainObject(value)) {
+      return null;
+    }
+    if (value.width !== undefined) {
+      normalized.width = value.width;
+    }
+    if (value.height !== undefined) {
+      normalized.height = value.height;
+    }
+    if (value.minWidth !== undefined) {
+      normalized.minWidth = value.minWidth;
+    }
+    if (value.minHeight !== undefined) {
+      normalized.minHeight = value.minHeight;
+    }
+    if (value.maxWidth !== undefined) {
+      normalized.maxWidth = value.maxWidth;
+    }
+    if (value.maxHeight !== undefined) {
+      normalized.maxHeight = value.maxHeight;
+    }
+    if (value.left !== undefined) {
+      normalized.left = value.left;
+    }
+    if (value.top !== undefined) {
+      normalized.top = value.top;
+    }
+    if (value.padding !== undefined) {
+      normalized.padding = value.padding;
+    }
+    if (value.margin !== undefined) {
+      normalized.margin = value.margin;
+    }
+    if (value.gap !== undefined) {
+      normalized.gap = value.gap;
+    }
+    if (value.dock !== undefined) {
+      normalized.dock = allowedDocks.indexOf(value.dock) >= 0 ? value.dock : "none";
+    }
+
+    return Object.keys(normalized).length ? normalized : null;
+  }
+
+  function normalizeResponsiveStackBreakpoint(value) {
+    var normalized = {};
+
+    if (!isPlainObject(value)) {
+      return null;
+    }
+    if (value.orientation !== undefined) {
+      normalized.orientation = value.orientation === "horizontal" ? "horizontal" : "vertical";
+    }
+    if (value.spacing !== undefined && isNumber(value.spacing)) {
+      normalized.spacing = value.spacing;
+    }
+    if (value.gap !== undefined) {
+      normalized.gap = value.gap;
+    }
+
+    return Object.keys(normalized).length ? normalized : null;
+  }
+
+  function resolveResponsiveValues(baseValues, responsiveConfig, viewportWidth) {
+    var resolved = {};
+    var breakpointValues;
+    var key;
+
+    for (key in baseValues) {
+      if (Object.prototype.hasOwnProperty.call(baseValues, key)) {
+        resolved[key] = baseValues[key];
+      }
+    }
+
+    if (!responsiveConfig) {
+      return resolved;
+    }
+
+    responsiveBreakpointOrder.forEach(function(name) {
+      if (name !== "base" && viewportWidth < responsiveBreakpointMinWidths[name]) {
+        return;
+      }
+      breakpointValues = responsiveConfig[name];
+      if (!breakpointValues) {
+        return;
+      }
+      for (key in breakpointValues) {
+        if (Object.prototype.hasOwnProperty.call(breakpointValues, key)) {
+          resolved[key] = breakpointValues[key];
+        }
+      }
+    });
+
+    return resolved;
+  }
+
+  function cloneThemeSection(section) {
+    var copy = {};
+    var key;
+    for (key in section) {
+      if (Object.prototype.hasOwnProperty.call(section, key)) {
+        copy[key] = section[key];
+      }
+    }
+    return copy;
+  }
+
+  function cloneTheme(theme) {
+    var copy = {};
+    var section;
+    theme = theme || defaultTheme;
+    for (section in defaultTheme) {
+      if (Object.prototype.hasOwnProperty.call(defaultTheme, section)) {
+        copy[section] = cloneThemeSection(theme[section] || defaultTheme[section]);
+      }
+    }
+    return copy;
+  }
+
+  function mergeTheme(baseTheme, overrideTheme) {
+    var merged = cloneTheme(baseTheme || defaultTheme);
+    var section;
+    var token;
+    var overrideSection;
+
+    if (!isPlainObject(overrideTheme)) {
+      return merged;
+    }
+
+    for (section in defaultTheme) {
+      if (!Object.prototype.hasOwnProperty.call(defaultTheme, section)) {
+        continue;
+      }
+      overrideSection = overrideTheme[section];
+      if (!isPlainObject(overrideSection)) {
+        continue;
+      }
+      for (token in defaultTheme[section]) {
+        if (Object.prototype.hasOwnProperty.call(overrideSection, token) && overrideSection[token] != null && overrideSection[token] !== "") {
+          merged[section][token] = String(overrideSection[token]);
+        }
+      }
+    }
+
+    return merged;
+  }
+
+  function cloneThemeOverride(theme) {
+    var copy = {};
+    var section;
+    var token;
+    var sourceSection;
+
+    if (!isPlainObject(theme)) {
+      return null;
+    }
+
+    for (section in defaultTheme) {
+      if (!Object.prototype.hasOwnProperty.call(defaultTheme, section)) {
+        continue;
+      }
+      sourceSection = theme[section];
+      if (!isPlainObject(sourceSection)) {
+        continue;
+      }
+      copy[section] = {};
+      for (token in defaultTheme[section]) {
+        if (Object.prototype.hasOwnProperty.call(sourceSection, token) && sourceSection[token] != null && sourceSection[token] !== "") {
+          copy[section][token] = String(sourceSection[token]);
+        }
+      }
+      if (Object.keys(copy[section]).length === 0) {
+        delete copy[section];
+      }
+    }
+
+    return Object.keys(copy).length > 0 ? copy : null;
+  }
+
+  function themeVariablesFromTheme(theme) {
+    return {
+      "--jog-app-background": theme.colors.appBackground,
+      "--jog-surface": theme.colors.surface,
+      "--jog-surface-muted": theme.colors.surfaceMuted,
+      "--jog-text": theme.colors.text,
+      "--jog-text-muted": theme.colors.textMuted,
+      "--jog-text-strong": theme.colors.textStrong,
+      "--jog-border": theme.colors.border,
+      "--jog-border-soft": theme.colors.borderSoft,
+      "--jog-primary": theme.colors.primary,
+      "--jog-primary-text": theme.colors.primaryText,
+      "--jog-danger": theme.colors.danger,
+      "--jog-danger-text": theme.colors.dangerText,
+      "--jog-overlay": theme.colors.overlay,
+      "--jog-resize-grip": theme.colors.resizeGrip,
+      "--jog-font-family": theme.typography.fontFamily,
+      "--jog-font-size": theme.typography.fontSize,
+      "--jog-caption-size": theme.typography.captionSize,
+      "--jog-title-size": theme.typography.titleSize,
+      "--jog-line-height": theme.typography.lineHeight,
+      "--jog-radius-control": theme.radius.control,
+      "--jog-radius-section": theme.radius.section,
+      "--jog-radius-shell": theme.radius.shell,
+      "--jog-radius-window": theme.radius.window,
+      "--jog-page-padding": theme.spacing.pagePadding,
+      "--jog-section-header-x": theme.spacing.sectionHeaderX,
+      "--jog-section-header-y": theme.spacing.sectionHeaderY,
+      "--jog-section-body": theme.spacing.sectionBody,
+      "--jog-window-content": theme.spacing.windowContent,
+      "--jog-control-padding-x": theme.spacing.controlPaddingX,
+      "--jog-control-padding-y": theme.spacing.controlPaddingY,
+      "--jog-close-button-x": theme.spacing.closeButtonX,
+      "--jog-close-button-y": theme.spacing.closeButtonY,
+      "--jog-field-gap": theme.spacing.fieldGap,
+      "--jog-list-padding": theme.spacing.listPadding,
+      "--jog-shadow-shell": theme.shadow.shell,
+      "--jog-shadow-section": theme.shadow.section,
+      "--jog-shadow-window": theme.shadow.window,
+      "--jog-shadow-invalid-ring": theme.shadow.invalidRing
+    };
+  }
+
+  function applyThemeVariablesToNode(node, theme) {
+    var variables;
+    var name;
+
+    if (!node || !node.style) {
+      return;
+    }
+
+    variables = themeVariablesFromTheme(theme);
+    for (name in variables) {
+      if (Object.prototype.hasOwnProperty.call(variables, name)) {
+        if (typeof node.style.setProperty === "function") {
+          node.style.setProperty(name, variables[name]);
+        } else {
+          node.style[name] = variables[name];
+        }
+      }
+    }
+  }
+
+  function refreshRunningApplications() {
+    runningApplications.forEach(function(application) {
+      if (application && typeof application._applyTheme === "function") {
+        application._applyTheme();
+      }
+    });
   }
 
   function ensureArray(value) {
@@ -168,6 +569,9 @@
     if (state.gridColumn != null || state.gridRow != null) {
       summary.push("grid=(" + (state.gridColumn != null ? state.gridColumn : "-") + "," + (state.gridRow != null ? state.gridRow : "-") + ")");
     }
+    if (state.gridArea) {
+      summary.push("area=" + state.gridArea);
+    }
     if ((state.columnSpan || 1) !== 1 || (state.rowSpan || 1) !== 1) {
       summary.push("span=(" + (state.columnSpan || 1) + "," + (state.rowSpan || 1) + ")");
     }
@@ -306,15 +710,51 @@
     this.document = null;
     this.rootHost = null;
     this._dirtyControls = new Set();
+    this._responsiveControls = new Set();
     this._scheduled = false;
     this._windowZIndex = 1000;
     this._activeModalOverlay = null;
     this._modalWindows = [];
+    this._viewportListenerAttached = false;
+    this._handleViewportResize = this._handleViewportResize.bind(this);
   }
 
   Runtime.prototype.attach = function(doc, rootHost) {
     this.document = doc;
     this.rootHost = rootHost;
+    if (!this._viewportListenerAttached && typeof global.addEventListener === "function") {
+      global.addEventListener("resize", this._handleViewportResize);
+      this._viewportListenerAttached = true;
+    }
+  };
+
+  Runtime.prototype.getViewportWidth = function() {
+    if (this.document && this.document.body && isNumber(this.document.body.clientWidth) && this.document.body.clientWidth > 0) {
+      return this.document.body.clientWidth;
+    }
+    if (isNumber(global.innerWidth) && global.innerWidth > 0) {
+      return global.innerWidth;
+    }
+    return 1280;
+  };
+
+  Runtime.prototype.trackResponsiveControl = function(control, enabled) {
+    if (!control) {
+      return;
+    }
+    if (enabled) {
+      this._responsiveControls.add(control);
+      return;
+    }
+    this._responsiveControls.delete(control);
+  };
+
+  Runtime.prototype._handleViewportResize = function() {
+    var runtime = this;
+    this.debugLog("Lifecycle", "Viewport resize width=" + this.getViewportWidth());
+    this._responsiveControls.forEach(function(control) {
+      runtime.markDirty(control);
+    });
   };
 
   Runtime.prototype.debugLog = function(topic, message) {
@@ -479,6 +919,7 @@
     overlay.className = "jog-modal-overlay";
     this.document.body.appendChild(overlay);
     this._activeModalOverlay = overlay;
+    this.applyThemeToOverlay();
   };
 
   Runtime.prototype.hideModalOverlay = function() {
@@ -491,12 +932,24 @@
     this._activeModalOverlay = null;
   };
 
+  Runtime.prototype.applyThemeToOverlay = function(theme) {
+    var resolvedTheme = theme || (this.application && this.application._resolveTheme ? this.application._resolveTheme() : activeGlobalTheme);
+
+    if (!this._activeModalOverlay) {
+      return;
+    }
+
+    this._activeModalOverlay.style.background = resolvedTheme.colors.overlay;
+  };
+
   function Application() {
     this.Runtime = new Runtime(this);
     this.MainPage = null;
     this._stylesInjected = false;
     this.Debug = false;
     this._debugTopics = null;
+    this._themeOverride = null;
+    this._resolvedTheme = cloneTheme(activeGlobalTheme);
   }
 
   Application.prototype.Run = function(page) {
@@ -506,6 +959,10 @@
     page._attachToApplication(this);
     page.Refresh();
     this.Runtime.flush();
+    this._applyTheme();
+    if (runningApplications.indexOf(this) < 0) {
+      runningApplications.push(this);
+    }
   };
 
   Application.prototype.DumpTree = function(options) {
@@ -529,6 +986,27 @@
     set: function(value) { this._debugTopics = normalizeDebugTopics(value); }
   });
 
+  Object.defineProperty(Application.prototype, "Theme", {
+    get: function() { return this._themeOverride ? cloneThemeOverride(this._themeOverride) : null; },
+    set: function(value) {
+      this._themeOverride = cloneThemeOverride(value);
+      this._applyTheme();
+    }
+  });
+
+  Application.prototype._resolveTheme = function() {
+    this._resolvedTheme = mergeTheme(activeGlobalTheme, this._themeOverride);
+    return this._resolvedTheme;
+  };
+
+  Application.prototype._applyTheme = function() {
+    var theme = this._resolveTheme();
+    if (this.MainPage && this.MainPage._domNode) {
+      applyThemeVariablesToNode(this.MainPage._domNode, theme);
+    }
+    this.Runtime.applyThemeToOverlay(theme);
+  };
+
   Application.prototype._injectBaseStyles = function() {
     if (this._stylesInjected) {
       return;
@@ -536,22 +1014,22 @@
     var style = document.createElement("style");
     style.type = "text/css";
     style.textContent = [
-      ".jog-root { position: relative; min-height: 100vh; font-family: Arial, sans-serif; background: #f3f4f6; color: #1e293b; padding: 32px; }",
-      ".jog-page { position: relative; min-height: calc(100vh - 64px); }",
+      ".jog-root { position: relative; min-height: 100vh; font-family: var(--jog-font-family); font-size: var(--jog-font-size); background: var(--jog-app-background); color: var(--jog-text-strong); padding: var(--jog-page-padding); }",
+      ".jog-page { position: relative; min-height: 100%; }",
       ".jog-control { box-sizing: border-box; }",
       ".jog-panel { position: relative; }",
-      ".jog-dock-panel { position: relative; min-height: 100%; min-width: 100%; background: #ffffff; border: 1px solid #dbe2ea; border-radius: 16px; box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06); overflow: hidden; }",
+      ".jog-dock-panel { position: relative; min-height: 100%; min-width: 100%; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-shell); box-shadow: var(--jog-shadow-shell); overflow: hidden; }",
       ".jog-stack-panel { position: relative; display: flex; }",
       ".jog-stack-panel.vertical { flex-direction: column; }",
       ".jog-stack-panel.horizontal { flex-direction: row; align-items: center; }",
       ".jog-fill-width { width: 100%; }",
-      ".jog-section { position: relative; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04); overflow: hidden; }",
-      ".jog-section-header { padding: 14px 16px; font-size: 13px; font-weight: 600; color: #0f172a; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }",
-      ".jog-section-body { position: relative; padding: 16px; }",
+      ".jog-section { position: relative; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-section); box-shadow: var(--jog-shadow-section); overflow: hidden; }",
+      ".jog-section-header { padding: var(--jog-section-header-y) var(--jog-section-header-x); font-size: var(--jog-title-size); font-weight: 600; color: var(--jog-text); background: var(--jog-surface-muted); border-bottom: 1px solid var(--jog-border-soft); }",
+      ".jog-section-body { position: relative; padding: var(--jog-section-body); }",
       ".jog-grid-panel { position: relative; display: grid; align-items: start; }",
-      ".jog-window { position: absolute; border: 1px solid #cbd5e1; border-radius: 14px; background: #ffffff; box-shadow: 0 24px 50px rgba(15, 23, 42, 0.16); overflow: hidden; }",
-      ".jog-window-titlebar { background: #f8fafc; color: #0f172a; padding: 12px 16px; font-weight: 600; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }",
-      ".jog-window-content { position: relative; padding: 20px; background: #ffffff; }",
+      ".jog-window { position: absolute; border: 1px solid var(--jog-border); border-radius: var(--jog-radius-window); background: var(--jog-surface); box-shadow: var(--jog-shadow-window); overflow: hidden; }",
+      ".jog-window-titlebar { background: var(--jog-surface-muted); color: var(--jog-text); padding: 12px 16px; font-weight: 600; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--jog-border-soft); }",
+      ".jog-window-content { position: relative; padding: var(--jog-window-content); background: var(--jog-surface); }",
       ".jog-window-resize-handle { position: absolute; z-index: 2; }",
       ".jog-window-resize-handle.edge-top { top: -4px; left: 12px; right: 12px; height: 8px; cursor: ns-resize; }",
       ".jog-window-resize-handle.edge-right { top: 12px; right: -4px; bottom: 12px; width: 8px; cursor: ew-resize; }",
@@ -560,23 +1038,32 @@
       ".jog-window-resize-handle.corner-top-left { top: -4px; left: -4px; width: 14px; height: 14px; cursor: nwse-resize; }",
       ".jog-window-resize-handle.corner-top-right { top: -4px; right: -4px; width: 14px; height: 14px; cursor: nesw-resize; }",
       ".jog-window-resize-handle.corner-bottom-left { bottom: -4px; left: -4px; width: 14px; height: 14px; cursor: nesw-resize; }",
-      ".jog-window-resize-handle.corner-bottom-right { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 0 45%, #94a3b8 45% 55%, transparent 55% 100%); }",
-      ".jog-button { border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-size: 14px; }",
+      ".jog-window-resize-handle.corner-bottom-right { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 0 45%, var(--jog-resize-grip) 45% 55%, transparent 55% 100%); }",
+      ".jog-button { border: 1px solid var(--jog-border); background: var(--jog-surface); color: var(--jog-text); border-radius: var(--jog-radius-control); padding: var(--jog-control-padding-y) 14px; cursor: pointer; font-size: var(--jog-font-size); }",
       ".jog-button:disabled { opacity: 0.6; cursor: default; }",
-      ".jog-label { display: block; color: #475569; font-size: 14px; line-height: 1.45; }",
-      ".jog-label.jog-error-text { color: #b91c1c; font-size: 12px; line-height: 1.35; }",
-      ".jog-textbox { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: #ffffff; }",
-      ".jog-textarea { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: #ffffff; resize: vertical; min-height: 120px; }",
-      ".jog-checkbox-row { display: flex; align-items: center; gap: 10px; color: #334155; font-size: 14px; }",
+      ".jog-window-close { padding: var(--jog-close-button-y) var(--jog-close-button-x); background: var(--jog-primary); border-color: var(--jog-primary); color: var(--jog-primary-text); }",
+      ".jog-button.jog-theme-preset-primary { background: var(--jog-primary); border-color: var(--jog-primary); color: var(--jog-primary-text); }",
+      ".jog-button.jog-theme-preset-danger { background: var(--jog-danger); border-color: var(--jog-danger); color: var(--jog-primary-text); }",
+      ".jog-button.jog-theme-preset-quiet { background: transparent; border-color: transparent; color: var(--jog-text-muted); box-shadow: none; }",
+      ".jog-label { display: block; color: var(--jog-text-muted); font-size: var(--jog-font-size); line-height: var(--jog-line-height); }",
+      ".jog-label.jog-theme-preset-primary { color: var(--jog-primary); font-weight: 600; }",
+      ".jog-label.jog-theme-preset-strong { color: var(--jog-text); font-weight: 600; }",
+      ".jog-label.jog-error-text { color: var(--jog-danger-text); font-size: var(--jog-caption-size); line-height: 1.35; }",
+      ".jog-section.jog-theme-preset-muted { background: var(--jog-surface-muted); }",
+      ".jog-section.jog-theme-preset-primary { border-color: var(--jog-primary); }",
+      ".jog-section.jog-theme-preset-primary .jog-section-header { background: var(--jog-primary); color: var(--jog-primary-text); border-bottom-color: var(--jog-primary); }",
+      ".jog-textbox { border: 1px solid var(--jog-border); border-radius: var(--jog-radius-control); padding: var(--jog-control-padding-y) var(--jog-control-padding-x); font-size: var(--jog-font-size); background: var(--jog-surface); color: var(--jog-text); }",
+      ".jog-textarea { border: 1px solid var(--jog-border); border-radius: var(--jog-radius-control); padding: var(--jog-control-padding-y) var(--jog-control-padding-x); font-size: var(--jog-font-size); background: var(--jog-surface); color: var(--jog-text); resize: vertical; min-height: 120px; }",
+      ".jog-checkbox-row { display: flex; align-items: center; gap: var(--jog-field-gap); color: var(--jog-text-strong); font-size: var(--jog-font-size); }",
       ".jog-checkbox { width: 16px; height: 16px; }",
-      ".jog-radio-row { display: flex; align-items: center; gap: 10px; color: #334155; font-size: 14px; }",
+      ".jog-radio-row { display: flex; align-items: center; gap: var(--jog-field-gap); color: var(--jog-text-strong); font-size: var(--jog-font-size); }",
       ".jog-radio { width: 16px; height: 16px; }",
-      ".jog-select { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: #ffffff; min-height: 42px; }",
-      ".jog-listbox { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; font-size: 14px; background: #ffffff; min-height: 120px; }",
-      ".jog-textbox.jog-invalid, .jog-textarea.jog-invalid, .jog-select.jog-invalid, .jog-listbox.jog-invalid { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12); }",
-      ".jog-checkbox-row.jog-invalid, .jog-radio-row.jog-invalid { color: #b91c1c; }",
-      ".jog-stack-panel.jog-invalid .jog-radio-row { color: #b91c1c; }",
-      ".jog-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.22); z-index: 1000; }"
+      ".jog-select { border: 1px solid var(--jog-border); border-radius: var(--jog-radius-control); padding: var(--jog-control-padding-y) var(--jog-control-padding-x); font-size: var(--jog-font-size); background: var(--jog-surface); color: var(--jog-text); min-height: 42px; }",
+      ".jog-listbox { border: 1px solid var(--jog-border); border-radius: var(--jog-radius-control); padding: var(--jog-list-padding); font-size: var(--jog-font-size); background: var(--jog-surface); color: var(--jog-text); min-height: 120px; }",
+      ".jog-textbox.jog-invalid, .jog-textarea.jog-invalid, .jog-select.jog-invalid, .jog-listbox.jog-invalid { border-color: var(--jog-danger); box-shadow: var(--jog-shadow-invalid-ring); }",
+      ".jog-checkbox-row.jog-invalid, .jog-radio-row.jog-invalid { color: var(--jog-danger-text); }",
+      ".jog-stack-panel.jog-invalid .jog-radio-row { color: var(--jog-danger-text); }",
+      ".jog-modal-overlay { position: fixed; inset: 0; background: var(--jog-overlay); z-index: 1000; }"
     ].join("\n");
     document.head.appendChild(style);
     this._stylesInjected = true;
@@ -614,12 +1101,16 @@
       left: null,
       gridColumn: null,
       gridRow: null,
+      gridArea: null,
+      responsiveGrid: null,
+      responsiveLayout: null,
       columnSpan: 1,
       rowSpan: 1,
       padding: null,
       margin: null,
       gap: null,
       cssClass: null,
+      themePreset: "",
       tooltip: null,
       invalid: false,
       errorText: "",
@@ -689,6 +1180,10 @@
     return this._domNode;
   };
 
+  Component.prototype._isDockManagedChild = function(resolvedState) {
+    return !!(this._parent && this._parent._typeName === "DockPanel" && resolvedState && resolvedState.dock && resolvedState.dock !== "none");
+  };
+
   Component.prototype._createDomNode = function(doc) {
     var node = doc.createElement("div");
     node.className = "jog-control";
@@ -696,21 +1191,47 @@
   };
 
   Component.prototype._applyStateToDom = function(prevState, nextState) {
+    var isDockManagedChild;
+    var resolvedState = resolveResponsiveValues({
+      width: nextState.width,
+      height: nextState.height,
+      minWidth: nextState.minWidth,
+      minHeight: nextState.minHeight,
+      maxWidth: nextState.maxWidth,
+      maxHeight: nextState.maxHeight,
+      top: nextState.top,
+      left: nextState.left,
+      padding: nextState.padding,
+      margin: nextState.margin,
+      gap: nextState.gap,
+      dock: nextState.dock
+    }, nextState.responsiveLayout, this._runtime ? this._runtime.getViewportWidth() : 1280);
+
     if (!this._domNode) {
       return;
     }
+    this._resolvedResponsiveState = resolvedState;
+    isDockManagedChild = this._isDockManagedChild(resolvedState);
     this._domNode.id = nextState.name || nextState.id;
     this._domNode.style.display = nextState.visible ? "" : "none";
-    this._domNode.style.width = isNumber(nextState.width) ? toCssPixels(nextState.width) : "";
-    this._domNode.style.height = isNumber(nextState.height) ? toCssPixels(nextState.height) : "";
-    this._domNode.style.minWidth = isNumber(nextState.minWidth) ? toCssPixels(nextState.minWidth) : "";
-    this._domNode.style.minHeight = isNumber(nextState.minHeight) ? toCssPixels(nextState.minHeight) : "";
-    this._domNode.style.maxWidth = isNumber(nextState.maxWidth) ? toCssPixels(nextState.maxWidth) : "";
-    this._domNode.style.maxHeight = isNumber(nextState.maxHeight) ? toCssPixels(nextState.maxHeight) : "";
-    this._domNode.style.padding = toCssBox(nextState.padding);
-    this._domNode.style.margin = toCssBox(nextState.margin);
+    this._domNode.style.width = isDockManagedChild ? this._domNode.style.width : (isNumber(resolvedState.width) ? toCssPixels(resolvedState.width) : "");
+    this._domNode.style.height = isDockManagedChild ? this._domNode.style.height : (isNumber(resolvedState.height) ? toCssPixels(resolvedState.height) : "");
+    this._domNode.style.minWidth = isDockManagedChild ? this._domNode.style.minWidth : (isNumber(resolvedState.minWidth) ? toCssPixels(resolvedState.minWidth) : "");
+    this._domNode.style.minHeight = isDockManagedChild ? this._domNode.style.minHeight : (isNumber(resolvedState.minHeight) ? toCssPixels(resolvedState.minHeight) : "");
+    this._domNode.style.maxWidth = isDockManagedChild ? this._domNode.style.maxWidth : (isNumber(resolvedState.maxWidth) ? toCssPixels(resolvedState.maxWidth) : "");
+    this._domNode.style.maxHeight = isDockManagedChild ? this._domNode.style.maxHeight : (isNumber(resolvedState.maxHeight) ? toCssPixels(resolvedState.maxHeight) : "");
+    this._domNode.style.padding = toCssBox(resolvedState.padding);
+    this._domNode.style.margin = isDockManagedChild ? this._domNode.style.margin : toCssBox(resolvedState.margin);
     this._domNode.title = nextState.errorText || nextState.tooltip || "";
     this._domNode.classList.toggle("jog-invalid", !!nextState.invalid);
+    if (this._themePresetClass && this._themePresetClass !== "jog-theme-preset-" + nextState.themePreset) {
+      this._domNode.classList.remove(this._themePresetClass);
+      this._themePresetClass = "";
+    }
+    if (nextState.themePreset) {
+      this._themePresetClass = "jog-theme-preset-" + nextState.themePreset;
+      this._domNode.classList.add(this._themePresetClass);
+    }
     if (nextState.invalid) {
       this._domNode.setAttribute("aria-invalid", "true");
     } else {
@@ -718,6 +1239,9 @@
     }
     if (nextState.cssClass) {
       this._domNode.classList.add(nextState.cssClass);
+    }
+    if (this._runtime) {
+      this._runtime.trackResponsiveControl(this, !!(nextState.responsiveLayout || nextState.responsiveGrid));
     }
     if (!nextState.visible) {
       this._lifecycle = "Hidden";
@@ -775,6 +1299,7 @@
     }
     if (this._runtime) {
       this._runtime.debugLog("Lifecycle", "Dispose " + controlDebugName(this));
+      this._runtime.trackResponsiveControl(this, false);
     }
     this._bindings.forEach(function(binding) {
       if (typeof binding.unsubscribe === "function") {
@@ -948,6 +1473,11 @@
     set: function(value) { this._setState("gap", value); }
   });
 
+  Object.defineProperty(Component.prototype, "ResponsiveLayout", {
+    get: function() { return this._state.responsiveLayout; },
+    set: function(value) { this._setState("responsiveLayout", cloneResponsiveConfig(value, normalizeResponsiveLayoutBreakpoint)); }
+  });
+
   Object.defineProperty(Component.prototype, "GridColumn", {
     get: function() { return this._state.gridColumn; },
     set: function(value) { this._setState("gridColumn", value); }
@@ -956,6 +1486,16 @@
   Object.defineProperty(Component.prototype, "GridRow", {
     get: function() { return this._state.gridRow; },
     set: function(value) { this._setState("gridRow", value); }
+  });
+
+  Object.defineProperty(Component.prototype, "GridArea", {
+    get: function() { return this._state.gridArea; },
+    set: function(value) { this._setState("gridArea", value == null ? null : String(value)); }
+  });
+
+  Object.defineProperty(Component.prototype, "ResponsiveGrid", {
+    get: function() { return this._state.responsiveGrid; },
+    set: function(value) { this._setState("responsiveGrid", cloneResponsiveConfig(value, normalizeResponsivePlacementBreakpoint)); }
   });
 
   Object.defineProperty(Component.prototype, "ColumnSpan", {
@@ -976,6 +1516,11 @@
     }
   });
 
+  Object.defineProperty(Component.prototype, "ThemePreset", {
+    get: function() { return this._state.themePreset; },
+    set: function(value) { this._setState("themePreset", value == null ? "" : String(value)); }
+  });
+
   function Control(typeName) {
     Component.call(this, typeName || "Control");
   }
@@ -984,15 +1529,33 @@
   Control.prototype.constructor = Control;
 
   Control.prototype._applyStateToDom = function(prevState, nextState) {
+    var isDockManagedChild;
+    var resolvedLayoutState;
+    var resolvedGridPlacement;
+    var viewportWidth;
+
     Component.prototype._applyStateToDom.call(this, prevState, nextState);
     if (!this._domNode) {
       return;
     }
+    resolvedLayoutState = this._resolvedResponsiveState || nextState;
+    isDockManagedChild = this._isDockManagedChild(resolvedLayoutState);
+    if (this._runtime) {
+      viewportWidth = this._runtime.getViewportWidth();
+    }
+    resolvedGridPlacement = resolveResponsiveValues({
+      gridColumn: nextState.gridColumn,
+      gridRow: nextState.gridRow,
+      gridArea: nextState.gridArea,
+      columnSpan: nextState.columnSpan,
+      rowSpan: nextState.rowSpan
+    }, nextState.responsiveGrid, viewportWidth || 1280);
     this._domNode.style.position = this._usesFlowLayout() ? "" : "absolute";
-    this._domNode.style.left = this._usesFlowLayout() ? "" : toCssPixels(nextState.left);
-    this._domNode.style.top = this._usesFlowLayout() ? "" : toCssPixels(nextState.top);
-    this._domNode.style.gridColumn = nextState.gridColumn != null ? String(nextState.gridColumn) + " / span " + (nextState.columnSpan || 1) : "";
-    this._domNode.style.gridRow = nextState.gridRow != null ? String(nextState.gridRow) + " / span " + (nextState.rowSpan || 1) : "";
+    this._domNode.style.left = this._usesFlowLayout() || isDockManagedChild ? this._domNode.style.left : toCssPixels(resolvedLayoutState.left);
+    this._domNode.style.top = this._usesFlowLayout() || isDockManagedChild ? this._domNode.style.top : toCssPixels(resolvedLayoutState.top);
+    this._domNode.style.gridArea = resolvedGridPlacement.gridArea || "";
+    this._domNode.style.gridColumn = resolvedGridPlacement.gridArea ? "" : (resolvedGridPlacement.gridColumn != null ? String(resolvedGridPlacement.gridColumn) + " / span " + (resolvedGridPlacement.columnSpan || 1) : "");
+    this._domNode.style.gridRow = resolvedGridPlacement.gridArea ? "" : (resolvedGridPlacement.gridRow != null ? String(resolvedGridPlacement.gridRow) + " / span " + (resolvedGridPlacement.rowSpan || 1) : "");
     if ("disabled" in this._domNode) {
       this._domNode.disabled = !nextState.enabled;
     }
@@ -1108,6 +1671,9 @@
 
   Page.prototype._applyStateToDom = function(prevState, nextState) {
     Container.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (this._application) {
+      this._application._applyTheme();
+    }
     if (this._runtime && this._runtime.document) {
       this._runtime.document.title = nextState.title || "";
     }
@@ -1153,26 +1719,30 @@
   };
 
   DockPanel.prototype._applyStateToDom = function(prevState, nextState) {
+    var resolvedState;
+
     Container.prototype._applyStateToDom.call(this, prevState, nextState);
     if (!this._domNode) {
       return;
     }
+    resolvedState = this._resolvedResponsiveState || nextState;
 
-    var padding = normalizeBox(nextState.padding);
+    var padding = normalizeBox(resolvedState.padding);
     var top = padding.top;
     var left = padding.left;
     var right = (this._domNode.clientWidth || this.Width || 0) - padding.right;
     var bottom = (this._domNode.clientHeight || this.Height || 0) - padding.bottom;
 
     this._children.forEach(function(child) {
+      var childState = child._resolvedResponsiveState || child._state;
       if (!child._domNode) {
         return;
       }
 
-      var dock = child.Dock || "none";
-      var width = child.Width || child._domNode.offsetWidth || 0;
-      var height = child.Height || child._domNode.offsetHeight || 0;
-      var margin = normalizeBox(child.Margin);
+      var dock = childState.dock || child.Dock || "none";
+      var width = childState.width || child.Width || child._domNode.offsetWidth || 0;
+      var height = childState.height || child.Height || child._domNode.offsetHeight || 0;
+      var margin = normalizeBox(childState.margin);
       var style = child._domNode.style;
 
       style.position = "absolute";
@@ -1238,6 +1808,7 @@
     Container.call(this, "StackPanel");
     this._state.orientation = "vertical";
     this._state.spacing = 8;
+    this._state.responsive = null;
   }
 
   StackPanel.prototype = Object.create(Container.prototype);
@@ -1250,13 +1821,23 @@
   };
 
   StackPanel.prototype._applyStateToDom = function(prevState, nextState) {
+    var resolvedStack;
+
     Container.prototype._applyStateToDom.call(this, prevState, nextState);
     if (!this._domNode) {
       return;
     }
+    if (this._runtime) {
+      this._runtime.trackResponsiveControl(this, !!(nextState.responsive || nextState.responsiveLayout));
+    }
+    resolvedStack = resolveResponsiveValues({
+      orientation: nextState.orientation,
+      spacing: nextState.spacing,
+      gap: nextState.gap
+    }, nextState.responsive, this._runtime ? this._runtime.getViewportWidth() : 1280);
     this._domNode.classList.remove("vertical", "horizontal");
-    this._domNode.classList.add(nextState.orientation === "horizontal" ? "horizontal" : "vertical");
-    this._domNode.style.gap = toCssBox(nextState.gap != null ? nextState.gap : nextState.spacing) || "8px";
+    this._domNode.classList.add(resolvedStack.orientation === "horizontal" ? "horizontal" : "vertical");
+    this._domNode.style.gap = toCssBox(resolvedStack.gap != null ? resolvedStack.gap : resolvedStack.spacing) || "8px";
   };
 
   StackPanel.prototype._childUsesFlowLayout = function() {
@@ -1271,6 +1852,11 @@
   Object.defineProperty(StackPanel.prototype, "Spacing", {
     get: function() { return this._state.spacing; },
     set: function(value) { this._setState("spacing", isNumber(value) ? value : 8); }
+  });
+
+  Object.defineProperty(StackPanel.prototype, "Responsive", {
+    get: function() { return this._state.responsive; },
+    set: function(value) { this._setState("responsive", cloneResponsiveConfig(value, normalizeResponsiveStackBreakpoint)); }
   });
 
   function SectionPanel() {
@@ -1327,8 +1913,12 @@
     Container.call(this, "Grid");
     this._state.columns = "1fr";
     this._state.rows = "";
+    this._state.areas = "";
+    this._state.autoRows = "";
+    this._state.autoFlow = "row";
     this._state.columnGap = 12;
     this._state.rowGap = 12;
+    this._state.responsive = null;
   }
 
   Grid.prototype = Object.create(Container.prototype);
@@ -1341,14 +1931,33 @@
   };
 
   Grid.prototype._applyStateToDom = function(prevState, nextState) {
+    var resolvedGrid;
+    var viewportWidth;
+
     Container.prototype._applyStateToDom.call(this, prevState, nextState);
     if (!this._domNode) {
       return;
     }
-    this._domNode.style.gridTemplateColumns = toGridTrackList(nextState.columns, "1fr");
-    this._domNode.style.gridTemplateRows = toGridTrackList(nextState.rows, "");
-    this._domNode.style.columnGap = toCssPixels(nextState.columnGap);
-    this._domNode.style.rowGap = toCssPixels(nextState.rowGap);
+    if (this._runtime) {
+      this._runtime.trackResponsiveControl(this, !!nextState.responsive);
+      viewportWidth = this._runtime.getViewportWidth();
+    }
+    resolvedGrid = resolveResponsiveValues({
+      columns: nextState.columns,
+      rows: nextState.rows,
+      areas: nextState.areas,
+      autoRows: nextState.autoRows,
+      autoFlow: nextState.autoFlow,
+      columnGap: nextState.columnGap,
+      rowGap: nextState.rowGap
+    }, nextState.responsive, viewportWidth || 1280);
+    this._domNode.style.gridTemplateColumns = toGridTrackList(resolvedGrid.columns, "1fr");
+    this._domNode.style.gridTemplateRows = toGridTrackList(resolvedGrid.rows, "");
+    this._domNode.style.gridTemplateAreas = resolvedGrid.areas || "";
+    this._domNode.style.gridAutoRows = resolvedGrid.autoRows || "";
+    this._domNode.style.gridAutoFlow = resolvedGrid.autoFlow || "row";
+    this._domNode.style.columnGap = toCssPixels(resolvedGrid.columnGap);
+    this._domNode.style.rowGap = toCssPixels(resolvedGrid.rowGap);
   };
 
   Grid.prototype._childUsesFlowLayout = function() {
@@ -1365,6 +1974,24 @@
     set: function(value) { this._setState("rows", value); }
   });
 
+  Object.defineProperty(Grid.prototype, "Areas", {
+    get: function() { return this._state.areas; },
+    set: function(value) { this._setState("areas", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(Grid.prototype, "AutoRows", {
+    get: function() { return this._state.autoRows; },
+    set: function(value) { this._setState("autoRows", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(Grid.prototype, "AutoFlow", {
+    get: function() { return this._state.autoFlow; },
+    set: function(value) {
+      var allowed = ["row", "column", "row dense", "column dense"];
+      this._setState("autoFlow", allowed.indexOf(value) >= 0 ? value : "row");
+    }
+  });
+
   Object.defineProperty(Grid.prototype, "ColumnGap", {
     get: function() { return this._state.columnGap; },
     set: function(value) { this._setState("columnGap", isNumber(value) ? value : 12); }
@@ -1373,6 +2000,11 @@
   Object.defineProperty(Grid.prototype, "RowGap", {
     get: function() { return this._state.rowGap; },
     set: function(value) { this._setState("rowGap", isNumber(value) ? value : 12); }
+  });
+
+  Object.defineProperty(Grid.prototype, "Responsive", {
+    get: function() { return this._state.responsive; },
+    set: function(value) { this._setState("responsive", cloneResponsiveConfig(value, normalizeGridResponsiveBreakpoint)); }
   });
 
   function Label() {
@@ -1439,6 +2071,30 @@
   ValidationSummary.prototype.BindSummary = function(store, key, formatter) {
     this._messageLabel.BindMessage(store, key, formatter);
     this.BindVisible(store, key);
+  };
+
+  ValidationSummary.prototype.BindErrors = function(store, keys, formatter) {
+    var control = this;
+    var errorKeys = ensureArray(keys).slice();
+
+    function update() {
+      var messages = errorKeys.map(function(key) {
+        return store.Get(key);
+      }).filter(function(message) {
+        return !!message;
+      });
+      var summary = formatter ? formatter(messages, store) : (messages.length ? "Please fix: " + messages.join(" | ") : "");
+
+      control._messageLabel.Text = summary;
+      control.Visible = !!summary;
+    }
+
+    errorKeys.forEach(function(key) {
+      var unsubscribe = store.Subscribe(key, update);
+      control._bindings.push({ unsubscribe: unsubscribe });
+    });
+
+    update();
   };
 
   function Button() {
@@ -1922,11 +2578,7 @@
     var closeButton = doc.createElement("button");
     closeButton.type = "button";
     closeButton.textContent = "Close";
-    closeButton.className = "jog-button";
-    closeButton.style.padding = "4px 10px";
-    closeButton.style.background = "#0f172a";
-    closeButton.style.borderColor = "#0f172a";
-    closeButton.style.color = "#f8fafc";
+    closeButton.className = "jog-button jog-window-close";
     titleBar.appendChild(closeButton);
 
     var content = doc.createElement("div");
@@ -2190,6 +2842,20 @@
 
   Dialog.prototype = Object.create(Window.prototype);
   Dialog.prototype.constructor = Dialog;
+
+  JOG.SetTheme = function(theme) {
+    activeGlobalTheme = mergeTheme(defaultTheme, theme);
+    refreshRunningApplications();
+  };
+
+  JOG.GetTheme = function() {
+    return cloneTheme(activeGlobalTheme);
+  };
+
+  Object.defineProperty(JOG, "Theme", {
+    get: function() { return cloneTheme(activeGlobalTheme); },
+    set: function(value) { JOG.SetTheme(value); }
+  });
 
   JOG.Application = Application;
   JOG.Component = Component;

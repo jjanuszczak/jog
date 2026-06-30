@@ -22,6 +22,7 @@ JOG owns rendering, DOM creation, styling injection, and event wiring.
 
 Implemented public surface in `v2/JOG.js`:
 
+- theme API: `JOG.SetTheme()`, `JOG.GetTheme()`, `JOG.Theme`, `Application.Theme`
 - application runtime: `Application`, `Page`
 - base types: `Component`, `Control`, `Container`
 - layout containers: `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, `Grid`
@@ -48,6 +49,7 @@ Distribution build:
 - source runtime at [v2/JOG.js](../v2/JOG.js)
 - minified browser artifact at `dist/JOG.min.js`
 - source map at `dist/JOG.min.js.map`
+- starter release bundle at `dist/starter/`
 
 ## Application Model
 
@@ -67,24 +69,86 @@ app.Run(page);
 
 `Page` is the root container. It also sets `document.title` from `page.Title`.
 
+## Theme Model
+
+JOG now exposes a small public theme API instead of relying only on hardcoded built-in styling.
+
+Global theme usage:
+
+```js
+JOG.SetTheme({
+  colors: {
+    appBackground: "#f8f5ef",
+    primary: "#7c3f00",
+    primaryText: "#fff7ed"
+  },
+  typography: {
+    fontFamily: "\"IBM Plex Sans\", Arial, sans-serif"
+  }
+});
+```
+
+Per-application overrides:
+
+```js
+var app = new JOG.Application();
+
+app.Theme = {
+  colors: {
+    primary: "#0f766e",
+    primaryText: "#f0fdfa"
+  }
+};
+```
+
+Behavior implemented now:
+
+- global themes merge with built-in defaults
+- `Application.Theme` merges over the global theme for that app only
+- the runtime applies resolved values through CSS custom properties on the page root
+- the modal overlay is also themed even though it renders outside the page subtree
+
+Supported theme groups today:
+
+- `colors`
+- `typography`
+- `radius`
+- `spacing`
+- `shadow`
+
 ## Install Model
 
 JOG V2 is currently a direct browser runtime, not an npm-installed application framework.
+Npm packaging is intentionally deferred until the current release-asset automation proves insufficient.
 
 The practical install story today is:
 
-1. ship `v2/JOG.js` as a readable development build, or ship `dist/JOG.min.js` as a release build
-2. include the runtime with a `<script>` tag
-3. load app code that constructs controls and calls `Application.Run(page)`
+1. treat GitHub Releases as the primary distribution channel for browser-ready artifacts
+2. ship `v2/JOG.js` as a readable development build, or ship `dist/JOG.min.js` as a release build
+3. include the runtime with a `<script>` tag
+4. load app code that constructs controls and calls `Application.Run(page)`
 
 Generate the minified distribution with:
 
 ```bash
 npm install
-npm run build:dist
+npm run build:release
 ```
 
-This is the appropriate release packaging model for the current state of the project. It keeps the browser delivery story simple while the runtime API continues to evolve.
+This currently writes:
+
+- `dist/JOG.min.js`
+- `dist/JOG.min.js.map`
+- `dist/starter/index.html`
+- `dist/starter/StarterApp.js`
+- `dist/release/JOG.min.js`
+- `dist/release/JOG.min.js.map`
+- `dist/release/jog-starter-index.html`
+- `dist/release/jog-starter-app.js`
+
+The `dist/release/` files are the exact assets that should be attached to GitHub Releases today. The current release process is documented in [doc/release-guide.md](release-guide.md), and the upload step is automated in [release-artifacts.yml](../.github/workflows/release-artifacts.yml).
+
+This is the appropriate release packaging model for the current state of the project. It keeps the browser delivery story simple while the runtime API continues to evolve, and now includes a minimal starter bundle you can copy and rename.
 
 ## Control Model
 
@@ -188,6 +252,7 @@ Use it when you need explicit `Left` and `Top` placement.
 
 - `Orientation = "vertical"` or `"horizontal"`
 - `Gap` or `Spacing` controls item spacing
+- `Responsive` can switch orientation and spacing by breakpoint
 
 Use it for simple linear layouts, toolbars, vertical forms, and button rows.
 
@@ -205,6 +270,8 @@ Children can set:
 
 The container also respects container `Padding` and child `Margin`.
 
+Responsive dock behavior can now be driven through inherited `ResponsiveLayout` on the container and its children. This is the current way to collapse a left sidebar into a top region on smaller widths.
+
 Use it for app shells, sidebars, top bars, and detail regions.
 
 ### SectionPanel
@@ -221,17 +288,54 @@ Grid container properties:
 
 - `Columns`
 - `Rows`
+- `Areas`
+- `AutoRows`
+- `AutoFlow`
 - `ColumnGap`
 - `RowGap`
+- `Responsive`
 
 Child placement properties:
 
 - `GridColumn`
 - `GridRow`
+- `GridArea`
 - `ColumnSpan`
 - `RowSpan`
+- `ResponsiveGrid`
 
-Current limitation: `Grid` is explicit placement only. There is no auto-layout engine, no named areas, and no higher-level row or column abstraction yet.
+Breakpoint keys implemented now:
+
+- `base`
+- `sm` at `640px`
+- `md` at `768px`
+- `lg` at `1024px`
+- `xl` at `1280px`
+
+Example:
+
+```js
+formGrid.Responsive = {
+  base: { columns: ["1fr"] },
+  md: { columns: ["160px", "1fr"] }
+};
+
+nameInput.ResponsiveGrid = {
+  base: { column: 1, row: 2 },
+  md: { column: 2, row: 1 }
+};
+```
+
+Component-level layout changes can also use `ResponsiveLayout`:
+
+```js
+sidebar.ResponsiveLayout = {
+  base: { dock: "top", height: 220, margin: { bottom: 16 } },
+  md: { dock: "left", width: 270, margin: { top: 0, right: 24, bottom: 0, left: 0 } }
+};
+```
+
+Current limitation: `Grid` now supports explicit placement, named areas, automatic row sizing, and breakpoint-based responsive overrides, while `StackPanel` and `DockPanel` now support narrower responsive behavior. There is still no higher-level layout abstraction or container-query model.
 
 ## Window and Dialog Model
 
@@ -264,6 +368,27 @@ Useful window properties today:
 
 When `Resizable = true`, the window can be resized from edges and corners. Resize behavior currently respects `MinWidth` and `MinHeight`.
 
+## Theme Presets
+
+JOG now has a small built-in preset surface on `ThemePreset`.
+
+Implemented presets today:
+
+- `Button`: `primary`, `danger`, `quiet`
+- `Label`: `primary`, `strong`
+- `SectionPanel`: `primary`, `muted`
+
+Example:
+
+```js
+saveButton.ThemePreset = "primary";
+deleteButton.ThemePreset = "danger";
+sidebar.ThemePreset = "primary";
+titleLabel.ThemePreset = "strong";
+```
+
+This is intentionally narrow. It gives app code a stable presentation layer without opening arbitrary per-control style objects yet.
+
 ## Store and Binding Model
 
 `JOG.Store` is intentionally small.
@@ -288,6 +413,7 @@ Current explicit binding helpers:
 - `Label.BindText(store, key, formatter)`
 - `ValidationMessage.BindMessage(store, key, formatter)`
 - `ValidationSummary.BindSummary(store, key, formatter)`
+- `ValidationSummary.BindErrors(store, keys, formatter)`
 - `TextBox.BindText(store, key)`
 - `TextArea.BindText(store, key)`
 - `CheckBox.BindChecked(store, key)`
@@ -335,7 +461,7 @@ The recommended pattern now is:
 3. have validation code set or clear that store key
 4. render inline error labels only where you want them
 
-You can also keep a separate summary key in the store when you want a page-level validation summary block above the form. `ValidationMessage` and `ValidationSummary` now remove most of the repeated wiring for those regions while keeping validation timing in app code.
+You can also keep a separate summary key in the store when you want a page-level validation summary block above the form. When your summary is just a composition of field-level error strings, `ValidationSummary.BindErrors(store, ["nameError", "statusError"])` removes that extra summary-store wiring while keeping validation timing in app code.
 
 For radio-group validation, bind the error key to the `StackPanel` that owns the radio buttons. The built-in invalid styling now propagates from that row container to the radio captions.
 
@@ -423,6 +549,7 @@ Calling setters on a disposed control throws.
 [v2/FormApp.js](../v2/FormApp.js) demonstrates:
 
 - `Grid` form layout
+- breakpoint-based responsive `Grid` layout
 - text input binding
 - dropdown binding
 - checkbox binding
@@ -435,7 +562,7 @@ Calling setters on a disposed control throws.
 - `BindError()` for field-level invalid state
 - `Label.BindText()` and `BindVisible()` for reusable page-level validation wiring
 - inline error labels driven by store state
-- validation summary region driven by store state
+- validation summary region driven either by a dedicated store key or directly from multiple field error keys
 - checkbox and radio-group validation with invalid-state styling
 
 [v2/CustomerAdminApp.js](../v2/CustomerAdminApp.js) now also demonstrates:
@@ -447,9 +574,17 @@ Calling setters on a disposed control throws.
 
 [v2/ExampleApp.js](../v2/ExampleApp.js) now also demonstrates:
 
+- switching the public theme API at runtime between the built-in default and two distinct palettes
 - opening one modal dialog directly
 - opening a second modal on top of the first
 - verifying that the shared overlay stays between the top modal and lower modal windows
+
+[v2/OpportunityBoardApp.js](../v2/OpportunityBoardApp.js) now also demonstrates:
+
+- breakpoint-aware dialog form layout inside the opportunity editor
+- responsive `DockPanel` shell behavior for the board sidebar
+- responsive `StackPanel` action rows
+- built-in `ThemePreset` usage on buttons, labels, and sections
 
 ## Guidance for Developers
 
@@ -462,13 +597,13 @@ Calling setters on a disposed control throws.
 
 Not implemented yet:
 
-- theming API beyond built-in styles
-- resize behavior for windows
 - menus, tabs, grids for data, trees, toolbars
-- diagnostics tooling
-- automated tests
+- richer diagnostics tooling beyond debug logging and tree dumps
+- accessibility pass
 
 Partially implemented:
 
+- theming is now public and token-based, and built-in theme presets exist, but arbitrary per-control style objects are still not implemented
 - validation exists at the control level, but there is no first-class form validation API yet
 - inline error presentation is possible, but app code must render the error labels explicitly
+- responsive layout helpers now exist for `Grid`, and in narrower form for `StackPanel` and `DockPanel`, but not for `SectionPanel`

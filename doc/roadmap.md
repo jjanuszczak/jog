@@ -17,8 +17,11 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - window z-order management
 - control-level invalid state and error text
 - application diagnostics with debug logging and tree dump
+- public theme API with global and per-application token overrides
+- built-in theme presets for selected control types
 - zero-dependency Node test runner for core runtime regression checks
 - minified browser distribution build at `dist/JOG.min.js`
+- starter release bundle at `dist/starter/`
 
 ### Base Types
 
@@ -54,6 +57,7 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - `Label.BindText`
 - `ValidationMessage.BindMessage`
 - `ValidationSummary.BindSummary`
+- `ValidationSummary.BindErrors`
 - `TextBox.BindText`
 - `TextArea.BindText`
 - `CheckBox.BindChecked`
@@ -81,15 +85,19 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - simple example app
 - customer admin example
 - form demo with grid layout
+- form demo with breakpoint-aware responsive grid layout
 - form demo validation and inline error feedback
 - form demo validation summary with reusable binding helpers
 - form demo checkbox and radio-group invalid-state feedback
 - opportunity board sample with CRM-style add, edit, and delete flows
+- opportunity editor dialog with breakpoint-aware responsive grid layout
+- opportunity board shell with responsive dock and stack behavior
+- opportunity board use of built-in theme presets
 
 ### Tests
 
 - Node test runner at `test/run-v2-tests.js`
-- baseline coverage for store, container rules, diagnostics, error binding, lifecycle guards, richer window resize behavior, modal stacking, window lifecycle events, and example-level integration flows including customer selection, dialog close branches, and form reset behavior
+- baseline coverage for store, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock and stack behavior, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, and example-level integration flows including customer selection, dialog close branches, and form reset behavior
 
 ## Partial
 
@@ -99,10 +107,10 @@ No major known runtime gaps remain beyond normal hardening.
 
 ### Layout
 
-- `Grid` supports explicit placement only
-- no auto row generation abstraction
-- no named areas
-- no responsive layout helpers
+- `Grid` now has breakpoint-based responsive track and placement overrides
+- `StackPanel` now has breakpoint-based orientation and spacing overrides
+- `DockPanel` now supports responsive shell and child layout changes through inherited `ResponsiveLayout`
+- `SectionPanel` still has no dedicated responsive helper surface
 
 ### Events
 
@@ -111,11 +119,16 @@ No major known runtime gaps remain beyond normal hardening.
 ### Styling
 
 - framework injects built-in styles
-- public theme API is not implemented yet
+- public theme API exists for global and per-application token overrides
+- built-in theme presets now exist for selected control types
+- arbitrary per-control style objects are still not implemented
 
 ### Packaging
 
 - release packaging is direct browser script usage, not npm runtime installation
+- GitHub Releases are the primary intended distribution channel for built browser artifacts
+- GitHub Release asset upload is automated for published releases
+- npm packaging is intentionally deferred unless the current release artifact flow proves insufficient
 - minified distribution output exists, but there is no broader package-manager or CDN distribution story yet
 
 ### Validation
@@ -124,22 +137,9 @@ No major known runtime gaps remain beyond normal hardening.
 - error-state binding from store to control now exists
 - page-level visibility and label text can now bind directly to store keys
 - first-class validation display controls now exist for inline messages and summary blocks
+- validation summaries can now derive their own message directly from multiple field error keys
 - radio-group invalid styling can now be applied at the row-container level
 - app code must still orchestrate when validation runs
-
-## Next Recommended Work
-
-### 1. Validation Maturity
-
-Build on the new validation surface:
-
-- consider whether first-class validation summary or field-message controls are worth adding
-
-### 2. Packaging Maturity
-
-- decide whether to keep GitHub Releases as the primary distribution path
-- consider a starter release bundle with `JOG.min.js`, a starter HTML file, and a minimal app example
-- decide later whether npm packaging is worth the maintenance cost
 
 ## Deferred
 
@@ -149,9 +149,10 @@ Build on the new validation surface:
 - tab control
 - data grid
 - tree view
-- theming system
+- arbitrary per-control style objects
 - richer binding model
 - accessibility pass
+- npm package publishing unless the release artifact workflow later proves insufficient
 
 ## Documentation Rule
 

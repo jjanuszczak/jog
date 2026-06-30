@@ -12,6 +12,8 @@ async function main() {
   var distDir = path.join(rootDir, "dist");
   var outputPath = path.join(distDir, "JOG.min.js");
   var sourceMapPath = path.join(distDir, "JOG.min.js.map");
+  var starterSourceDir = path.join(rootDir, "starter");
+  var starterDistDir = path.join(distDir, "starter");
   var source = fs.readFileSync(inputPath, "utf8");
   var result;
 
@@ -31,8 +33,12 @@ async function main() {
   fs.mkdirSync(distDir, { recursive: true });
   fs.writeFileSync(outputPath, result.code, "utf8");
   fs.writeFileSync(sourceMapPath, result.map, "utf8");
+  fs.mkdirSync(starterDistDir, { recursive: true });
+  fs.copyFileSync(path.join(starterSourceDir, "index.html"), path.join(starterDistDir, "index.html"));
+  fs.copyFileSync(path.join(starterSourceDir, "StarterApp.js"), path.join(starterDistDir, "StarterApp.js"));
 
   console.log("Built dist/JOG.min.js");
+  console.log("Built dist/starter/");
 }
 
 main().catch(function(error) {

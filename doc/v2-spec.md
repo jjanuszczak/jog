@@ -497,28 +497,124 @@ JOG should support styling without requiring app authors to write CSS by hand.
 
 ### 18.1 Framework Styling Rules
 
-- framework may emit stable class names
-- framework may set dynamic inline styles
-- theme objects may define control defaults
+- framework should emit stable class names for built-in controls
+- framework may set dynamic inline styles for layout and runtime-driven positioning
+- framework should expose a public theme API based on named design tokens
+- apps should be able to theme the entire runtime without editing the injected stylesheet directly
 
-### 18.2 Theme Example
+### 18.2 Public Theme API
+
+The public styling surface for V2 should be token-based and explicit.
+
+Required global API:
+
+- `JOG.SetTheme(themeObject)`
+- `JOG.GetTheme()`
+- `JOG.Theme`
+
+Required application-level API:
+
+- `app.Theme`
+
+Theme application rules:
+
+- `JOG.SetTheme(...)` sets the process-wide default theme for future apps
+- running apps without an application override should update when the global theme changes
+- `app.Theme` should override the global theme for that application only
+- the active app theme should be resolved as `merge(globalTheme, app.Theme)`
+
+### 18.3 Theme Shape
 
 ```js
-JOG.Theme.Default = {
-  Button: {
-    padding: "6px 10px"
+JOG.SetTheme({
+  colors: {
+    appBackground: "#f5efe6",
+    surface: "#fffdf8",
+    surfaceMuted: "#f2eadf",
+    text: "#1f2937",
+    textMuted: "#5b6472",
+    border: "#d7cbbb",
+    primary: "#8a4b2a",
+    primaryText: "#fff8f1",
+    danger: "#c2410c",
+    dangerText: "#9a3412",
+    overlay: "rgba(42, 24, 16, 0.28)"
   },
-  Window: {
-    backgroundColor: "#dddddd"
+  typography: {
+    fontFamily: "\"IBM Plex Sans\", Arial, sans-serif",
+    fontSize: "14px",
+    captionSize: "12px",
+    titleSize: "13px",
+    lineHeight: "1.45"
+  },
+  radius: {
+    control: "8px",
+    section: "14px",
+    shell: "16px",
+    window: "14px"
+  },
+  spacing: {
+    pagePadding: "32px",
+    sectionBody: "16px",
+    windowContent: "20px"
+  },
+  shadow: {
+    shell: "0 14px 34px rgba(15, 23, 42, 0.06)",
+    section: "0 8px 20px rgba(15, 23, 42, 0.04)",
+    window: "0 24px 50px rgba(15, 23, 42, 0.16)"
+  }
+});
+```
+
+Applications should also be able to override the global theme:
+
+```js
+var app = new JOG.Application();
+
+app.Theme = {
+  colors: {
+    primary: "#0f766e",
+    primaryText: "#f0fdfa"
   }
 };
 ```
 
-### 18.3 Public Styling Surface
+### 18.4 Initial Token Groups
+
+V2 should standardize these theme groups:
+
+- `colors`
+- `typography`
+- `radius`
+- `spacing`
+- `shadow`
+
+Each group should contain documented token names. Unknown token names should not be relied on as public API.
+
+### 18.5 Styling Delivery Model
+
+The runtime should:
+
+- inject one stable base stylesheet
+- express default visual styling through CSS custom properties
+- assign resolved theme values to the page root so child controls inherit them
+- apply a small amount of runtime style directly where required for layout, positioning, or out-of-tree overlays
+
+### 18.6 Public Styling Surface
+
+Implemented public styling hooks should be limited to:
 
 - `CssClass`
-- theme selection
-- optional per-control style object later
+- `JOG.SetTheme(themeObject)`
+- `JOG.GetTheme()`
+- `JOG.Theme`
+- `app.Theme`
+
+Not part of the initial public API:
+
+- arbitrary per-control style objects
+- direct editing of generated framework CSS
+- undocumented CSS variable names as compatibility guarantees
 
 ## 19. Error Handling and Diagnostics
 
