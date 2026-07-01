@@ -16,12 +16,12 @@ The active implementation is `v2/`.
 JOG V2 is functional and actively evolving. It already includes:
 
 - application and page bootstrapping
-- controls such as `MenuBar`, `ToolBar`, `StatusBar`, `TabControl`, `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, and `ListBox`
+- controls such as `MenuBar`, `ToolBar`, `StatusBar`, `TabControl`, `DataGrid`, `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, and `ListBox`
 - layout containers such as `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, and `Grid`
 - breakpoint-aware responsive overrides for `Grid`
 - responsive layout helpers for `StackPanel` and `DockPanel`
 - dialogs and windows with dragging, stacked modal behavior, and lower-right resizing
-- explicit store-based binding
+- explicit store-based binding plus first-pass collection state
 - control-level validation state
 - public theme API with global and per-app token overrides
 - built-in theme presets for selected control types
@@ -68,7 +68,7 @@ What they cover:
 - `notepad.html`: multi-document notepad shell with a docked menu, docked status bar, responsive editor area, browser file open and save flows, and one document per tab
 - `customer-admin.html`: CRUD-style page shell with shared inline and dialog validation
 - `form-demo.html`: form layout, responsive grid collapse, explicit store binding, reusable validation summary wiring, inline errors, radio-group invalid state
-- `opportunity-board.html`: CRM-style opportunity rows with add, edit, delete, modal record editing, a responsive editor form, and a responsive board shell
+- `opportunity-board.html`: CRM-style opportunity board using `Collection` plus `DataGrid` for row selection, edit and delete commands, dirty-state tracking, derived summaries, and first-pass resizable columns
 
 ## Installing JOG Today
 

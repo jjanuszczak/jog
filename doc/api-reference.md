@@ -448,6 +448,52 @@ Current limitations:
 - no container-query model
 - no responsive helper surface yet for `SectionPanel`
 
+### `JOG.DataGrid`
+
+Extends `JOG.Control`.
+
+Properties:
+
+- `Columns`
+- `RowCommands`
+- `Collection`
+- `EmptyText`
+- `SelectionMode`
+- `ResizableColumns`
+
+Events:
+
+- `OnSelectionChange(listener)`
+- `OnRowCommand(listener)`
+
+Column shape supported now:
+
+- `key`
+- `field`
+- `title`
+- `width`
+- `align`
+- `formatter`
+- `resizable`
+
+Row command shape supported now:
+
+- `key`
+- `text`
+- `themePreset`
+- `enabled`
+- `visible`
+
+Notes:
+
+- binds to a `JOG.Collection`
+- renders a header row plus one rendered row per collection record
+- supports single-row selection or `SelectionMode = "none"`
+- `ResizableColumns = true` enables mouse-driven header resizing for columns that already use explicit pixel widths
+- row command events expose `args.Key`, `args.RowId`, `args.Row`, and `args.Command`
+- dirty and selected rows receive built-in styling
+- sorting, filtering, inline editing, virtualization, touch resizing, and keyboard navigation are not implemented yet
+
 ## Controls
 
 ### `JOG.Label`
@@ -703,6 +749,47 @@ Notes:
 - `Subscribe` returns an unsubscribe function
 - `Set` does nothing if the new value is strictly equal to the old value
 
+### `JOG.Collection`
+
+Methods:
+
+- `GetIdKey()`
+- `GetRowId(row)`
+- `GetRows()`
+- `GetRow(id)`
+- `SetRows(rows)`
+- `Insert(row, index)`
+- `Update(id, updaterOrPatch)`
+- `Upsert(row)`
+- `Remove(id)`
+- `Select(id)`
+- `SetSelectedIds(ids)`
+- `ToggleSelected(id)`
+- `ClearSelection()`
+- `IsSelected(id)`
+- `GetSelectedId()`
+- `GetSelectedIds()`
+- `GetSelectedRows()`
+- `GetDirtyRowIds()`
+- `GetDeletedRowIds()`
+- `GetDirtyState()`
+- `IsDirty(id)`
+- `HasDirtyRows()`
+- `MarkClean(ids)`
+- `SetSummaryDefinitions(definitions)`
+- `GetSummary(key)`
+- `GetSummaries()`
+- `Subscribe(key, listener)`
+
+Notes:
+
+- constructor accepts `{ idKey, rows, summaryDefinitions, selectedId, selectedIds }`
+- row ids are compared as strings using the configured `idKey`
+- `Update(id, updaterOrPatch)` accepts either a function or a shallow patch object
+- dirty tracking covers changed current rows plus deleted baseline rows
+- `MarkClean()` without ids resets the current snapshot as the clean baseline
+- subscription keys are `rows`, `selection`, `dirty`, `summary`, and `change`
+
 ### `JOG.EventArgs`
 
 Properties:
@@ -713,6 +800,11 @@ Properties:
 - `Handled`
 - `Value`
 - `Key`
+- `RowId`
+- `Row`
+- `Column`
+- `Command`
+- `Index`
 
 ## Minimal Example
 

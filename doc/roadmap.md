@@ -4,6 +4,17 @@
 
 This roadmap tracks implementation reality, not aspiration. Update it whenever framework work lands.
 
+## Current Direction
+
+JOG should optimize for one narrow product lane:
+
+- browser-based internal tools
+- line-of-business applications
+- form-heavy and CRUD-heavy workflows
+- desktop-style shells with tabs, dialogs, status chrome, and predictable state flow
+
+That means the next phase is not broad control expansion for its own sake. The next phase is making shell layout dependable, shipping stronger data-heavy primitives, improving state leverage, and closing the keyboard and accessibility gap.
+
 ## Implemented
 
 ### Runtime and Core
@@ -46,6 +57,7 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - `ToolBar`
 - `StatusBar`
 - `TabControl`
+- `DataGrid`
 - `Label`
 - `ValidationMessage`
 - `ValidationSummary`
@@ -60,6 +72,7 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 ### State and Binding
 
 - `Store`
+- `Collection`
 - `Label.BindText`
 - `ValidationMessage.BindMessage`
 - `ValidationSummary.BindSummary`
@@ -74,6 +87,7 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - `SetError(message)`
 - `ClearError()`
 - `BindError(store, key)`
+- collection row identity, selection, dirty tracking, and derived summary definitions
 
 ### Windows and Dialogs
 
@@ -98,6 +112,8 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 - form demo validation summary with reusable binding helpers
 - form demo checkbox and radio-group invalid-state feedback
 - opportunity board sample with CRM-style add, edit, and delete flows
+- opportunity board migrated to `Collection` plus `DataGrid`
+- opportunity board now demonstrates first-pass resizable `DataGrid` columns
 - opportunity editor dialog with breakpoint-aware responsive grid layout
 - opportunity board shell with responsive dock and stack behavior
 - opportunity board use of built-in theme presets
@@ -105,13 +121,17 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 ### Tests
 
 - Node test runner at `test/run-v2-tests.js`
-- baseline coverage for store, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock and stack behavior, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, and example-level integration flows including customer selection, dialog close branches, and form reset behavior
+- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock and stack behavior, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
 
 ## Partial
 
 ### Window System
 
-No major known runtime gaps remain beyond normal hardening.
+- modal stacking, drag, resize, and lifecycle hooks are working
+- modal focus trap is not implemented yet
+- focus restoration after dialog close is not implemented yet
+- broader keyboard-first dialog behavior still needs hardening
+- the window system is usable, but not yet production-grade from an accessibility standpoint
 
 ### Layout
 
@@ -119,6 +139,8 @@ No major known runtime gaps remain beyond normal hardening.
 - `StackPanel` now has breakpoint-based orientation and spacing overrides
 - `DockPanel` now supports responsive shell and child layout changes through inherited `ResponsiveLayout`
 - `SectionPanel` still has no dedicated responsive helper surface
+- shell layout still pushes too much height and chrome math into app code
+- the framework still lacks a higher-level workspace or split-shell container for desktop-style app composition
 
 ### Shell Controls
 
@@ -128,10 +150,17 @@ No major known runtime gaps remain beyond normal hardening.
 - `TabControl` exists as a first minimal tabbed container with explicit `TabPage` children
 - nested menus, accelerators, and keyboard navigation are not implemented yet
 - toolbar overflow, separators, richer status conventions, closable tabs, and drag reordering are not implemented yet
+- shell controls are proving the concept, but still need more depth before they can carry a long-lived business app without custom glue
 
 ### Events
 
 - shorthand aliases still exist alongside the preferred `OnX` style
+
+### API Contract
+
+- the runtime, examples, and current developer docs now center the authoring model around `new`, property assignment, `Add`, `OnX`, and `Application.Run(page)`
+- older rationale documents still contain outdated or broader examples, including `Click(listener)`-first guidance and older future-control framing
+- the public contract needs to be reconciled so contributors have one canonical programming model
 
 ### Styling
 
@@ -158,14 +187,81 @@ No major known runtime gaps remain beyond normal hardening.
 - radio-group invalid styling can now be applied at the row-container level
 - app code must still orchestrate when validation runs
 
+### State and Data
+
+- explicit store binding is working well for single-record forms
+- `Collection` now covers row identity, selection, update patterns, dirty tracking, deleted-row tracking, and derived summaries
+- `DataGrid` now covers columns, rows, single selection, basic formatting, dirty-row styling, row commands, and first-pass mouse resizing for pixel-width columns
+- app code still owns sorting, filtering, inline editing flows, persistence, and keyboard-heavy interaction behavior
+- collection-to-control binding is still split between `Collection` subscriptions and `Store` bindings rather than a broader derived-state layer
+- resized column widths currently persist only in memory for the lifetime of the grid instance
+- the initial data-grid sprint goal is met at a credible first-pass level, but not yet at a production-depth level
+
+## Next Priorities
+
+1. Shell and layout hardening
+2. Richer binding and app-state helpers
+3. DataGrid depth and behavior hardening
+4. Accessibility and keyboard model
+5. Deeper shell-control behavior
+6. Browser-level interaction verification
+
+### 1. Shell And Layout Hardening
+
+- make shell layout boring and dependable
+- reduce explicit height, offset, and chrome math in app code
+- add stronger desktop-style shell composition primitives such as split-workspace and left-nav-plus-content patterns
+- strengthen container interactions so examples like `notepad` require less manual layout coordination
+
+### 2. Richer Binding And App-State Helpers
+
+- add stronger support for collection updates and repeated UI structures
+- improve validation orchestration helpers
+- improve selection, dirty tracking, and derived-value patterns without turning JOG into a magic framework
+- keep the model explicit and JavaScript-first
+
+### 3. DataGrid Depth And Behavior Hardening
+
+- add sorting and filtering without breaking the explicit collection model
+- add inline editing patterns only after the row-command and dialog flows are stable
+- harden column sizing and layout behavior for wider datasets
+- keep resized column widths in memory only for now, then later decide whether apps need hooks for saved views or per-user persistence
+- expose finer per-column overflow and sizing behavior once more than the OpportunityBoard example needs it
+- keep `TreeView` behind deeper `DataGrid` maturity unless a concrete app need pulls it forward
+
+## Remaining From Initial Data Scope
+
+- sorting is still deferred
+- filtering is still deferred
+- inline editing inside `DataGrid` is still deferred
+- persistence of collection mutations remains app-owned
+- keyboard-first and accessibility-grade grid behavior remains unfinished
+
+### 4. Accessibility And Keyboard Model
+
+- add modal focus trap
+- restore focus after dialog close
+- add keyboard navigation for `MenuBar`
+- add keyboard navigation for `TabControl`
+- review control labeling and semantics
+- treat accessibility as framework completeness, not deferred polish
+
+### 5. Deeper Shell-Control Behavior
+
+- add menu hierarchy and better command behavior where appropriate
+- add toolbar overflow and separators
+- add stronger status-bar conventions
+- add closable and reorderable tabs when the underlying shell behavior is stable
+
+### 6. Browser-Level Interaction Verification
+
+- keep the zero-dependency Node suite for fast regression coverage
+- add lightweight real-browser verification for focus order, keyboard flows, modal correctness, and pointer interaction edge cases
+
 ## Deferred
 
-- tool bar
-- data grid
 - tree view
 - arbitrary per-control style objects
-- richer binding model
-- accessibility pass
 - npm package publishing unless the release artifact workflow later proves insufficient
 
 ## Documentation Rule

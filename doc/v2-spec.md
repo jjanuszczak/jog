@@ -25,6 +25,14 @@ JOG can still be valuable if it becomes the best tool for a narrower class of wo
 
 The technical goal of V2 is therefore not to imitate React. It is to deliver a plain-JavaScript, desktop-style browser UI runtime that is internally modern, externally simple, and materially more productive for the kind of developer JOG is meant to serve.
 
+This specification should stay aligned with the implemented V2 direction. It is not a wish-list for every possible UI category. It should describe the product lane JOG is actually trying to own:
+
+- browser-based internal tools
+- line-of-business applications
+- desktop-style shells
+- form-heavy and CRUD-heavy workflows
+- data-centric applications that need tabs, dialogs, status chrome, validation, and predictable state flow
+
 ## 1. Product Goal
 
 JOG V2 is a plain-JavaScript UI framework for the browser with these rules:
@@ -69,13 +77,26 @@ var button = new JOG.Button();
 button.Name = "cmdSave";
 button.Text = "Save";
 button.Location(20, 20);
-button.Click(onSave);
+button.OnClick(onSave);
 
 page.Add(button);
 app.Run(page);
 ```
 
-### 4.2 Public API Constraints
+### 4.2 Canonical Authoring Model
+
+The canonical JOG V2 authoring model is:
+
+- create controls with `new`
+- set properties directly
+- compose through `Add`
+- handle events with `OnX` methods such as `OnClick` and `OnChange`
+- bootstrap applications with `Application.Run(page)`
+- use explicit store binding where state synchronization is needed
+
+Compatibility aliases such as `Click(listener)` and `Change(listener)` may exist, but they are not the preferred public style.
+
+### 4.3 Public API Constraints
 
 - no HTML fragments
 - no JSX
@@ -114,16 +135,25 @@ app.Run(page);
 - `JOG.Panel`
 - `JOG.StackPanel`
 - `JOG.DockPanel`
+- `JOG.SectionPanel`
 - `JOG.Grid`
 
-### 5.5 Future Controls
+### 5.5 Shell Controls
 
 - `JOG.MenuBar`
 - `JOG.ToolBar`
 - `JOG.StatusBar`
 - `JOG.TabControl`
+- `JOG.TabPage`
+
+These controls now exist, but they are still early and should be treated as first-pass shell primitives rather than complete desktop-shell subsystems.
+
+### 5.6 Data-Centric Controls
+
 - `JOG.DataGrid`
 - `JOG.TreeView`
+
+`JOG.DataGrid` now exists as a first-pass flagship control for the current product lane. `TreeView` remains deferred behind deeper `DataGrid` maturity or a concrete app need.
 
 ## 6. Core Public Properties
 
@@ -151,6 +181,17 @@ Window-capable controls should also expose:
 - `Modal`
 - `Resizable`
 - `Draggable`
+
+The current V2 surface also benefits from:
+
+- `MinWidth`
+- `MinHeight`
+- `MaxWidth`
+- `MaxHeight`
+- `Padding`
+- `Margin`
+- validation state such as `Invalid` and `ErrorText`
+- responsive layout metadata where applicable
 
 ## 7. Core Public Methods
 
@@ -180,7 +221,18 @@ Window-capable controls should also expose:
 
 ## 8. Core Public Events
 
-All controls should expose a standard event registration pattern.
+All controls should expose a standard event registration pattern. The preferred public style is `OnX`.
+
+Preferred style:
+
+- `OnClick(listener)`
+- `OnChange(listener)`
+- `OnFocus(listener)`
+- `OnBlur(listener)`
+- `OnKeyDown(listener)`
+- `OnKeyUp(listener)`
+
+Compatibility aliases may also exist:
 
 - `Click(listener)`
 - `Change(listener)`
@@ -191,11 +243,12 @@ All controls should expose a standard event registration pattern.
 
 Window and dialog types should also expose:
 
-- `Load(listener)`
-- `Show(listener)`
-- `Hide(listener)`
-- `Close(listener)`
-- `Dispose(listener)`
+- `OnLoad(listener)`
+- `OnShow(listener)`
+- `OnHide(listener)`
+- `OnClose(listener)`
+
+For V2, the framework should favor one documented event style instead of presenting old and new forms as equally primary.
 
 ## 9. Internal Runtime Architecture
 
@@ -229,6 +282,8 @@ Responsibilities:
 - event cleanup
 - focus coordination
 - window and dialog management
+- responsive layout recalculation
+- diagnostics and error reporting
 
 ### 9.4 Renderer Layer
 
@@ -363,6 +418,19 @@ These are internal, not public app-facing APIs.
 - event subscriptions are released on dispose
 - child controls are disposed when parent disposal policy requires it
 
+### 13.4 Accessibility and Focus Direction
+
+Accessibility is part of framework completeness for JOG's target product lane.
+
+The intended direction for V2 is:
+
+- dialogs should trap focus when modal
+- focus should return to the prior control when a modal dialog closes
+- shell controls should support keyboard-first interaction
+- controls should expose sound semantics and invalid-state signaling
+
+This area is not complete in the current implementation and should be treated as active framework work, not optional polish.
+
 ## 14. Layout System
 
 ### 14.1 Supported Layout Modes
@@ -397,7 +465,17 @@ JOG V2 should support:
 - row and column spanning
 - alignment within cells
 
-### 14.3 Layout Priority
+### 14.3 Product-Lane Layout Direction
+
+The next layout step should not be more raw primitives in isolation. It should be making desktop-style application shells dependable.
+
+That means:
+
+- less manual height and chrome math in app code
+- stronger composition for shell-style pages
+- better support for multi-pane, tabbed, and status-driven business-app layouts
+
+### 14.4 Layout Priority
 
 V2 minimum target:
 
@@ -419,6 +497,8 @@ The windowing subsystem is a primary differentiator for JOG.
 - z-index ordering
 - focus handoff
 - close handling
+- focus trapping for modal dialogs
+- focus restoration after modal close
 
 ### 15.2 Nice-to-Have Features
 
@@ -439,12 +519,14 @@ The windowing subsystem is a primary differentiator for JOG.
 
 ### 16.1 Public Model
 
-Controls expose strongly named registration methods:
+Controls should expose strongly named registration methods:
 
 ```js
-button.Click(onSave);
-textBox.Change(onNameChanged);
+button.OnClick(onSave);
+textBox.OnChange(onNameChanged);
 ```
+
+Compatibility aliases may exist for older samples or convenience, but the spec should treat `OnX` as canonical.
 
 ### 16.2 Internal Model
 
@@ -490,6 +572,19 @@ activeCheckBox.BindChecked(customerState, "active");
 - two-way binding only for input-style controls
 - explicit property binding methods
 - no expression language
+
+### 17.4 Next Binding Priorities
+
+The current gap is not field-level binding. That part exists. The current gap is higher-order state leverage for business apps:
+
+- collection updates
+- repeated-item rendering patterns
+- selection state
+- dirty tracking
+- derived values and summary state
+- validation orchestration across larger forms
+
+V2 should improve those areas without abandoning the explicit JavaScript programming model.
 
 ## 18. Styling and Theme Model
 
@@ -657,10 +752,12 @@ JOG V2 should have a real diagnostic model.
 - modal dialog behavior
 - textbox input propagation
 - layout container behavior
+- shell-control interaction behavior
+- accessibility-sensitive keyboard flows
 
 ### 20.4 Sample App Regression
 
-The calculator-style sample app should continue to work under V2.
+The example apps that define the target lane should continue to work under V2, especially shell, form, CRUD, and dialog flows.
 
 ## 21. V2 Delivery Scope
 
@@ -679,65 +776,80 @@ The calculator-style sample app should continue to work under V2.
 - renderer
 - lifecycle management
 - event cleanup
+- clear canonical authoring model around `Run(page)` and `OnX`
 
 ### 21.2 Should-Have
 
 - `DockPanel`
+- `SectionPanel`
+- `Grid`
+- `DataGrid`
 - minimal store and binding
 - modal overlay manager
 - diagnostics mode
+- first-pass shell controls
+- responsive layout behavior
 
 ### 21.3 Can-Wait
 
-- `Grid`
-- advanced data grid
-- resizable windows
-- advanced theming
+- `TreeView`
+- deeper shell-control behavior
+- deeper collection-oriented state helpers
+- full accessibility and keyboard pass
 
-## 22. Migration Strategy
+### 21.4 Current Data Scope Status
 
-### Phase 1
+The first-pass data sprint is now implemented at a credibility level, not a finished end-state.
 
-Freeze the public naming conventions and the first supported object model.
+Implemented now:
 
-### Phase 2
+- `JOG.Collection` for row identity, selection, explicit updates, dirty tracking, deleted-row tracking, and derived summaries
+- `JOG.DataGrid` for explicit columns, collection-backed rows, single selection, basic formatting, row commands, and first-pass mouse resizing for pixel-width columns
+- `OpportunityBoard` as the proving example for collection plus grid composition
+- regression coverage for collection updates, selection, grid rerendering, and column resizing
 
-Rebuild internals under the same public API style:
+Still remaining from a fuller business-app interpretation:
 
-- state model
-- scheduler
-- renderer
-- lifecycle manager
+- sorting
+- filtering
+- inline grid editing
+- persistence integration for collection mutations
+- app-exposed persistence hooks for resized column widths if needed later
+- keyboard-first and accessibility-grade grid interaction
 
-### Phase 3
+## 22. Strategic Next Steps
 
-Reimplement first-class controls:
+JOG is now beyond the original migration phase. The next steps should optimize for alignment and product credibility in the business-app lane.
 
-- `Button`
-- `Label`
-- `TextBox`
-- `Page`
-- `Window`
+### 22.1 Unify The Public Contract
 
-### Phase 4
+- align rationale docs, spec, developer guide, and API reference
+- treat `Run(page)` and `OnX` as canonical
+- keep compatibility aliases secondary
 
-Add layout containers:
+### 22.2 Harden Shell And Layout Behavior
 
-- `Panel`
-- `StackPanel`
-- `DockPanel`
+- make desktop-style shell composition dependable
+- reduce manual app-level chrome and sizing math
+- deepen the layout story around multi-pane and tabbed shells
 
-### Phase 5
+### 22.3 Deepen Data-Heavy Primitives
 
-Add dialog and modal support.
+- harden `DataGrid` now that the first pass exists
+- add the next internal-tool behaviors in the right order: sorting, filtering, then inline editing
+- keep row commands, selection, and predictable data flow as the baseline that must not regress
 
-### Phase 6
+### 22.4 Improve State Leverage
 
-Add explicit store and binding helpers.
+- add stronger collection, selection, derived-state, and validation-orchestration helpers
+- keep the programming model explicit rather than magical
 
-### Phase 7
+### 22.5 Close The Accessibility Gap
 
-Add diagnostics and regression tests.
+- implement modal focus trap
+- restore focus on close
+- add keyboard behavior across shell controls
+- add browser-level verification for interaction correctness
 
 ## 23. Acceptance Criteria
 
@@ -750,6 +862,9 @@ JOG V2 is acceptable when all of the following are true:
 5. Windows and dialogs behave predictably with z-order and modal support.
 6. At least one real sample app proves the productivity model.
 7. The API remains straightforward for a desktop-style developer.
+8. The shell and layout model are dependable enough that app code does not carry excessive chrome math.
+9. The framework has a credible path for data-centric internal-tool work, including a serious grid strategy.
+10. Accessibility and keyboard behavior are treated as product requirements, not deferred polish.
 
 ## 24. Summary
 
@@ -758,6 +873,9 @@ JOG V2 should be a plain-JavaScript, desktop-style browser UI runtime with:
 - explicit control APIs
 - a modern internal rendering architecture
 - first-class windowing and layout
+- business-app shell credibility
+- stronger state leverage for CRUD and form workflows
+- a first-pass data-centric flagship control in `DataGrid`, with a clear path to deeper behavior
 - predictable lifecycle and cleanup
 - zero requirement for app developers to write HTML or manipulate the DOM
 

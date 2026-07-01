@@ -259,6 +259,41 @@ function dispatchNodeClick(node) {
   listeners[0]({ target: node });
 }
 
+function dispatchNodeMouseDown(node, clientX, clientY) {
+  var listeners = (node && node.eventListeners && node.eventListeners.mousedown) || [];
+
+  assertEqual(listeners.length > 0, true, "Node should expose a mousedown listener.");
+  listeners[0]({
+    target: node,
+    clientX: clientX || 0,
+    clientY: clientY || 0,
+    preventDefault: function() {},
+    stopPropagation: function() {}
+  });
+}
+
+function dispatchDocumentMouseMove(document, clientX, clientY) {
+  var listeners = (document && document.eventListeners && document.eventListeners.mousemove) || [];
+
+  assertEqual(listeners.length > 0, true, "Document should expose a mousemove listener.");
+  listeners[0]({
+    target: document,
+    clientX: clientX || 0,
+    clientY: clientY || 0
+  });
+}
+
+function dispatchDocumentMouseUp(document, clientX, clientY) {
+  var listeners = (document && document.eventListeners && document.eventListeners.mouseup) || [];
+
+  assertEqual(listeners.length > 0, true, "Document should expose a mouseup listener.");
+  listeners[0]({
+    target: document,
+    clientX: clientX || 0,
+    clientY: clientY || 0
+  });
+}
+
 function dispatchNodeKeyDown(node, key) {
   var listeners = (node && node.eventListeners && node.eventListeners.keydown) || [];
 
@@ -1452,6 +1487,161 @@ function testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute() {
   assertEqual(win._domNode.style.position, "absolute", "Windows on a page should remain absolutely positioned.");
 }
 
+function testCollectionTracksUpdatesSelectionDirtyStateAndSummaries() {
+  var JOG = loadJOG();
+  var collection = new JOG.Collection({
+    idKey: "id",
+    rows: [
+      { id: "a", name: "Northwind", value: 10 },
+      { id: "b", name: "Atlas", value: 20 }
+    ],
+    summaryDefinitions: {
+      total: function(rows) {
+        return rows.reduce(function(sum, row) {
+          return sum + row.value;
+        }, 0);
+      },
+      dirtyCount: function(rows, currentCollection) {
+        return currentCollection.GetDirtyRowIds().length + currentCollection.GetDeletedRowIds().length;
+      }
+    }
+  });
+
+  assertEqual(collection.GetSummary("total"), 30, "Collection should compute summaries from initial rows.");
+  assertEqual(collection.HasDirtyRows(), false, "Initial collection state should be clean.");
+
+  collection.Select("b");
+  assertEqual(collection.GetSelectedId(), "b", "Collection should track the selected row id.");
+
+  collection.Update("b", { value: 35 });
+  assertEqual(collection.GetSummary("total"), 45, "Collection summaries should update after row changes.");
+  assertEqual(collection.IsDirty("b"), true, "Updated rows should be marked dirty.");
+
+  collection.Remove("a");
+  assertEqual(collection.GetDeletedRowIds().length, 1, "Removing a baseline row should track deleted ids.");
+  assertEqual(collection.GetDeletedRowIds()[0], "a", "Deleted row ids should include removed records.");
+  assertEqual(collection.GetSummary("dirtyCount"), 2, "Dirty summaries should include updated and deleted rows.");
+
+  collection.MarkClean();
+  assertEqual(collection.HasDirtyRows(), false, "MarkClean should reset dirty state.");
+  assertEqual(collection.GetDeletedRowIds().length, 0, "MarkClean should clear deleted row ids.");
+}
+
+function testDataGridRendersSelectionCommandsAndCollectionRefresh() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var collection = new JOG.Collection({
+    rows: [
+      { id: "1", account: "Northwind", value: 100 },
+      { id: "2", account: "Atlas", value: 200 }
+    ]
+  });
+  var grid = new JOG.DataGrid();
+  var capturedSelection = "";
+  var capturedCommand = "";
+
+  grid.Columns = [
+    { key: "account", title: "Account", width: "1fr" },
+    { key: "value", title: "Value", width: "120px", align: "right", formatter: function(value) { return "$" + value; } }
+  ];
+  grid.RowCommands = [
+    { key: "edit", text: "Edit", themePreset: "quiet" }
+  ];
+  grid.Collection = collection;
+
+  grid.OnSelectionChange(function(args) {
+    capturedSelection = args.RowId;
+  });
+  grid.OnRowCommand(function(args) {
+    capturedCommand = args.Key + ":" + args.RowId;
+  });
+
+  page.Add(grid);
+  app.Run(page);
+
+  assertEqual(grid._headerNode.children.length, 3, "DataGrid should render one header cell per column plus commands.");
+  assertEqual(grid._rowNodes.length, 2, "DataGrid should render one row node per collection row.");
+  assertEqual(grid._rowNodes[0].children[0].textContent, "Northwind", "DataGrid should render field values.");
+  assertEqual(grid._rowNodes[0].children[1].textContent, "$100", "DataGrid should apply cell formatters.");
+
+  dispatchNodeClick(grid._rowNodes[1]);
+  app.Runtime.flush();
+
+  assertEqual(collection.GetSelectedId(), "2", "Clicking a grid row should update collection selection.");
+  assertEqual(capturedSelection, "2", "Grid selection events should expose the row id.");
+  assertEqual(grid._rowNodes[1].className.indexOf("jog-selected") >= 0, true, "Selected rows should render with the selected class.");
+
+  dispatchNodeClick(grid._commandNodes["2"].edit);
+  assertEqual(capturedCommand, "edit:2", "Grid row commands should expose command and row id.");
+
+  collection.Update("2", { account: "Atlas Renewed", value: 240 });
+  app.Runtime.flush();
+
+  assertEqual(grid._rowNodes[1].children[0].textContent, "Atlas Renewed", "Grid should refresh rendered rows after collection updates.");
+  assertEqual(grid._rowNodes[1].className.indexOf("jog-dirty") >= 0, true, "Dirty rows should render with the dirty class.");
+}
+
+function testDataGridSupportsResizablePixelWidthColumns() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var collection = new JOG.Collection({
+    rows: [
+      { id: "1", account: "Northwind", stage: "Proposal" }
+    ]
+  });
+  var grid = new JOG.DataGrid();
+
+  grid.ResizableColumns = true;
+  grid.Columns = [
+    { key: "account", title: "Account", width: "180px" },
+    { key: "stage", title: "Stage", width: "120px" }
+  ];
+  grid.Collection = collection;
+
+  page.Add(grid);
+  app.Run(page);
+
+  assert(!!grid._resizeHandleNodes.account, "Resizable pixel-width columns should render a resize handle.");
+  assertEqual(grid._headerNode.style.gridTemplateColumns, "180px 120px", "Grid should start with configured pixel widths.");
+
+  dispatchNodeMouseDown(grid._resizeHandleNodes.account, 180, 0);
+  dispatchDocumentMouseMove(app.Runtime.document, 230, 0);
+  app.Runtime.flush();
+
+  assertEqual(grid._headerNode.style.gridTemplateColumns, "230px 120px", "Dragging a resize handle should update the header track width.");
+  assertEqual(grid._rowNodes[0].style.gridTemplateColumns, "230px 120px", "Dragging a resize handle should update row track widths.");
+
+  dispatchDocumentMouseUp(app.Runtime.document, 230, 0);
+}
+
+function testOpportunityBoardUsesCollectionAndDataGridFlow() {
+  var loaded = loadExampleApp("OpportunityBoardApp.js");
+  var grid = findControl(loaded.page, function(control) {
+    return control.Name === "opportunityDataGrid";
+  });
+  var dialog = findControl(loaded.page, function(control) {
+    return control.Name === "opportunityEditorDialog";
+  });
+  var statusLabel = findControl(loaded.page, function(control) {
+    return control._typeName === "Label" && control.Text.indexOf("Status:") === 0;
+  });
+
+  assert(!!grid, "OpportunityBoard should render a DataGrid.");
+  assertEqual(grid.Collection.GetRows().length, 3, "OpportunityBoard should start with seeded collection rows.");
+
+  dispatchNodeClick(grid._rowNodes[1]);
+  loaded.app.Runtime.flush();
+  assertEqual(grid.Collection.GetSelectedId(), "2", "OpportunityBoard grid selection should flow through the collection.");
+  assertEqual(statusLabel.Text.indexOf("Atlas Bio") >= 0, true, "OpportunityBoard status should reflect the selected row.");
+  assertEqual(grid.ResizableColumns, true, "OpportunityBoard should enable resizable grid columns.");
+
+  dispatchNodeClick(grid._commandNodes["2"].edit);
+  loaded.app.Runtime.flush();
+  assertEqual(dialog.Visible, true, "OpportunityBoard edit command should open the editor dialog.");
+}
+
 var tests = [
   { name: "store subscribe and unsubscribe", fn: testStoreSubscribeAndUnsubscribe },
   { name: "container rejects duplicate child names", fn: testContainerRejectsDuplicateChildNames },
@@ -1487,7 +1677,11 @@ var tests = [
   { name: "tool bar uses flow layout for child controls", fn: testToolBarUsesFlowLayoutForChildControls },
   { name: "status bar uses flow layout for child controls", fn: testStatusBarUsesFlowLayoutForChildControls },
   { name: "tab control switches visible page", fn: testTabControlSwitchesVisiblePage },
-  { name: "page direct children use flow layout while windows remain absolute", fn: testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute }
+  { name: "page direct children use flow layout while windows remain absolute", fn: testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute },
+  { name: "collection tracks updates selection dirty state and summaries", fn: testCollectionTracksUpdatesSelectionDirtyStateAndSummaries },
+  { name: "data grid renders selection commands and collection refresh", fn: testDataGridRendersSelectionCommandsAndCollectionRefresh },
+  { name: "data grid supports resizable pixel-width columns", fn: testDataGridSupportsResizablePixelWidthColumns },
+  { name: "opportunity board uses collection and data grid flow", fn: testOpportunityBoardUsesCollectionAndDataGridFlow }
 ];
 
 var failed = 0;

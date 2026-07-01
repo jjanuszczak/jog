@@ -28,8 +28,8 @@ Implemented public surface in `v2/JOG.js`:
 - layout containers: `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, `Grid`
 - shell controls: `MenuBar`, `ToolBar`, `StatusBar`, `TabControl`, `TabPage`
 - windows: `Window`, `Dialog`
-- controls: `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
-- state: `Store`
+- controls: `DataGrid`, `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
+- state: `Store`, `Collection`
 - event payload type: `EventArgs`
 - control-level validation state: `Invalid`, `ErrorText`, `SetError()`, `ClearError()`, `BindError()`, `ValidationMessage`, `ValidationSummary`
 - application diagnostics: `Debug`, `DumpTree()`, `LogTree()`
@@ -184,6 +184,40 @@ Every control is a JavaScript object with internal state. State changes do not w
 4. each control applies current state to its DOM node
 
 This is the core architectural shift from V1. It separates control state from direct DOM mutation.
+
+## Data Controls
+
+JOG now has a first-pass data-centric layer aimed at CRUD and internal-tool screens.
+
+`JOG.Collection` is the runtime state model for row-oriented data. It currently handles:
+
+- stable row identity through a configurable `idKey`
+- explicit row insert, update, upsert, and remove operations
+- single-row selection through `Select()` and `ClearSelection()`
+- dirty tracking for updated rows and deleted baseline rows
+- derived summaries through named summary functions
+
+`JOG.DataGrid` is the first control built on top of that model. The implemented surface today is intentionally narrow:
+
+- explicit column definitions with `key`, `title`, `width`, `align`, and optional `formatter`
+- rows provided by a bound `JOG.Collection`
+- single-row selection
+- row command buttons through `RowCommands`
+- optional mouse-driven header resizing through `ResizableColumns` for pixel-width columns
+- empty-state text
+- dirty-row and selected-row styling
+
+What it does not do yet:
+
+- sorting
+- filtering
+- inline editing
+- column reordering
+- virtualization
+- touch resizing
+- accessibility-grade keyboard navigation
+
+The current design goal is credibility, not completeness. It gives business-app examples a first-class repeated-item surface without trying to solve the full grid problem in one pass.
 
 ## Shell Controls
 
@@ -522,6 +556,65 @@ Current explicit binding helpers:
 
 Binding is explicit and per-control. There is no expression language, selector syntax, derived store, or automatic form model.
 
+## Collection Model
+
+`JOG.Collection` is the current state primitive for repeated business records.
+
+```js
+var deals = new JOG.Collection({
+  idKey: "id",
+  rows: [
+    { id: 1, account: "Northwind", value: 145000 }
+  ],
+  summaryDefinitions: {
+    totalValue: function(rows) {
+      return rows.reduce(function(sum, row) {
+        return sum + row.value;
+      }, 0);
+    }
+  }
+});
+```
+
+Available collection methods:
+
+- `GetIdKey()`
+- `GetRowId(row)`
+- `GetRows()`
+- `GetRow(id)`
+- `SetRows(rows)`
+- `Insert(row, index)`
+- `Update(id, updaterOrPatch)`
+- `Upsert(row)`
+- `Remove(id)`
+- `Select(id)`
+- `SetSelectedIds(ids)`
+- `ToggleSelected(id)`
+- `ClearSelection()`
+- `GetSelectedId()`
+- `GetSelectedIds()`
+- `GetSelectedRows()`
+- `GetDirtyRowIds()`
+- `GetDeletedRowIds()`
+- `GetDirtyState()`
+- `IsDirty(id)`
+- `HasDirtyRows()`
+- `MarkClean(ids)`
+- `SetSummaryDefinitions(definitions)`
+- `GetSummary(key)`
+- `GetSummaries()`
+- `Subscribe(key, listener)`
+
+Supported subscription keys today:
+
+- `rows`
+- `selection`
+- `dirty`
+- `summary`
+- `change`
+
+The collection API stays explicit. App code decides when records become clean again, usually after a persistence step or a deliberate local snapshot reset.
+
 ## Validation Model
 
 JOG now has a small control-level validation surface.
@@ -682,6 +775,8 @@ Calling setters on a disposed control throws.
 - breakpoint-aware dialog form layout inside the opportunity editor
 - responsive `DockPanel` shell behavior for the board sidebar
 - responsive `StackPanel` action rows
+- `DataGrid` row commands with collection-backed updates
+- first-pass header drag resizing for pixel-width columns
 - built-in `ThemePreset` usage on buttons, labels, and sections
 
 ## Guidance for Developers

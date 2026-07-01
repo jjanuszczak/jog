@@ -118,41 +118,77 @@
     clearValidation(store);
   }
 
-  function buildMetrics(records, store) {
-    var stageWeight = {
-      prospect: 0.15,
-      qualified: 0.35,
-      proposal: 0.6,
-      negotiation: 0.8,
-      closedwon: 1
+  var STAGE_WEIGHTS = {
+    prospect: 0.15,
+    qualified: 0.35,
+    proposal: 0.6,
+    negotiation: 0.8,
+    closedwon: 1
+  };
+
+  var STAGE_LABELS = {
+    prospect: "Prospect",
+    qualified: "Qualified",
+    proposal: "Proposal",
+    negotiation: "Negotiation",
+    closedwon: "Closed Won"
+  };
+
+  var OWNER_LABELS = {
+    maya: "Maya Santos",
+    daniel: "Daniel Ng",
+    farah: "Farah Rahman",
+    john: "John Januszczak"
+  };
+
+  function createOpportunitySummaries() {
+    return {
+      totalOpen: function(rows) {
+        return rows.length;
+      },
+      pipelineValue: function(rows) {
+        return rows.reduce(function(total, row) {
+          return total + (row.value || 0);
+        }, 0);
+      },
+      weightedValue: function(rows) {
+        return rows.reduce(function(total, row) {
+          return total + ((row.value || 0) * (STAGE_WEIGHTS[row.stage] || 0));
+        }, 0);
+      },
+      lateStageCount: function(rows) {
+        return rows.filter(function(row) {
+          return row.stage === "proposal" || row.stage === "negotiation" || row.stage === "closedwon";
+        }).length;
+      },
+      highestRecord: function(rows) {
+        return rows.reduce(function(current, row) {
+          if (!current || row.value > current.value) {
+            return row;
+          }
+          return current;
+        }, null);
+      },
+      dirtyCount: function(rows, collection) {
+        return collection.GetDirtyRowIds().length + collection.GetDeletedRowIds().length;
+      }
     };
-    var totalValue = 0;
-    var weightedValue = 0;
-    var lateStageCount = 0;
-    var highestRecord = null;
+  }
 
-    records.forEach(function(record) {
-      totalValue += record.value;
-      weightedValue += record.value * (stageWeight[record.stage] || 0);
-      if (record.stage === "proposal" || record.stage === "negotiation" || record.stage === "closedwon") {
-        lateStageCount += 1;
-      }
-      if (!highestRecord || record.value > highestRecord.value) {
-        highestRecord = record;
-      }
-    });
+  function describeHeadline(collection) {
+    var highestRecord = collection.GetSummary("highestRecord");
 
-    store.Set("totalOpenText", String(records.length));
-    store.Set("pipelineValueText", formatCurrency(totalValue));
-    store.Set("weightedValueText", formatCurrency(weightedValue));
-    store.Set("lateStageText", String(lateStageCount));
-    store.Set(
-      "headlineText",
-      highestRecord
-        ? highestRecord.account + " is the largest open deal at " + formatCurrency(highestRecord.value) + "."
-        : "No opportunities in the board yet."
-    );
-    store.Set("emptyStateText", records.length ? "" : "No opportunities yet. Use Add Opportunity to create the first record.");
+    return highestRecord
+      ? highestRecord.account + " is the largest open deal at " + formatCurrency(highestRecord.value) + "."
+      : "No opportunities in the board yet.";
+  }
+
+  function getOwnerLabel(ownerKey) {
+    return OWNER_LABELS[ownerKey] || ownerKey || "";
+  }
+
+  function getStageLabel(stageKey) {
+    return STAGE_LABELS[stageKey] || stageKey || "";
   }
 
   function createMetricCard(title, store, key) {
@@ -376,38 +412,40 @@
   function OpportunityBoardPage() {
     JOG.Page.call(this);
 
-    var page = this;
     var nextOpportunityId = 4;
-    var opportunities = [
-      {
-        id: 1,
-        account: "Northwind Foods",
-        stage: "proposal",
-        value: 145000,
-        product: "Analytics Cloud",
-        owner: "maya",
-        nextStep: "Send security appendix and lock the executive review."
-      },
-      {
-        id: 2,
-        account: "Atlas Bio",
-        stage: "qualified",
-        value: 68000,
-        product: "Workflow Suite",
-        owner: "daniel",
-        nextStep: "Map deployment scope with the operations lead."
-      },
-      {
-        id: 3,
-        account: "Summit Capital",
-        stage: "negotiation",
-        value: 220000,
-        product: "Investor Portal",
-        owner: "farah",
-        nextStep: "Trade revised commercial terms with procurement this week."
-      }
-    ];
-
+    var opportunityCollection = new JOG.Collection({
+      idKey: "id",
+      summaryDefinitions: createOpportunitySummaries(),
+      rows: [
+        {
+          id: 1,
+          account: "Northwind Foods",
+          stage: "proposal",
+          value: 145000,
+          product: "Analytics Cloud",
+          owner: "maya",
+          nextStep: "Send security appendix and lock the executive review."
+        },
+        {
+          id: 2,
+          account: "Atlas Bio",
+          stage: "qualified",
+          value: 68000,
+          product: "Workflow Suite",
+          owner: "daniel",
+          nextStep: "Map deployment scope with the operations lead."
+        },
+        {
+          id: 3,
+          account: "Summit Capital",
+          stage: "negotiation",
+          value: 220000,
+          product: "Investor Portal",
+          owner: "farah",
+          nextStep: "Trade revised commercial terms with procurement this week."
+        }
+      ]
+    });
     var editorStore = new JOG.Store({
       editingId: "",
       editorMode: "edit",
@@ -427,8 +465,8 @@
       pipelineValueText: "$0",
       weightedValueText: "$0",
       lateStageText: "0",
+      dirtyRowsText: "0",
       headlineText: "",
-      emptyStateText: "",
       statusMessage: "Ready."
     });
 
@@ -457,7 +495,7 @@
     title.Location(0, 12);
 
     var subtitle = new JOG.Label();
-    subtitle.Text = "A CRM-style sample with dynamic opportunity rows, edit and delete actions, and a modal add flow.";
+    subtitle.Text = "A CRM-style sample using Collection plus DataGrid for selection, summaries, and row commands.";
     subtitle.Location(0, 36);
 
     topBar.Add(title);
@@ -475,7 +513,7 @@
       base: {
         dock: "top",
         width: null,
-        height: 236,
+        height: 284,
         margin: { bottom: 18 }
       },
       md: {
@@ -503,12 +541,14 @@
     var pipelineCard = createMetricCard("Pipeline Value", editorStore, "pipelineValueText");
     var weightedCard = createMetricCard("Weighted Value", editorStore, "weightedValueText");
     var lateStageCard = createMetricCard("Late Stage Deals", editorStore, "lateStageText");
+    var dirtyCard = createMetricCard("Dirty Rows", editorStore, "dirtyRowsText");
 
     sidebarStack.Add(headline);
     sidebarStack.Add(totalCard);
     sidebarStack.Add(pipelineCard);
     sidebarStack.Add(weightedCard);
     sidebarStack.Add(lateStageCard);
+    sidebarStack.Add(dirtyCard);
     sidebar.Add(sidebarStack);
 
     var boardSection = new JOG.SectionPanel();
@@ -535,133 +575,67 @@
     addButton.Text = "Add Opportunity";
     addButton.ThemePreset = "primary";
 
+    var clearSelectionButton = new JOG.Button();
+    clearSelectionButton.Text = "Clear Selection";
+    clearSelectionButton.ThemePreset = "quiet";
+
+    var markCleanButton = new JOG.Button();
+    markCleanButton.Text = "Mark Clean";
+    markCleanButton.ThemePreset = "quiet";
+
     var statusLabel = new JOG.Label();
     statusLabel.BindText(editorStore, "statusMessage", function(value) {
       return "Status: " + value;
     });
 
     actionRow.Add(addButton);
+    actionRow.Add(clearSelectionButton);
+    actionRow.Add(markCleanButton);
     actionRow.Add(statusLabel);
 
-    var headerCard = new JOG.SectionPanel();
-    headerCard.Name = "opportunityHeaderCard";
-    headerCard.Title = "";
-    headerCard.Padding = 8;
-    headerCard.ThemePreset = "muted";
-
-    var headerGrid = new JOG.Grid();
-    headerGrid.Name = "opportunityHeaderGrid";
-    headerGrid.Columns = ["180px", "110px", "120px", "150px", "130px", "minmax(220px, 1fr)", "132px"];
-    headerGrid.ColumnGap = 12;
-    headerGrid.RowGap = 0;
-
-    [
-      "Account",
-      "Stage",
-      "Value",
-      "Product",
-      "Owner",
-      "Next Step",
-      "Actions"
-    ].forEach(function(text, index) {
-      var label = new JOG.Label();
-      label.Text = text;
-      label.GridColumn = index + 1;
-      label.GridRow = 1;
-      headerGrid.Add(label);
-    });
-
-    headerCard.Add(headerGrid);
-
-    var emptyState = new JOG.Label();
-    emptyState.Name = "opportunityEmptyState";
-    emptyState.BindText(editorStore, "emptyStateText");
-    emptyState.BindVisible(editorStore, "emptyStateText");
-
-    var rowsHost = new JOG.StackPanel();
-    rowsHost.Name = "opportunityRowsHost";
-    rowsHost.Orientation = "vertical";
-    rowsHost.Gap = 8;
+    var boardGrid = new JOG.DataGrid();
+    boardGrid.Name = "opportunityDataGrid";
+    boardGrid.Collection = opportunityCollection;
+    boardGrid.ResizableColumns = true;
+    boardGrid.EmptyText = "No opportunities yet. Use Add Opportunity to create the first record.";
+    boardGrid.Columns = [
+      { key: "account", title: "Account", width: "180px" },
+      { key: "stage", title: "Stage", width: "120px", formatter: function(value) { return getStageLabel(value); } },
+      { key: "value", title: "Value", width: "120px", align: "right", formatter: function(value) { return formatCurrency(value); } },
+      { key: "product", title: "Product", width: "160px" },
+      { key: "owner", title: "Owner", width: "150px", formatter: function(value) { return getOwnerLabel(value); } },
+      { key: "nextStep", title: "Next Step", width: "280px" }
+    ];
+    boardGrid.RowCommands = [
+      { key: "edit", text: "Edit", themePreset: "primary" },
+      { key: "delete", text: "Delete", themePreset: "danger" }
+    ];
 
     boardLayout.Add(actionRow);
-    boardLayout.Add(headerCard);
-    boardLayout.Add(emptyState);
-    boardLayout.Add(rowsHost);
+    boardLayout.Add(boardGrid);
     boardSection.Add(boardLayout);
 
-    function updateBoard() {
-      rowsHost.Clear();
+    function syncBoardState() {
+      editorStore.Set("totalOpenText", String(opportunityCollection.GetSummary("totalOpen") || 0));
+      editorStore.Set("pipelineValueText", formatCurrency(opportunityCollection.GetSummary("pipelineValue") || 0));
+      editorStore.Set("weightedValueText", formatCurrency(opportunityCollection.GetSummary("weightedValue") || 0));
+      editorStore.Set("lateStageText", String(opportunityCollection.GetSummary("lateStageCount") || 0));
+      editorStore.Set("dirtyRowsText", String(opportunityCollection.GetSummary("dirtyCount") || 0));
+      editorStore.Set("headlineText", describeHeadline(opportunityCollection));
+    }
 
-      opportunities.forEach(function(record) {
-        var rowCard = new JOG.SectionPanel();
-        rowCard.Name = "opportunityRow" + record.id;
-        rowCard.Title = "";
-        rowCard.Padding = 8;
+    function syncSelectionStatus() {
+      var selected = opportunityCollection.GetSelectedRows()[0];
 
-        var rowGrid = new JOG.Grid();
-        rowGrid.Name = "opportunityRowGrid" + record.id;
-        rowGrid.Columns = ["180px", "110px", "120px", "150px", "130px", "minmax(220px, 1fr)", "132px"];
-        rowGrid.ColumnGap = 10;
-        rowGrid.RowGap = 2;
+      if (!selected) {
+        editorStore.Set("statusMessage", opportunityCollection.HasDirtyRows() ? "No row selected. Pending local changes exist." : "Ready.");
+        return;
+      }
 
-        function addValue(column, valueText) {
-          var label = new JOG.Label();
-          label.Text = valueText;
-          label.GridColumn = column;
-          label.GridRow = 1;
-          rowGrid.Add(label);
-        }
-
-        addValue(1, record.account);
-        addValue(2, record.stage);
-        addValue(3, formatCurrency(record.value));
-        addValue(4, record.product);
-        addValue(5, record.owner);
-        addValue(6, record.nextStep);
-
-        var actions = new JOG.StackPanel();
-        actions.Name = "opportunityActions" + record.id;
-        actions.Orientation = "horizontal";
-        actions.Gap = 6;
-        actions.GridColumn = 7;
-        actions.GridRow = 1;
-        actions.Responsive = {
-          base: { orientation: "vertical", gap: 8 },
-          md: { orientation: "horizontal", gap: 8 }
-        };
-
-        var editButton = new JOG.Button();
-        editButton.Text = "Edit";
-        editButton.ThemePreset = "quiet";
-        editButton.Width = 58;
-        editButton.OnClick(function() {
-          loadOpportunityIntoStore(editorStore, cloneOpportunity(record), "edit");
-          editorStore.Set("statusMessage", "Editing " + record.account + ".");
-          editorDialog.ShowModal();
-        });
-
-        var deleteButton = new JOG.Button();
-        deleteButton.Text = "Delete";
-        deleteButton.ThemePreset = "danger";
-        deleteButton.Width = 68;
-        deleteButton.OnClick(function() {
-          opportunities = opportunities.filter(function(existing) {
-            return existing.id !== record.id;
-          });
-          editorStore.Set("statusMessage", "Deleted " + record.account + ".");
-          updateBoard();
-        });
-
-        actions.Add(editButton);
-        actions.Add(deleteButton);
-        rowGrid.Add(actions);
-
-        rowCard.Add(rowGrid);
-        rowsHost.Add(rowCard);
-      });
-
-      buildMetrics(opportunities, editorStore);
-      page.Refresh();
+      editorStore.Set(
+        "statusMessage",
+        "Selected " + selected.account + " in " + getStageLabel(selected.stage) + " for " + formatCurrency(selected.value) + "."
+      );
     }
 
     function saveOpportunity() {
@@ -674,24 +648,19 @@
         owner: editorStore.Get("owner"),
         nextStep: (editorStore.Get("nextStep") || "").trim()
       };
-      var existing = opportunities.filter(function(item) {
-        return item.id === record.id;
-      })[0];
 
-      if (existing) {
-        existing.account = record.account;
-        existing.stage = record.stage;
-        existing.value = record.value;
-        existing.product = record.product;
-        existing.owner = record.owner;
-        existing.nextStep = record.nextStep;
-        editorStore.Set("statusMessage", "Saved changes to " + record.account + ".");
+      if (opportunityCollection.GetRow(record.id)) {
+        opportunityCollection.Update(record.id, record);
       } else {
-        opportunities.push(record);
-        editorStore.Set("statusMessage", "Added " + record.account + " to the board.");
+        opportunityCollection.Insert(record);
       }
 
-      updateBoard();
+      opportunityCollection.Select(record.id);
+      editorStore.Set(
+        "statusMessage",
+        (editorStore.Get("editorMode") === "add" ? "Added " : "Saved changes to ") + record.account + "."
+      );
+      syncBoardState();
     }
 
     var editorDialog = new OpportunityEditorDialog(editorStore, saveOpportunity);
@@ -707,6 +676,56 @@
       editorDialog.ShowModal();
     });
 
+    clearSelectionButton.OnClick(function() {
+      opportunityCollection.ClearSelection();
+      syncSelectionStatus();
+    });
+
+    markCleanButton.OnClick(function() {
+      opportunityCollection.MarkClean();
+      editorStore.Set("statusMessage", "Marked the current board snapshot as clean.");
+      syncBoardState();
+    });
+
+    boardGrid.OnSelectionChange(function(args) {
+      var row = args.Row;
+
+      if (!row) {
+        return;
+      }
+      editorStore.Set(
+        "statusMessage",
+        "Selected " + row.account + " in " + getStageLabel(row.stage) + " for " + formatCurrency(row.value) + "."
+      );
+    });
+
+    boardGrid.OnRowCommand(function(args) {
+      var row = args.Row;
+
+      if (!row) {
+        return;
+      }
+      if (args.Key === "edit") {
+        loadOpportunityIntoStore(editorStore, cloneOpportunity(row), "edit");
+        editorStore.Set("statusMessage", "Editing " + row.account + ".");
+        editorDialog.ShowModal();
+        return;
+      }
+      if (args.Key === "delete") {
+        opportunityCollection.Remove(row.id);
+        editorStore.Set("statusMessage", "Deleted " + row.account + ".");
+        syncBoardState();
+        syncSelectionStatus();
+      }
+    });
+
+    opportunityCollection.Subscribe("change", function() {
+      syncBoardState();
+    });
+    opportunityCollection.Subscribe("selection", function() {
+      syncSelectionStatus();
+    });
+
     shell.Add(topBar);
     shell.Add(sidebar);
     shell.Add(boardSection);
@@ -714,7 +733,8 @@
     this.Add(shell);
     this.Add(editorDialog);
 
-    updateBoard();
+    syncBoardState();
+    syncSelectionStatus();
   }
 
   OpportunityBoardPage.prototype = Object.create(JOG.Page.prototype);

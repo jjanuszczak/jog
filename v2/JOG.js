@@ -374,6 +374,134 @@
     });
   }
 
+  function cloneDataGridColumns(columns) {
+    return ensureArray(columns).map(function(column, index) {
+      var normalized = isPlainObject(column) ? column : {};
+      var key = normalized.key != null && normalized.key !== "" ? String(normalized.key) : "";
+      var field = normalized.field != null && normalized.field !== "" ? String(normalized.field) : key;
+
+      if (!key) {
+        key = field || ("column-" + index);
+      }
+      if (!field) {
+        field = key;
+      }
+
+      return {
+        key: key,
+        field: field,
+        title: normalized.title != null ? String(normalized.title) : key,
+        width: normalized.width != null && normalized.width !== "" ? String(normalized.width) : "1fr",
+        align: normalized.align === "center" || normalized.align === "right" ? normalized.align : "left",
+        formatter: typeof normalized.formatter === "function" ? normalized.formatter : null,
+        resizable: normalized.resizable !== false
+      };
+    });
+  }
+
+  function cloneDataGridCommands(commands) {
+    return ensureArray(commands).map(function(command, index) {
+      var normalized = isPlainObject(command) ? command : {};
+      return {
+        key: normalized.key != null && normalized.key !== "" ? String(normalized.key) : "command-" + index,
+        text: normalized.text != null ? String(normalized.text) : "",
+        themePreset: normalized.themePreset != null ? String(normalized.themePreset) : "",
+        enabled: normalized.enabled === undefined ? true : normalized.enabled,
+        visible: normalized.visible === undefined ? true : normalized.visible
+      };
+    });
+  }
+
+  function cloneCollectionRow(row) {
+    if (isPlainObject(row)) {
+      return Object.assign({}, row);
+    }
+    return row;
+  }
+
+  function normalizeCollectionRows(rows) {
+    return ensureArray(rows).map(function(row) {
+      return cloneCollectionRow(row);
+    });
+  }
+
+  function shallowEqualObjects(left, right) {
+    var leftKeys;
+    var rightKeys;
+    var i;
+
+    if (left === right) {
+      return true;
+    }
+    if (!isPlainObject(left) || !isPlainObject(right)) {
+      return left === right;
+    }
+
+    leftKeys = Object.keys(left);
+    rightKeys = Object.keys(right);
+    if (leftKeys.length !== rightKeys.length) {
+      return false;
+    }
+
+    for (i = 0; i < leftKeys.length; i += 1) {
+      if (left[leftKeys[i]] !== right[leftKeys[i]]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function arrayShallowEqual(left, right) {
+    var i;
+
+    left = ensureArray(left);
+    right = ensureArray(right);
+    if (left.length !== right.length) {
+      return false;
+    }
+    for (i = 0; i < left.length; i += 1) {
+      if (left[i] !== right[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function uniqueValues(values) {
+    var seen = {};
+    var output = [];
+
+    ensureArray(values).forEach(function(value) {
+      var key = value == null ? "" : String(value);
+      if (!key || seen[key]) {
+        return;
+      }
+      seen[key] = true;
+      output.push(key);
+    });
+
+    return output;
+  }
+
+  function parsePixelWidth(value) {
+    var text;
+    var match;
+
+    if (value == null || value === "") {
+      return null;
+    }
+    if (isNumber(value)) {
+      return value;
+    }
+    text = String(value).trim();
+    match = text.match(/^([0-9]+(?:\.[0-9]+)?)px$/i);
+    if (!match) {
+      return null;
+    }
+    return parseFloat(match[1]);
+  }
+
   function themeVariablesFromTheme(theme) {
     return {
       "--jog-app-background": theme.colors.appBackground,
@@ -650,6 +778,11 @@
     extras = extras || {};
     this.Value = extras.Value;
     this.Key = extras.Key;
+    this.RowId = extras.RowId;
+    this.Row = extras.Row;
+    this.Column = extras.Column;
+    this.Command = extras.Command;
+    this.Index = extras.Index;
   }
 
   function normalizeDebugTopics(value) {
@@ -724,6 +857,381 @@
     listeners.forEach(function(listener) {
       listener(value);
     });
+  };
+
+  function Collection(options) {
+    var config = Array.isArray(options) ? { rows: options } : (options || {});
+
+    this._idKey = config.idKey != null && config.idKey !== "" ? String(config.idKey) : "id";
+    this._rows = [];
+    this._listeners = {};
+    this._selectedIds = [];
+    this._dirtyIds = [];
+    this._deletedIds = [];
+    this._cleanRowsById = {};
+    this._summaryDefinitions = {};
+    this._summaries = {};
+
+    this.SetSummaryDefinitions(config.summaryDefinitions || {});
+    this.SetRows(config.rows || [], { resetDirty: true, silent: true });
+    if (config.selectedIds) {
+      this.SetSelectedIds(config.selectedIds, { silent: true });
+    } else if (config.selectedId != null && config.selectedId !== "") {
+      this.Select(config.selectedId, { silent: true });
+    }
+  }
+
+  Collection.prototype._getRowId = function(row) {
+    var value;
+
+    if (!isPlainObject(row)) {
+      return "";
+    }
+    value = row[this._idKey];
+    return value == null || value === "" ? "" : String(value);
+  };
+
+  Collection.prototype._getRowsSnapshot = function() {
+    return this._rows.map(function(row) {
+      return cloneCollectionRow(row);
+    });
+  };
+
+  Collection.prototype._reindexCleanRows = function(rows) {
+    var collection = this;
+    var map = {};
+
+    ensureArray(rows).forEach(function(row) {
+      var rowId = collection._getRowId(row);
+      if (!rowId) {
+        return;
+      }
+      map[rowId] = cloneCollectionRow(row);
+    });
+
+    this._cleanRowsById = map;
+  };
+
+  Collection.prototype._recomputeDirtyState = function() {
+    var collection = this;
+    var dirty = [];
+
+    this._rows.forEach(function(row) {
+      var rowId = collection._getRowId(row);
+      var cleanRow;
+      if (!rowId) {
+        return;
+      }
+      cleanRow = collection._cleanRowsById[rowId];
+      if (!cleanRow || !shallowEqualObjects(cleanRow, row)) {
+        dirty.push(rowId);
+      }
+    });
+
+    this._dirtyIds = dirty;
+    this._deletedIds = uniqueValues(this._deletedIds.filter(function(rowId) {
+      return !!collection._cleanRowsById[rowId] && !collection.GetRow(rowId);
+    }));
+  };
+
+  Collection.prototype._recomputeSummaries = function() {
+    var collection = this;
+    var summaries = {};
+    var key;
+
+    for (key in this._summaryDefinitions) {
+      if (!Object.prototype.hasOwnProperty.call(this._summaryDefinitions, key)) {
+        continue;
+      }
+      summaries[key] = this._summaryDefinitions[key](this._getRowsSnapshot(), collection);
+    }
+
+    this._summaries = summaries;
+  };
+
+  Collection.prototype._normalizeSelection = function(selectedIds) {
+    var collection = this;
+    return uniqueValues(selectedIds).filter(function(rowId) {
+      return !!collection.GetRow(rowId);
+    });
+  };
+
+  Collection.prototype._emit = function(key, value) {
+    var listeners = ensureArray(this._listeners[key]).slice();
+    listeners.forEach(function(listener) {
+      listener(value);
+    });
+  };
+
+  Collection.prototype._notify = function(change) {
+    change = change || {};
+    this._recomputeDirtyState();
+    this._recomputeSummaries();
+    this._emit("rows", this.GetRows());
+    this._emit("selection", this.GetSelectedIds());
+    this._emit("dirty", this.GetDirtyState());
+    this._emit("summary", this.GetSummaries());
+    this._emit("change", {
+      type: change.type || "change",
+      rowId: change.rowId || "",
+      rows: this.GetRows(),
+      selectedIds: this.GetSelectedIds(),
+      dirty: this.GetDirtyState(),
+      summaries: this.GetSummaries()
+    });
+  };
+
+  Collection.prototype.GetIdKey = function() {
+    return this._idKey;
+  };
+
+  Collection.prototype.GetRowId = function(row) {
+    return this._getRowId(row);
+  };
+
+  Collection.prototype.GetRows = function() {
+    return this._getRowsSnapshot();
+  };
+
+  Collection.prototype.GetRow = function(id) {
+    var rowId = id == null ? "" : String(id);
+    var found = this._rows.filter(function(row) {
+      return String(row[this._idKey]) === rowId;
+    }, this)[0];
+
+    return found ? cloneCollectionRow(found) : null;
+  };
+
+  Collection.prototype.SetRows = function(rows, options) {
+    var collection = this;
+    var normalizedRows = normalizeCollectionRows(rows);
+    var ids = {};
+
+    options = options || {};
+    normalizedRows.forEach(function(row) {
+      var rowId = collection._getRowId(row);
+      invariant(!!rowId, "Collection rows must include a non-empty " + collection._idKey + " value.");
+      invariant(!ids[rowId], "Duplicate collection row id: " + rowId);
+      ids[rowId] = true;
+    });
+
+    this._rows = normalizedRows;
+    this._selectedIds = this._normalizeSelection(this._selectedIds);
+    if (options.resetDirty) {
+      this._reindexCleanRows(this._rows);
+      this._deletedIds = [];
+    } else {
+      this._deletedIds = uniqueValues(this._deletedIds.filter(function(rowId) {
+        return !!collection._cleanRowsById[rowId] && !collection.GetRow(rowId);
+      }));
+    }
+    this._recomputeDirtyState();
+    this._recomputeSummaries();
+    if (!options.silent) {
+      this._notify({ type: "setRows" });
+    }
+  };
+
+  Collection.prototype.Insert = function(row, index) {
+    var nextRows = this.GetRows();
+    var insertionIndex = isNumber(index) ? Math.max(0, Math.min(index, nextRows.length)) : nextRows.length;
+    nextRows.splice(insertionIndex, 0, cloneCollectionRow(row));
+    this.SetRows(nextRows);
+  };
+
+  Collection.prototype.Update = function(id, updater) {
+    var rowId = id == null ? "" : String(id);
+    var nextRows = this.GetRows();
+    var index = -1;
+    var currentRow;
+    var nextRow;
+
+    nextRows.some(function(row, rowIndex) {
+      if (String(row[this._idKey]) === rowId) {
+        index = rowIndex;
+        return true;
+      }
+      return false;
+    }, this);
+
+    invariant(index >= 0, "Collection row not found: " + rowId);
+    currentRow = nextRows[index];
+    if (typeof updater === "function") {
+      nextRow = updater(cloneCollectionRow(currentRow));
+    } else if (isPlainObject(updater)) {
+      nextRow = Object.assign({}, currentRow, updater);
+    } else {
+      nextRow = currentRow;
+    }
+    nextRows[index] = cloneCollectionRow(nextRow);
+    this.SetRows(nextRows);
+  };
+
+  Collection.prototype.Upsert = function(row) {
+    var rowId = this._getRowId(row);
+
+    invariant(!!rowId, "Collection rows must include a non-empty " + this._idKey + " value.");
+    if (this.GetRow(rowId)) {
+      this.Update(rowId, row);
+      return;
+    }
+    this.Insert(row);
+  };
+
+  Collection.prototype.Remove = function(id) {
+    var rowId = id == null ? "" : String(id);
+    var nextRows = this.GetRows().filter(function(row) {
+      return String(row[this._idKey]) !== rowId;
+    }, this);
+
+    if (nextRows.length === this._rows.length) {
+      return;
+    }
+    if (this._cleanRowsById[rowId]) {
+      this._deletedIds = uniqueValues(this._deletedIds.concat([rowId]));
+    }
+    this.SetRows(nextRows);
+  };
+
+  Collection.prototype.Select = function(id, options) {
+    options = options || {};
+    this._selectedIds = this._normalizeSelection([id]);
+    if (!options.silent) {
+      this._notify({ type: "select", rowId: this._selectedIds[0] || "" });
+    }
+  };
+
+  Collection.prototype.SetSelectedIds = function(ids, options) {
+    options = options || {};
+    this._selectedIds = this._normalizeSelection(ids);
+    if (!options.silent) {
+      this._notify({ type: "select", rowId: this._selectedIds[0] || "" });
+    }
+  };
+
+  Collection.prototype.ToggleSelected = function(id) {
+    var rowId = id == null ? "" : String(id);
+
+    if (!rowId) {
+      this.ClearSelection();
+      return;
+    }
+    if (this.IsSelected(rowId)) {
+      this.ClearSelection();
+      return;
+    }
+    this.Select(rowId);
+  };
+
+  Collection.prototype.ClearSelection = function(options) {
+    options = options || {};
+    this._selectedIds = [];
+    if (!options.silent) {
+      this._notify({ type: "clearSelection" });
+    }
+  };
+
+  Collection.prototype.IsSelected = function(id) {
+    var rowId = id == null ? "" : String(id);
+    return this._selectedIds.indexOf(rowId) >= 0;
+  };
+
+  Collection.prototype.GetSelectedIds = function() {
+    return this._selectedIds.slice();
+  };
+
+  Collection.prototype.GetSelectedId = function() {
+    return this._selectedIds[0] || "";
+  };
+
+  Collection.prototype.GetSelectedRows = function() {
+    var collection = this;
+    return this._selectedIds.map(function(rowId) {
+      return collection.GetRow(rowId);
+    }).filter(function(row) {
+      return !!row;
+    });
+  };
+
+  Collection.prototype.GetDirtyRowIds = function() {
+    return this._dirtyIds.slice();
+  };
+
+  Collection.prototype.GetDeletedRowIds = function() {
+    return this._deletedIds.slice();
+  };
+
+  Collection.prototype.IsDirty = function(id) {
+    var rowId = id == null ? "" : String(id);
+    return this._dirtyIds.indexOf(rowId) >= 0 || this._deletedIds.indexOf(rowId) >= 0;
+  };
+
+  Collection.prototype.HasDirtyRows = function() {
+    return this._dirtyIds.length > 0 || this._deletedIds.length > 0;
+  };
+
+  Collection.prototype.GetDirtyState = function() {
+    return {
+      rowIds: this.GetDirtyRowIds(),
+      deletedRowIds: this.GetDeletedRowIds(),
+      hasDirtyRows: this.HasDirtyRows()
+    };
+  };
+
+  Collection.prototype.MarkClean = function(ids) {
+    var collection = this;
+    var selectedIds = uniqueValues(ids);
+
+    if (!selectedIds.length) {
+      this._reindexCleanRows(this._rows);
+      this._deletedIds = [];
+      this._notify({ type: "markClean" });
+      return;
+    }
+
+    selectedIds.forEach(function(rowId) {
+      var row = collection.GetRow(rowId);
+      if (row) {
+        collection._cleanRowsById[rowId] = cloneCollectionRow(row);
+      } else {
+        delete collection._cleanRowsById[rowId];
+      }
+    });
+    this._deletedIds = this._deletedIds.filter(function(rowId) {
+      return selectedIds.indexOf(rowId) < 0;
+    });
+    this._notify({ type: "markClean" });
+  };
+
+  Collection.prototype.SetSummaryDefinitions = function(definitions) {
+    this._summaryDefinitions = Object.assign({}, definitions || {});
+    this._recomputeSummaries();
+  };
+
+  Collection.prototype.GetSummary = function(key) {
+    return this._summaries[key];
+  };
+
+  Collection.prototype.GetSummaries = function() {
+    return Object.assign({}, this._summaries);
+  };
+
+  Collection.prototype.Subscribe = function(key, listener) {
+    if (!this._listeners[key]) {
+      this._listeners[key] = [];
+    }
+    this._listeners[key].push(listener);
+    var collection = this;
+    return function() {
+      var listeners = collection._listeners[key];
+      if (!listeners) {
+        return;
+      }
+      var index = listeners.indexOf(listener);
+      if (index >= 0) {
+        listeners.splice(index, 1);
+      }
+    };
   };
 
   function Runtime(application) {
@@ -1062,6 +1570,24 @@
       ".jog-section-header { padding: var(--jog-section-header-y) var(--jog-section-header-x); font-size: var(--jog-title-size); font-weight: 600; color: var(--jog-text); background: var(--jog-surface-muted); border-bottom: 1px solid var(--jog-border-soft); }",
       ".jog-section-body { position: relative; padding: var(--jog-section-body); }",
       ".jog-grid-panel { position: relative; display: grid; align-items: start; }",
+      ".jog-data-grid { position: relative; border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-section); background: var(--jog-surface); overflow-x: auto; overflow-y: hidden; }",
+      ".jog-data-grid-header, .jog-data-grid-row { display: grid; align-items: stretch; min-width: max-content; }",
+      ".jog-data-grid-header { background: var(--jog-surface-muted); border-bottom: 1px solid var(--jog-border-soft); }",
+      ".jog-data-grid-header-cell { position: relative; padding: 10px 12px; font-size: var(--jog-caption-size); font-weight: 600; color: var(--jog-text); border-right: 1px solid var(--jog-border-soft); }",
+      ".jog-data-grid-header-cell:last-child { border-right: 0; }",
+      ".jog-data-grid-resize-handle { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 1; }",
+      ".jog-data-grid-body { position: relative; }",
+      ".jog-data-grid-row { border-bottom: 1px solid var(--jog-border-soft); }",
+      ".jog-data-grid-row:last-child { border-bottom: 0; }",
+      ".jog-data-grid-row.jog-selected { background: rgba(15, 23, 42, 0.06); }",
+      ".jog-data-grid-row.jog-dirty { box-shadow: inset 3px 0 0 var(--jog-primary); }",
+      ".jog-data-grid-cell { padding: 12px; color: var(--jog-text-muted); border-right: 1px solid var(--jog-border-soft); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }",
+      ".jog-data-grid-cell:last-child { border-right: 0; }",
+      ".jog-data-grid-cell.align-right { text-align: right; }",
+      ".jog-data-grid-cell.align-center { text-align: center; }",
+      ".jog-data-grid-command-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }",
+      ".jog-data-grid-command { padding-left: 10px; padding-right: 10px; }",
+      ".jog-data-grid-empty { padding: 18px 12px; color: var(--jog-text-muted); }",
       ".jog-window { position: absolute; border: 1px solid var(--jog-border); border-radius: var(--jog-radius-window); background: var(--jog-surface); box-shadow: var(--jog-shadow-window); overflow: hidden; }",
       ".jog-window-titlebar { background: var(--jog-surface-muted); color: var(--jog-text); padding: 12px 16px; font-weight: 600; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--jog-border-soft); }",
       ".jog-window-content { position: relative; padding: var(--jog-window-content); background: var(--jog-surface); }",
@@ -2302,6 +2828,353 @@
     set: function(value) { this._setState("responsive", cloneResponsiveConfig(value, normalizeGridResponsiveBreakpoint)); }
   });
 
+  function DataGrid() {
+    Control.call(this, "DataGrid");
+    this._state.columns = [];
+    this._state.columnWidthOverrides = {};
+    this._state.rowCommands = [];
+    this._state.emptyText = "No rows.";
+    this._state.selectionMode = "single";
+    this._state.resizableColumns = false;
+    this._state.collection = null;
+    this._headerNode = null;
+    this._bodyNode = null;
+    this._emptyNode = null;
+    this._collectionUnsubscribe = null;
+    this._rowNodes = [];
+    this._commandNodes = {};
+    this._resizeHandleNodes = {};
+    this._activeResize = null;
+  }
+
+  DataGrid.prototype = Object.create(Control.prototype);
+  DataGrid.prototype.constructor = DataGrid;
+
+  DataGrid.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("div");
+    var header = doc.createElement("div");
+    var body = doc.createElement("div");
+    var empty = doc.createElement("div");
+
+    node.className = "jog-control jog-data-grid";
+    header.className = "jog-data-grid-header";
+    body.className = "jog-data-grid-body";
+    empty.className = "jog-data-grid-empty";
+
+    node.appendChild(header);
+    node.appendChild(body);
+    node.appendChild(empty);
+
+    this._headerNode = header;
+    this._bodyNode = body;
+    this._emptyNode = empty;
+    return node;
+  };
+
+  DataGrid.prototype._clearNodeChildren = function(node) {
+    while (node && node.children && node.children.length) {
+      node.removeChild(node.children[0]);
+    }
+  };
+
+  DataGrid.prototype._getResolvedColumns = function() {
+    var overrides = this._state.columnWidthOverrides || {};
+
+    return cloneDataGridColumns(this._state.columns).map(function(column) {
+      if (overrides[column.key] != null) {
+        column.width = String(overrides[column.key]);
+      }
+      return column;
+    });
+  };
+
+  DataGrid.prototype._getVisibleCommands = function(row, rowIndex) {
+    return cloneDataGridCommands(this._state.rowCommands).filter(function(command) {
+      if (command.visible === false) {
+        return false;
+      }
+      if (typeof command.visible === "function") {
+        return !!command.visible(row, rowIndex);
+      }
+      return true;
+    });
+  };
+
+  DataGrid.prototype._getGridTemplateColumns = function(columns, includeCommands) {
+    var tracks = columns.map(function(column) {
+      return column.width || "1fr";
+    });
+
+    if (includeCommands) {
+      tracks.push("max-content");
+    }
+    return tracks.join(" ");
+  };
+
+  DataGrid.prototype._canResizeColumn = function(column) {
+    if (!this._state.resizableColumns || !column || column.resizable === false) {
+      return false;
+    }
+    return parsePixelWidth(column.width) != null;
+  };
+
+  DataGrid.prototype._setColumnWidth = function(columnKey, widthPx) {
+    var overrides = Object.assign({}, this._state.columnWidthOverrides || {});
+    overrides[columnKey] = Math.max(80, Math.round(widthPx)) + "px";
+    this._setState("columnWidthOverrides", overrides);
+  };
+
+  DataGrid.prototype._beginColumnResize = function(column, event) {
+    var control = this;
+    var doc;
+    var startWidth;
+
+    if (!this._runtime || !column || !this._canResizeColumn(column)) {
+      return;
+    }
+
+    doc = this._runtime.document;
+    startWidth = parsePixelWidth(column.width);
+    if (startWidth == null) {
+      return;
+    }
+
+    this._activeResize = {
+      columnKey: column.key,
+      startX: event.clientX || 0,
+      startWidth: startWidth,
+      onMove: null,
+      onUp: null
+    };
+
+    this._activeResize.onMove = function(moveEvent) {
+      var delta = (moveEvent.clientX || 0) - control._activeResize.startX;
+      control._setColumnWidth(control._activeResize.columnKey, control._activeResize.startWidth + delta);
+    };
+
+    this._activeResize.onUp = function() {
+      if (!control._activeResize) {
+        return;
+      }
+      doc.removeEventListener("mousemove", control._activeResize.onMove);
+      doc.removeEventListener("mouseup", control._activeResize.onUp);
+      control._activeResize = null;
+    };
+
+    doc.addEventListener("mousemove", this._activeResize.onMove);
+    doc.addEventListener("mouseup", this._activeResize.onUp);
+  };
+
+  DataGrid.prototype._resolveCellText = function(column, row, rowIndex, rowId) {
+    var value = row[column.field];
+
+    if (column.formatter) {
+      value = column.formatter(value, row, {
+        rowId: rowId,
+        rowIndex: rowIndex,
+        column: column,
+        collection: this._state.collection
+      });
+    }
+
+    return value == null ? "" : String(value);
+  };
+
+  DataGrid.prototype._bindCollection = function(collection) {
+    var control = this;
+
+    if (this._collectionUnsubscribe) {
+      this._collectionUnsubscribe();
+      this._collectionUnsubscribe = null;
+    }
+    if (!collection || typeof collection.Subscribe !== "function") {
+      return;
+    }
+    this._collectionUnsubscribe = collection.Subscribe("change", function() {
+      control.Refresh();
+    });
+  };
+
+  DataGrid.prototype._applyStateToDom = function(prevState, nextState) {
+    var control = this;
+    var collection = nextState.collection;
+    var columns = this._getResolvedColumns();
+    var rows = collection && typeof collection.GetRows === "function" ? collection.GetRows() : [];
+    var includeCommands = cloneDataGridCommands(nextState.rowCommands).length > 0;
+
+    Control.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (!this._domNode || !this._headerNode || !this._bodyNode || !this._emptyNode) {
+      return;
+    }
+
+    if (prevState.collection !== nextState.collection) {
+      this._bindCollection(nextState.collection);
+    }
+
+    this._clearNodeChildren(this._headerNode);
+    this._clearNodeChildren(this._bodyNode);
+    this._rowNodes = [];
+    this._commandNodes = {};
+    this._resizeHandleNodes = {};
+
+    this._headerNode.style.gridTemplateColumns = this._getGridTemplateColumns(columns, includeCommands);
+
+    columns.forEach(function(column) {
+      var headerCell = control._runtime.document.createElement("div");
+      headerCell.className = "jog-data-grid-header-cell" + (column.align === "right" ? " align-right" : (column.align === "center" ? " align-center" : ""));
+      headerCell.textContent = column.title;
+      if (control._canResizeColumn(column)) {
+        var handle = control._runtime.document.createElement("div");
+        handle.className = "jog-data-grid-resize-handle";
+        handle.addEventListener("mousedown", function(event) {
+          if (typeof event.preventDefault === "function") {
+            event.preventDefault();
+          }
+          if (typeof event.stopPropagation === "function") {
+            event.stopPropagation();
+          }
+          control._beginColumnResize(column, event);
+        });
+        headerCell.appendChild(handle);
+        control._resizeHandleNodes[column.key] = handle;
+      }
+      control._headerNode.appendChild(headerCell);
+    });
+
+    if (includeCommands) {
+      var commandHeader = control._runtime.document.createElement("div");
+      commandHeader.className = "jog-data-grid-header-cell";
+      commandHeader.textContent = "Actions";
+      control._headerNode.appendChild(commandHeader);
+    }
+
+    this._headerNode.style.display = columns.length || includeCommands ? "" : "none";
+    this._emptyNode.textContent = nextState.emptyText || "No rows.";
+    this._emptyNode.style.display = rows.length ? "none" : "";
+
+    rows.forEach(function(row, rowIndex) {
+      var rowId = collection ? collection.GetRowId(row) : "";
+      var rowNode = control._runtime.document.createElement("div");
+      var commands = control._getVisibleCommands(row, rowIndex);
+
+      rowNode.className = "jog-data-grid-row";
+      rowNode.style.gridTemplateColumns = control._getGridTemplateColumns(columns, commands.length > 0);
+      if (collection && collection.IsSelected(rowId)) {
+        rowNode.classList.add("jog-selected");
+      }
+      if (collection && collection.IsDirty(rowId)) {
+        rowNode.classList.add("jog-dirty");
+      }
+      if (nextState.selectionMode !== "none") {
+        rowNode.addEventListener("click", function(event) {
+          if (!collection) {
+            return;
+          }
+          collection.Select(rowId);
+          control._raiseEvent("SelectionChange", event, {
+            RowId: rowId,
+            Row: cloneCollectionRow(row),
+            Value: rowId,
+            Index: rowIndex
+          });
+        });
+      }
+
+      columns.forEach(function(column) {
+        var cell = control._runtime.document.createElement("div");
+        cell.className = "jog-data-grid-cell" + (column.align === "right" ? " align-right" : (column.align === "center" ? " align-center" : ""));
+        cell.textContent = control._resolveCellText(column, row, rowIndex, rowId);
+        rowNode.appendChild(cell);
+      });
+
+      if (commands.length) {
+        var commandCell = control._runtime.document.createElement("div");
+        commandCell.className = "jog-data-grid-cell jog-data-grid-command-cell";
+
+        control._commandNodes[rowId] = {};
+        commands.forEach(function(command, commandIndex) {
+          var button = control._runtime.document.createElement("button");
+          var enabled = typeof command.enabled === "function" ? !!command.enabled(row, rowIndex) : command.enabled !== false;
+
+          button.className = "jog-button jog-data-grid-command" + (command.themePreset ? " jog-theme-preset-" + command.themePreset : "");
+          button.type = "button";
+          button.textContent = command.text;
+          button.disabled = !enabled;
+          button.addEventListener("click", function(event) {
+            control._raiseEvent("RowCommand", event, {
+              Key: command.key,
+              Command: command,
+              RowId: rowId,
+              Row: cloneCollectionRow(row),
+              Value: rowId,
+              Index: commandIndex
+            });
+          });
+          commandCell.appendChild(button);
+          control._commandNodes[rowId][command.key] = button;
+        });
+        rowNode.appendChild(commandCell);
+      }
+
+      control._bodyNode.appendChild(rowNode);
+      control._rowNodes.push(rowNode);
+    });
+  };
+
+  DataGrid.prototype.Dispose = function() {
+    if (this._activeResize && this._runtime && this._runtime.document) {
+      this._runtime.document.removeEventListener("mousemove", this._activeResize.onMove);
+      this._runtime.document.removeEventListener("mouseup", this._activeResize.onUp);
+      this._activeResize = null;
+    }
+    if (this._collectionUnsubscribe) {
+      this._collectionUnsubscribe();
+      this._collectionUnsubscribe = null;
+    }
+    Control.prototype.Dispose.call(this);
+  };
+
+  DataGrid.prototype.OnRowCommand = function(listener) {
+    this._registerEvent("RowCommand", listener);
+  };
+
+  DataGrid.prototype.OnSelectionChange = function(listener) {
+    this._registerEvent("SelectionChange", listener);
+  };
+
+  Object.defineProperty(DataGrid.prototype, "Columns", {
+    get: function() { return cloneDataGridColumns(this._state.columns); },
+    set: function(value) { this._setState("columns", cloneDataGridColumns(value)); }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "RowCommands", {
+    get: function() { return cloneDataGridCommands(this._state.rowCommands); },
+    set: function(value) { this._setState("rowCommands", cloneDataGridCommands(value)); }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "EmptyText", {
+    get: function() { return this._state.emptyText; },
+    set: function(value) { this._setState("emptyText", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "SelectionMode", {
+    get: function() { return this._state.selectionMode; },
+    set: function(value) {
+      var nextValue = value === "none" ? "none" : "single";
+      this._setState("selectionMode", nextValue);
+    }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "ResizableColumns", {
+    get: function() { return !!this._state.resizableColumns; },
+    set: function(value) { this._setState("resizableColumns", !!value); }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "Collection", {
+    get: function() { return this._state.collection; },
+    set: function(value) { this._setState("collection", value || null); }
+  });
+
   function Label() {
     Control.call(this, "Label");
   }
@@ -3171,6 +4044,7 @@
   JOG.TabControl = TabControl;
   JOG.SectionPanel = SectionPanel;
   JOG.Grid = Grid;
+  JOG.DataGrid = DataGrid;
   JOG.Window = Window;
   JOG.Dialog = Dialog;
   JOG.Label = Label;
@@ -3184,6 +4058,7 @@
   JOG.DropDownList = DropDownList;
   JOG.ListBox = ListBox;
   JOG.Store = Store;
+  JOG.Collection = Collection;
   JOG.EventArgs = EventArgs;
 
   global.JOG = JOG;
