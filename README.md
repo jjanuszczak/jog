@@ -56,6 +56,7 @@ Open these files directly in a browser:
 
 - [v2/hello-world.html](v2/hello-world.html)
 - [v2/example.html](v2/example.html)
+- [v2/notepad.html](v2/notepad.html)
 - [v2/customer-admin.html](v2/customer-admin.html)
 - [v2/form-demo.html](v2/form-demo.html)
 - [v2/opportunity-board.html](v2/opportunity-board.html)
@@ -64,6 +65,7 @@ What they cover:
 
 - `hello-world.html`: the smallest runnable JOG app, one page and one label
 - `example.html`: small runtime sanity check, first `MenuBar`, `ToolBar`, `StatusBar`, and `TabControl` usage, default-versus-custom theme switching, stacked modal dialogs, resize behavior
+- `notepad.html`: multi-document notepad shell with a docked menu, docked status bar, responsive editor area, browser file open and save flows, and one document per tab
 - `customer-admin.html`: CRUD-style page shell with shared inline and dialog validation
 - `form-demo.html`: form layout, responsive grid collapse, explicit store binding, reusable validation summary wiring, inline errors, radio-group invalid state
 - `opportunity-board.html`: CRM-style opportunity rows with add, edit, delete, modal record editing, a responsive editor form, and a responsive board shell

@@ -90,6 +90,7 @@ This roadmap tracks implementation reality, not aspiration. Update it whenever f
 
 - bare-bones hello world example
 - simple example app
+- notepad example with multi-document tabs and browser file open/save flows
 - customer admin example
 - form demo with grid layout
 - form demo with breakpoint-aware responsive grid layout

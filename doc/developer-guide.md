@@ -42,6 +42,7 @@ Example apps:
 
 - [v2/hello-world.html](../v2/hello-world.html)
 - [v2/example.html](../v2/example.html)
+- [v2/notepad.html](../v2/notepad.html)
 - [v2/customer-admin.html](../v2/customer-admin.html)
 - [v2/form-demo.html](../v2/form-demo.html)
 - [v2/opportunity-board.html](../v2/opportunity-board.html)
