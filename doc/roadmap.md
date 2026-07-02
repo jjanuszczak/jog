@@ -55,6 +55,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `SplitPanel`
 - `StackPanel`
 - `SectionPanel`
+- `SectionPanel` responsive title and body-padding overrides
 - `Grid`
 
 ### Controls
@@ -130,12 +131,13 @@ That means the next phase is not broad control expansion for its own sake. The n
 - opportunity board now demonstrates first-pass resizable `DataGrid` columns
 - opportunity editor dialog with breakpoint-aware responsive grid layout
 - opportunity board shell with responsive dock and stack behavior
+- opportunity board now demonstrates responsive `SectionPanel` title and padding changes
 - opportunity board use of built-in theme presets
 
 ### Tests
 
 - Node test runner at `test/run-v2-tests.js`
-- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, split, and stack behavior, browser text file helper flows, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
+- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, split, stack, and section behavior, browser text file helper flows, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
 
 ## Partial
 
@@ -154,7 +156,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `StackPanel` now has breakpoint-based orientation and spacing overrides
 - `DockPanel` now supports responsive shell and child layout changes through inherited `ResponsiveLayout`
 - `SplitPanel` now supports first-pane and second-pane sizing plus breakpoint-based orientation changes
-- `SectionPanel` still has no dedicated responsive helper surface
+- `SectionPanel` now supports a dedicated responsive helper surface for title and body-padding changes
 - shell layout is substantially more dependable than it was before this hardening pass, but app code still owns higher-level chrome composition decisions
 - the framework still lacks deeper multi-pane workspace management beyond `DockPanel` plus `SplitPanel`
 

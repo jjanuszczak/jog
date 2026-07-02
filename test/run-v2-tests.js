@@ -735,6 +735,38 @@ function testResponsiveDockAndStackLayoutsApplyOnMountAndResize() {
   assertEqual(actionRow._domNode.style.gap, "8px", "Responsive StackPanel should restore desktop gap on wider resize.");
 }
 
+function testSectionPanelResponsiveTitleAndPadding() {
+  var sandbox = createJOGSandbox({ innerWidth: 560 });
+  var JOG = sandbox.JOG;
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var section = new JOG.SectionPanel();
+
+  section.Title = "Desktop Summary";
+  section.Padding = 18;
+  section.Responsive = {
+    base: {
+      title: "Summary",
+      padding: 10
+    },
+    md: {
+      title: "Desktop Summary",
+      padding: 18
+    }
+  };
+  page.Add(section);
+  app.Run(page);
+
+  assertEqual(section._headerNode.textContent, "Summary", "Responsive SectionPanel should use the mobile title on narrow mount.");
+  assertEqual(section._bodyNode.style.padding, "10px", "Responsive SectionPanel should use the mobile body padding on narrow mount.");
+
+  dispatchWindowResize(sandbox, 980);
+  app.Runtime.flush();
+
+  assertEqual(section._headerNode.textContent, "Desktop Summary", "Responsive SectionPanel should restore the desktop title on wider resize.");
+  assertEqual(section._bodyNode.style.padding, "18px", "Responsive SectionPanel should restore the desktop body padding on wider resize.");
+}
+
 function testSplitPanelResponsiveOrientationAndSizing() {
   var sandbox = createJOGSandbox({ innerWidth: 560 });
   var JOG = sandbox.JOG;
@@ -2124,6 +2156,7 @@ var tests = [
   { name: "Grid supports named areas and auto rows", fn: testGridSupportsNamedAreasAndAutoRows },
   { name: "Grid responsive breakpoints apply on mount and resize", fn: testGridResponsiveBreakpointsApplyOnMountAndResize },
   { name: "responsive dock and stack layouts apply on mount and resize", fn: testResponsiveDockAndStackLayoutsApplyOnMountAndResize },
+  { name: "section panel responsive title and padding", fn: testSectionPanelResponsiveTitleAndPadding },
   { name: "split panel responsive orientation and sizing", fn: testSplitPanelResponsiveOrientationAndSizing },
   { name: "fill property supports tab workspace editors", fn: testFillPropertySupportsTabWorkspaceEditors },
   { name: "browser open text file uses modern picker", fn: testBrowserOpenTextFileUsesModernPicker },

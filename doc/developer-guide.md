@@ -473,6 +473,23 @@ Use it for left-nav-plus-content shells, inspector layouts, and stacked mobile f
 
 Use it to create visually separated regions such as forms, sidebars, summaries, and detail panels.
 
+`SectionPanel` now also supports a narrow `Responsive` surface for breakpoint-driven title and body-padding changes.
+
+Example:
+
+```js
+sidebar.Responsive = {
+  base: {
+    title: "Pipeline",
+    padding: 10
+  },
+  md: {
+    title: "Pipeline Snapshot",
+    padding: 12
+  }
+};
+```
+
 ### Grid
 
 `Grid` is the newest layout primitive. It uses CSS grid internally and is intended for desktop-style form layout.

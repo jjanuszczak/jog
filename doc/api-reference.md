@@ -477,12 +477,15 @@ Extends `JOG.Container`.
 Properties:
 
 - `Title`
+- `Responsive`
 
 Notes:
 
 - creates a titled frame with an internal body region
 - children are added to the body area, not the outer node
 - `ThemePreset` supports `primary` and `muted`
+- `Responsive` uses breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
+- `Responsive` breakpoint values can override `title` and `padding`
 
 ### `JOG.Grid`
 
@@ -529,7 +532,6 @@ Responsive breakpoints:
 Current limitations:
 
 - no container-query model
-- no responsive helper surface yet for `SectionPanel`
 
 ### `JOG.DataGrid`
 
