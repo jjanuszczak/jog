@@ -523,6 +523,16 @@
         margin: { top: 0, right: 24, bottom: 0, left: 0 }
       }
     };
+    sidebar.Responsive = {
+      base: {
+        title: "Pipeline",
+        padding: 10
+      },
+      md: {
+        title: "Pipeline Snapshot",
+        padding: 12
+      }
+    };
 
     var sidebarStack = new JOG.StackPanel();
     sidebarStack.Name = "opportunitySidebarStack";
@@ -556,6 +566,16 @@
     boardSection.Title = "Active Opportunities";
     boardSection.Dock = "fill";
     boardSection.Padding = 12;
+    boardSection.Responsive = {
+      base: {
+        title: "Opportunities",
+        padding: 10
+      },
+      md: {
+        title: "Active Opportunities",
+        padding: 12
+      }
+    };
 
     var boardLayout = new JOG.StackPanel();
     boardLayout.Name = "opportunityBoardLayout";

@@ -266,6 +266,22 @@
     return Object.keys(normalized).length ? normalized : null;
   }
 
+  function normalizeResponsiveSectionBreakpoint(value) {
+    var normalized = {};
+
+    if (!isPlainObject(value)) {
+      return null;
+    }
+    if (value.title !== undefined) {
+      normalized.title = value.title == null ? "" : String(value.title);
+    }
+    if (value.padding !== undefined) {
+      normalized.padding = value.padding;
+    }
+
+    return Object.keys(normalized).length ? normalized : null;
+  }
+
   function resolveResponsiveValues(baseValues, responsiveConfig, viewportWidth) {
     var resolved = {};
     var breakpointValues;
@@ -3112,6 +3128,7 @@
   function SectionPanel() {
     Container.call(this, "SectionPanel");
     this._state.title = "";
+    this._state.responsive = null;
     this._bodyNode = null;
   }
 
@@ -3141,13 +3158,24 @@
   };
 
   SectionPanel.prototype._applyStateToDom = function(prevState, nextState) {
+    var resolvedSection;
+    var viewportWidth;
+
     Container.prototype._applyStateToDom.call(this, prevState, nextState);
     if (!this._domNode) {
       return;
     }
-    this._headerNode.textContent = nextState.title || "";
-    this._headerNode.style.display = nextState.title ? "" : "none";
-    this._bodyNode.style.padding = toCssBox(nextState.padding != null ? nextState.padding : 16);
+    if (this._runtime) {
+      this._runtime.trackResponsiveControl(this, !!(nextState.responsive || nextState.responsiveLayout));
+      viewportWidth = this._runtime.getViewportWidth();
+    }
+    resolvedSection = resolveResponsiveValues({
+      title: nextState.title,
+      padding: nextState.padding
+    }, nextState.responsive, viewportWidth || 1280);
+    this._headerNode.textContent = resolvedSection.title || "";
+    this._headerNode.style.display = resolvedSection.title ? "" : "none";
+    this._bodyNode.style.padding = toCssBox(resolvedSection.padding != null ? resolvedSection.padding : 16);
   };
 
   SectionPanel.prototype._childUsesFlowLayout = function() {
@@ -3157,6 +3185,11 @@
   Object.defineProperty(SectionPanel.prototype, "Title", {
     get: function() { return this._state.title; },
     set: function(value) { this._setState("title", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(SectionPanel.prototype, "Responsive", {
+    get: function() { return this._state.responsive; },
+    set: function(value) { this._setState("responsive", cloneResponsiveConfig(value, normalizeResponsiveSectionBreakpoint)); }
   });
 
   function Grid() {
