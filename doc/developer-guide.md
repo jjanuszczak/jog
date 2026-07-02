@@ -23,6 +23,7 @@ JOG owns rendering, DOM creation, styling injection, and event wiring.
 Implemented public surface in `v2/JOG.js`:
 
 - theme API: `JOG.SetTheme()`, `JOG.GetTheme()`, `JOG.Theme`, `Application.Theme`
+- browser helpers: `JOG.Browser.OpenTextFile()`, `JOG.Browser.SaveTextFile()`
 - application runtime: `Application`, `Page`
 - base types: `Component`, `Control`, `Container`
 - layout containers: `Panel`, `DockPanel`, `SplitPanel`, `StackPanel`, `SectionPanel`, `Grid`
@@ -174,6 +175,50 @@ This currently writes:
 The `dist/release/` files are the exact assets that should be attached to GitHub Releases today. The current release process is documented in [doc/release-guide.md](release-guide.md), and the upload step is automated in [release-artifacts.yml](../.github/workflows/release-artifacts.yml).
 
 This is the appropriate release packaging model for the current state of the project. It keeps the browser delivery story simple while the runtime API continues to evolve, and now includes a minimal starter bundle you can copy and rename.
+
+## Browser Helpers
+
+JOG now exposes a very small browser-helper surface for text file open and save flows:
+
+```js
+JOG.Browser.OpenTextFile({
+  types: [
+    {
+      description: "Text files",
+      accept: {
+        "text/plain": [".txt", ".md"]
+      }
+    }
+  ]
+}).then(function(result) {
+  if (!result) {
+    return;
+  }
+  console.log(result.name, result.text);
+});
+```
+
+```js
+JOG.Browser.SaveTextFile({
+  text: "hello world",
+  suggestedName: "notes.txt"
+}).then(function(result) {
+  if (!result) {
+    return;
+  }
+  console.log(result.name, result.method);
+});
+```
+
+Behavior implemented now:
+
+- `OpenTextFile()` prefers the modern picker API when available
+- `OpenTextFile()` falls back to a runtime-managed hidden native file input when needed
+- `SaveTextFile()` reuses an existing file handle when one is available and `saveAs` is not requested
+- `SaveTextFile()` otherwise prefers the modern save picker, then falls back to a download link
+- both helpers return `null` on user cancel instead of treating cancel as an error
+
+This should stay narrow. The intent is to remove obvious browser DOM escape hatches from app code, not to turn JOG into a broad browser-services layer.
 
 ## Control Model
 
@@ -800,6 +845,8 @@ Calling setters on a disposed control throws.
 
 - docked shell chrome without manual viewport resize math
 - `Fill = true` inside a tab workspace for full-height editor composition
+- runtime-managed browser text file open and save flows through `JOG.Browser`
+- JOG dialog-based file-operation error reporting instead of browser `alert()` calls
 
 ## Guidance for Developers
 
