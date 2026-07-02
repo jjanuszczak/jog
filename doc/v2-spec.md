@@ -135,6 +135,7 @@ Compatibility aliases such as `Click(listener)` and `Change(listener)` may exist
 - `JOG.Panel`
 - `JOG.StackPanel`
 - `JOG.DockPanel`
+- `JOG.SplitPanel`
 - `JOG.SectionPanel`
 - `JOG.Grid`
 
@@ -188,6 +189,7 @@ The current V2 surface also benefits from:
 - `MinHeight`
 - `MaxWidth`
 - `MaxHeight`
+- `Fill`
 - `Padding`
 - `Margin`
 - validation state such as `Invalid` and `ErrorText`
@@ -283,6 +285,7 @@ Responsibilities:
 - focus coordination
 - window and dialog management
 - responsive layout recalculation
+- narrow browser-integration helpers for cases where app code would otherwise hand-roll DOM escape hatches
 - diagnostics and error reporting
 
 ### 9.4 Renderer Layer
@@ -458,6 +461,14 @@ JOG V2 should support:
 #### `DockPanel`
 
 - dock top, bottom, left, right, fill
+- page-shell use should avoid forcing child `100%` width and height when dock geometry is already authoritative
+- child-structure changes should trigger parent relayout so tabbed and split shells stay stable after mutations
+
+#### `SplitPanel`
+
+- horizontal or vertical two-pane workspace layout
+- fixed first-pane or second-pane sizing
+- breakpoint-based orientation changes
 
 #### `Grid`
 
@@ -475,6 +486,12 @@ That means:
 - stronger composition for shell-style pages
 - better support for multi-pane, tabbed, and status-driven business-app layouts
 
+Current implemented direction:
+
+- page-level shell layout is materially more dependable than it was earlier in V2
+- `Fill` is still a narrow stretch signal, not a general flexbox abstraction
+- dock-managed children should let `DockPanel` own their geometry
+
 ### 14.4 Layout Priority
 
 V2 minimum target:
@@ -482,7 +499,8 @@ V2 minimum target:
 1. `Panel`
 2. `StackPanel`
 3. `DockPanel`
-4. `Grid`
+4. `SplitPanel`
+5. `Grid`
 
 ## 15. Windowing System
 
@@ -500,6 +518,12 @@ The windowing subsystem is a primary differentiator for JOG.
 - focus trapping for modal dialogs
 - focus restoration after modal close
 
+Current implemented behavior also includes:
+
+- resizable windows with edge and corner handles
+- stacked modal overlays
+- scrollable window and dialog content panes so oversized dialog bodies remain reachable
+
 ### 15.2 Nice-to-Have Features
 
 - resizable windows
@@ -514,6 +538,22 @@ The windowing subsystem is a primary differentiator for JOG.
 - coordinate modal overlays
 - manage focus and restore prior focus
 - remove disposed windows cleanly
+
+Current gap:
+
+- focus trapping and focus restoration are still intended behavior, not completed behavior
+
+### 15.4 Browser Integration Direction
+
+The runtime should own a small number of explicit browser-integration helpers when the alternative is repeated ad hoc DOM manipulation in app code.
+
+Near-term priority:
+
+- a runtime-level file-picker helper that prefers modern browser file APIs when available
+- a built-in fallback path for browsers that still require a hidden native file input
+- an app-facing API narrow enough that examples such as `NotepadApp` do not append raw DOM nodes to `document.body`
+
+This should stay conservative. The goal is not a broad browser-service abstraction layer. The goal is to absorb obvious browser interop seams that otherwise weaken the JOG programming model.
 
 ## 16. Event System
 
@@ -759,6 +799,12 @@ JOG V2 should have a real diagnostic model.
 
 The example apps that define the target lane should continue to work under V2, especially shell, form, CRUD, and dialog flows.
 
+That now explicitly includes:
+
+- shell relayout after tab open and close
+- dock-managed fill layouts that stay inside their parent shell
+- dialog bodies that remain scrollable and reachable when content exceeds the initial window body
+
 ## 21. V2 Delivery Scope
 
 ### 21.1 Must-Have
@@ -781,6 +827,7 @@ The example apps that define the target lane should continue to work under V2, e
 ### 21.2 Should-Have
 
 - `DockPanel`
+- `SplitPanel`
 - `SectionPanel`
 - `Grid`
 - `DataGrid`
@@ -829,9 +876,9 @@ JOG is now beyond the original migration phase. The next steps should optimize f
 
 ### 22.2 Harden Shell And Layout Behavior
 
-- make desktop-style shell composition dependable
-- reduce manual app-level chrome and sizing math
-- deepen the layout story around multi-pane and tabbed shells
+- continue making desktop-style shell composition dependable
+- keep reducing the remaining manual app-level chrome and sizing math after the `SplitPanel` and fill-layout pass
+- deepen the layout story around multi-pane and tabbed shells beyond the current two-pane and tab-workspace baseline
 
 ### 22.3 Deepen Data-Heavy Primitives
 

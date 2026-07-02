@@ -27,7 +27,11 @@ That means the next phase is not broad control expansion for its own sake. The n
 - modal overlay support
 - window z-order management
 - base document style reset for full-viewport page rendering
+- follow-up viewport layout pass after app mount so fill-based shells can settle against measured browser dimensions
 - page-level flow layout for direct child controls, with windows and dialogs remaining absolute
+- narrow `Fill` layout flag for stretching workspace content inside shell layouts
+- `Fill` no longer overrides dock-managed child width and height with raw `100%` sizing, which keeps page shells and split workspaces inside their containers
+- container child-structure changes now also dirty parent layout so docked shells reflow after tab and workspace mutations
 - control-level invalid state and error text
 - application diagnostics with debug logging and tree dump
 - public theme API with global and per-application token overrides
@@ -47,6 +51,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 
 - `Panel`
 - `DockPanel`
+- `SplitPanel`
 - `StackPanel`
 - `SectionPanel`
 - `Grid`
@@ -99,13 +104,19 @@ That means the next phase is not broad control expansion for its own sake. The n
 - stacked modal overlay behavior across multiple visible dialogs
 - window lifecycle hooks with `OnLoad`, `OnShow`, `OnHide`, and `OnClose`
 - configurable close button label
+- scrollable window and dialog content panes so oversized dialog bodies stay reachable inside the window shell
 
 ### Example Apps
 
 - bare-bones hello world example
 - simple example app
 - notepad example with multi-document tabs and browser file open/save flows
+- notepad now uses fill-based tab workspace composition without manual viewport resize math
+- notepad shell now reflows correctly after document tab open and close operations
 - customer admin example
+- customer admin now demonstrates a `SplitPanel` left-nav-plus-content workspace
+- customer admin shell no longer overflows on the right edge
+- customer admin edit dialog now starts hidden correctly and uses a larger scrollable window body
 - form demo with grid layout
 - form demo with breakpoint-aware responsive grid layout
 - form demo validation and inline error feedback
@@ -121,13 +132,14 @@ That means the next phase is not broad control expansion for its own sake. The n
 ### Tests
 
 - Node test runner at `test/run-v2-tests.js`
-- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock and stack behavior, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
+- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, split, and stack behavior, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
 
 ## Partial
 
 ### Window System
 
 - modal stacking, drag, resize, and lifecycle hooks are working
+- window and dialog content panes now scroll internally when body content exceeds the available height
 - modal focus trap is not implemented yet
 - focus restoration after dialog close is not implemented yet
 - broader keyboard-first dialog behavior still needs hardening
@@ -138,9 +150,10 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `Grid` now has breakpoint-based responsive track and placement overrides
 - `StackPanel` now has breakpoint-based orientation and spacing overrides
 - `DockPanel` now supports responsive shell and child layout changes through inherited `ResponsiveLayout`
+- `SplitPanel` now supports first-pane and second-pane sizing plus breakpoint-based orientation changes
 - `SectionPanel` still has no dedicated responsive helper surface
-- shell layout still pushes too much height and chrome math into app code
-- the framework still lacks a higher-level workspace or split-shell container for desktop-style app composition
+- shell layout is substantially more dependable than it was before this hardening pass, but app code still owns higher-level chrome composition decisions
+- the framework still lacks deeper multi-pane workspace management beyond `DockPanel` plus `SplitPanel`
 
 ### Shell Controls
 
@@ -208,16 +221,18 @@ That means the next phase is not broad control expansion for its own sake. The n
 
 ### 1. Shell And Layout Hardening
 
-- make shell layout boring and dependable
-- reduce explicit height, offset, and chrome math in app code
+- keep making shell layout boring and dependable across more than the current examples
+- reduce the remaining explicit height, offset, and chrome math in app code
 - add stronger desktop-style shell composition primitives such as split-workspace and left-nav-plus-content patterns
-- strengthen container interactions so examples like `notepad` require less manual layout coordination
+- keep hardening container interactions so tab, split, and dialog-heavy shells stay stable without manual coordination
 
 ### 2. Richer Binding And App-State Helpers
 
 - add stronger support for collection updates and repeated UI structures
 - improve validation orchestration helpers
 - improve selection, dirty tracking, and derived-value patterns without turning JOG into a magic framework
+- add narrow runtime browser helpers where examples currently need DOM escape hatches, starting with a file-picker helper for `Notepad`
+- if the next flagship example needs a stronger browser-native utility story, use the planned Browser Data and Settings Utility captured in `doc/browser-data-settings-utility-prd.md`
 - keep the model explicit and JavaScript-first
 
 ### 3. DataGrid Depth And Behavior Hardening
@@ -263,6 +278,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - tree view
 - arbitrary per-control style objects
 - npm package publishing unless the release artifact workflow later proves insufficient
+- broad browser-service abstractions beyond focused runtime helpers such as file picking
 
 ## Documentation Rule
 

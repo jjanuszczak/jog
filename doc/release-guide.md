@@ -29,6 +29,8 @@ When a GitHub Release is published, [.github/workflows/release-artifacts.yml](..
 
 You can also run that workflow manually with `workflow_dispatch` to inspect the release artifact set without publishing a release.
 
+For hosted static example guidance, including CSP and recommended browser-security headers for the current Notepad example, see [notepad-hosting.md](notepad-hosting.md).
+
 ## Non-Goals Today
 
 - no npm package publishing

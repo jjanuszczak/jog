@@ -51,6 +51,7 @@ Notes:
 
 - `Run(page)` attaches to `document.body` and performs the first render.
 - `Run(page)` also injects the base document reset used by the runtime, including zeroing the default browser body margin and padding
+- `Run(page)` also schedules one follow-up viewport layout pass so fill-based shell layouts can settle against measured browser dimensions after mount
 - `Debug = true` enables runtime console logging for dirty queue activity, lifecycle work, and event dispatch
 - `DebugTopics` optionally filters debug output to selected categories such as `event`, `lifecycle`, `dirty`, and `flush`
 - `Theme` accepts a partial theme object that overrides the global JOG theme for that application only
@@ -209,6 +210,7 @@ Notes:
 - intended only as a child of `JOG.TabControl`
 - hosts the content for one tab pane
 - child controls use normal flow layout inside the tab page
+- `Fill = true` on a child control can now stretch that child through the tab workspace when the page layout calls for it
 
 ### `JOG.TabControl`
 
@@ -232,6 +234,7 @@ Notes:
 - derives each tab header from `TabPage.Title`, with fallback to `Name`
 - uses `TabPage.TabKey` or `Name` to identify the active tab
 - hides inactive tab pages
+- works more cleanly as a full-height workspace host when used with `Fill = true`
 - closable tabs, drag reordering, overflow handling, and docking behavior are not implemented yet
 
 ## Base Types
@@ -260,6 +263,7 @@ Common properties:
 - `Padding`
 - `Margin`
 - `Gap`
+- `Fill`
 - `ResponsiveLayout`
 - `GridColumn`
 - `GridRow`
@@ -285,6 +289,8 @@ Common methods:
 - `BindVisible(store, key, transform)`
 
 Notes:
+- `Fill` stretches ordinary flow-layout controls with flex and `100%` sizing when appropriate
+- dock-managed children inside `DockPanel` still honor `Fill` for stretch intent, but do not keep raw `100%` width or height overrides because dock layout owns those dimensions
 
 - `Dock` accepts `none`, `top`, `bottom`, `left`, `right`, `fill`
 - `ResponsiveLayout` accepts breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
@@ -292,6 +298,7 @@ Notes:
 - `ResponsiveGrid` accepts breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
 - `ResponsiveGrid` breakpoint values can override `column`, `row`, `area`, `columnSpan`, and `rowSpan`
 - `ThemePreset` is a small built-in presentation hook, not an arbitrary style object
+- `Fill = true` is a narrow stretch hint for shell and workspace layouts
 - `ColumnSpan` and `RowSpan` default to `1`
 - `SetError(message)` sets both `ErrorText` and `Invalid`
 - `ClearError()` clears both
@@ -368,6 +375,31 @@ Responsive support:
 
 - container-level changes can use inherited `ResponsiveLayout`
 - child dock, width, height, and margin changes can also use inherited `ResponsiveLayout`
+
+Notes:
+
+- still the main shell-chrome container for top, bottom, left, right, and fill regions
+
+### `JOG.SplitPanel`
+
+Extends `JOG.Container`.
+
+Properties:
+
+- `Orientation`
+- `FirstPaneSize`
+- `SecondPaneSize`
+- `Gap`
+- `Responsive`
+
+Notes:
+
+- intended for two-pane workspace composition such as left-nav-plus-content
+- `Orientation` accepts `horizontal` or `vertical`
+- `FirstPaneSize` and `SecondPaneSize` accept pixel numbers
+- `Responsive` uses breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
+- `Responsive` breakpoint values can override `orientation`, `gap`, `firstPaneSize`, and `secondPaneSize`
+- children use flow layout and stretch more cleanly when the child control also uses `Fill = true`
 
 ### `JOG.StackPanel`
 

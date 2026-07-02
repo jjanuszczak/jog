@@ -237,6 +237,28 @@
     return Object.keys(normalized).length ? normalized : null;
   }
 
+  function normalizeResponsiveSplitBreakpoint(value) {
+    var normalized = {};
+
+    if (!isPlainObject(value)) {
+      return null;
+    }
+    if (value.orientation !== undefined) {
+      normalized.orientation = value.orientation === "vertical" ? "vertical" : "horizontal";
+    }
+    if (value.gap !== undefined) {
+      normalized.gap = value.gap;
+    }
+    if (value.firstPaneSize !== undefined && isNumber(value.firstPaneSize) && value.firstPaneSize >= 0) {
+      normalized.firstPaneSize = value.firstPaneSize;
+    }
+    if (value.secondPaneSize !== undefined && isNumber(value.secondPaneSize) && value.secondPaneSize >= 0) {
+      normalized.secondPaneSize = value.secondPaneSize;
+    }
+
+    return Object.keys(normalized).length ? normalized : null;
+  }
+
   function resolveResponsiveValues(baseValues, responsiveConfig, viewportWidth) {
     var resolved = {};
     var breakpointValues;
@@ -1267,6 +1289,16 @@
     return 1280;
   };
 
+  Runtime.prototype.getViewportHeight = function() {
+    if (this.document && this.document.body && isNumber(this.document.body.clientHeight) && this.document.body.clientHeight > 0) {
+      return this.document.body.clientHeight;
+    }
+    if (isNumber(global.innerHeight) && global.innerHeight > 0) {
+      return global.innerHeight;
+    }
+    return 720;
+  };
+
   Runtime.prototype.trackResponsiveControl = function(control, enabled) {
     if (!control) {
       return;
@@ -1281,8 +1313,24 @@
   Runtime.prototype._handleViewportResize = function() {
     var runtime = this;
     this.debugLog("Lifecycle", "Viewport resize width=" + this.getViewportWidth());
+    if (this.application && this.application.MainPage) {
+      this.markDirty(this.application.MainPage);
+    }
     this._responsiveControls.forEach(function(control) {
       runtime.markDirty(control);
+    });
+  };
+
+  Runtime.prototype.scheduleViewportLayoutPass = function() {
+    var runtime = this;
+
+    if (typeof global.requestAnimationFrame !== "function") {
+      return;
+    }
+
+    global.requestAnimationFrame(function() {
+      runtime._handleViewportResize();
+      runtime.flush();
     });
   };
 
@@ -1492,6 +1540,7 @@
     if (runningApplications.indexOf(this) < 0) {
       runningApplications.push(this);
     }
+    this.Runtime.scheduleViewportLayoutPass();
   };
 
   Application.prototype.DumpTree = function(options) {
@@ -1543,12 +1592,15 @@
     var style = document.createElement("style");
     style.type = "text/css";
     style.textContent = [
-      "html, body { margin: 0; padding: 0; min-height: 100%; }",
-      ".jog-root { position: relative; min-height: 100vh; font-family: var(--jog-font-family); font-size: var(--jog-font-size); background: var(--jog-app-background); color: var(--jog-text-strong); padding: var(--jog-page-padding); }",
-      ".jog-page { position: relative; min-height: 100%; }",
+      "html, body { margin: 0; padding: 0; min-height: 100%; height: 100%; }",
+      ".jog-root { position: relative; display: flex; flex-direction: column; min-height: 100vh; height: 100vh; width: 100%; box-sizing: border-box; font-family: var(--jog-font-family); font-size: var(--jog-font-size); background: var(--jog-app-background); color: var(--jog-text-strong); padding: var(--jog-page-padding); }",
+      ".jog-page { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 100%; min-width: 0; width: 100%; box-sizing: border-box; }",
       ".jog-control { box-sizing: border-box; }",
       ".jog-panel { position: relative; }",
       ".jog-dock-panel { position: relative; min-height: 100%; min-width: 100%; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-shell); box-shadow: var(--jog-shadow-shell); overflow: hidden; }",
+      ".jog-split-panel { position: relative; display: flex; min-width: 0; min-height: 0; }",
+      ".jog-split-panel.horizontal { flex-direction: row; }",
+      ".jog-split-panel.vertical { flex-direction: column; }",
       ".jog-stack-panel { position: relative; display: flex; }",
       ".jog-menu-bar { position: relative; display: flex; align-items: center; gap: 4px; padding: 6px; background: var(--jog-surface-muted); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); }",
       ".jog-menu-bar-button { border: 0; background: transparent; color: var(--jog-text); border-radius: calc(var(--jog-radius-control) - 2px); padding: 8px 10px; cursor: pointer; font-size: var(--jog-font-size); line-height: var(--jog-line-height); }",
@@ -1556,13 +1608,13 @@
       ".jog-menu-bar-button:disabled { opacity: 0.5; cursor: default; }",
       ".jog-tool-bar { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); box-shadow: var(--jog-shadow-section); }",
       ".jog-status-bar { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 10px; background: var(--jog-surface-muted); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); color: var(--jog-text-muted); }",
-      ".jog-tab-control { position: relative; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-section); box-shadow: var(--jog-shadow-section); overflow: hidden; }",
+      ".jog-tab-control { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-section); box-shadow: var(--jog-shadow-section); overflow: hidden; }",
       ".jog-tab-header { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 10px 0; background: var(--jog-surface-muted); border-bottom: 1px solid var(--jog-border-soft); }",
       ".jog-tab-button { border: 1px solid transparent; background: transparent; color: var(--jog-text-muted); border-top-left-radius: var(--jog-radius-control); border-top-right-radius: var(--jog-radius-control); padding: 8px 12px; cursor: pointer; font-size: var(--jog-font-size); line-height: var(--jog-line-height); }",
       ".jog-tab-button.active { background: var(--jog-surface); color: var(--jog-text); border-color: var(--jog-border-soft); border-bottom-color: var(--jog-surface); }",
       ".jog-tab-button:disabled { opacity: 0.5; cursor: default; }",
-      ".jog-tab-body { position: relative; padding: 16px; }",
-      ".jog-tab-page { position: relative; }",
+      ".jog-tab-body { position: relative; display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; padding: 16px; }",
+      ".jog-tab-page { position: relative; display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; flex-direction: column; }",
       ".jog-stack-panel.vertical { flex-direction: column; }",
       ".jog-stack-panel.horizontal { flex-direction: row; align-items: center; }",
       ".jog-fill-width { width: 100%; }",
@@ -1588,9 +1640,9 @@
       ".jog-data-grid-command-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }",
       ".jog-data-grid-command { padding-left: 10px; padding-right: 10px; }",
       ".jog-data-grid-empty { padding: 18px 12px; color: var(--jog-text-muted); }",
-      ".jog-window { position: absolute; border: 1px solid var(--jog-border); border-radius: var(--jog-radius-window); background: var(--jog-surface); box-shadow: var(--jog-shadow-window); overflow: hidden; }",
+      ".jog-window { position: absolute; display: flex; flex-direction: column; box-sizing: border-box; border: 1px solid var(--jog-border); border-radius: var(--jog-radius-window); background: var(--jog-surface); box-shadow: var(--jog-shadow-window); overflow: hidden; }",
       ".jog-window-titlebar { background: var(--jog-surface-muted); color: var(--jog-text); padding: 12px 16px; font-weight: 600; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--jog-border-soft); }",
-      ".jog-window-content { position: relative; padding: var(--jog-window-content); background: var(--jog-surface); }",
+      ".jog-window-content { position: relative; flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: var(--jog-window-content); background: var(--jog-surface); }",
       ".jog-window-resize-handle { position: absolute; z-index: 2; }",
       ".jog-window-resize-handle.edge-top { top: -4px; left: 12px; right: 12px; height: 8px; cursor: ns-resize; }",
       ".jog-window-resize-handle.edge-right { top: 12px; right: -4px; bottom: 12px; width: 8px; cursor: ew-resize; }",
@@ -1667,6 +1719,7 @@
       responsiveLayout: null,
       columnSpan: 1,
       rowSpan: 1,
+      fill: false,
       padding: null,
       margin: null,
       gap: null,
@@ -1781,6 +1834,19 @@
     this._domNode.style.minHeight = isDockManagedChild ? this._domNode.style.minHeight : (isNumber(resolvedState.minHeight) ? toCssPixels(resolvedState.minHeight) : "");
     this._domNode.style.maxWidth = isDockManagedChild ? this._domNode.style.maxWidth : (isNumber(resolvedState.maxWidth) ? toCssPixels(resolvedState.maxWidth) : "");
     this._domNode.style.maxHeight = isDockManagedChild ? this._domNode.style.maxHeight : (isNumber(resolvedState.maxHeight) ? toCssPixels(resolvedState.maxHeight) : "");
+    if (nextState.fill) {
+      this._domNode.style.flex = "1 1 auto";
+      this._domNode.style.minWidth = this._domNode.style.minWidth || "0";
+      this._domNode.style.minHeight = this._domNode.style.minHeight || "0";
+      if (!isDockManagedChild && !isNumber(resolvedState.width)) {
+        this._domNode.style.width = "100%";
+      }
+      if (!isDockManagedChild && !isNumber(resolvedState.height)) {
+        this._domNode.style.height = "100%";
+      }
+    } else if (this._domNode.style.flex) {
+      this._domNode.style.flex = "";
+    }
     this._domNode.style.padding = toCssBox(resolvedState.padding);
     this._domNode.style.margin = isDockManagedChild ? this._domNode.style.margin : toCssBox(resolvedState.margin);
     this._domNode.title = nextState.errorText || nextState.tooltip || "";
@@ -2034,6 +2100,11 @@
     set: function(value) { this._setState("gap", value); }
   });
 
+  Object.defineProperty(Component.prototype, "Fill", {
+    get: function() { return !!this._state.fill; },
+    set: function(value) { this._setState("fill", !!value); }
+  });
+
   Object.defineProperty(Component.prototype, "ResponsiveLayout", {
     get: function() { return this._state.responsiveLayout; },
     set: function(value) { this._setState("responsiveLayout", cloneResponsiveConfig(value, normalizeResponsiveLayoutBreakpoint)); }
@@ -2165,6 +2236,9 @@
     this._children.push(child);
     this._state.children = this._children.slice();
     this._markDirty("children");
+    if (this._parent) {
+      this._parent._markDirty("child-layout");
+    }
     child._markDirty("parent");
   };
 
@@ -2178,6 +2252,9 @@
     child._setParent(null);
     child.Dispose();
     this._markDirty("children");
+    if (this._parent) {
+      this._parent._markDirty("child-layout");
+    }
   };
 
   Container.prototype.Clear = function() {
@@ -2272,6 +2349,8 @@
 
   function DockPanel() {
     Container.call(this, "DockPanel");
+    this._layoutSettlePending = false;
+    this._layoutSettleAttempts = 0;
   }
 
   DockPanel.prototype = Object.create(Container.prototype);
@@ -2284,7 +2363,22 @@
   };
 
   DockPanel.prototype._applyStateToDom = function(prevState, nextState) {
+    var actualHeight;
+    var actualWidth;
+    var pagePadding;
+    var parentHeight;
+    var parentNode;
+    var parentWidth;
+    var panelWidth;
+    var panelHeight;
     var resolvedState;
+    var reliableHeight;
+    var reliableWidth;
+    var targetHeight;
+    var targetWidth;
+    var theme;
+    var viewportHeight;
+    var viewportWidth;
 
     Container.prototype._applyStateToDom.call(this, prevState, nextState);
     if (!this._domNode) {
@@ -2295,8 +2389,38 @@
     var padding = normalizeBox(resolvedState.padding);
     var top = padding.top;
     var left = padding.left;
-    var right = (this._domNode.clientWidth || this.Width || 0) - padding.right;
-    var bottom = (this._domNode.clientHeight || this.Height || 0) - padding.bottom;
+    actualWidth = this._domNode.clientWidth || this._domNode.offsetWidth || this.Width || 0;
+    actualHeight = this._domNode.clientHeight || this._domNode.offsetHeight || this.Height || 0;
+    panelWidth = actualWidth;
+    panelHeight = actualHeight;
+
+    if (nextState.fill && this._runtime && this._parent && this._parent._typeName === "Page") {
+      parentNode = this._parent._domNode;
+      parentWidth = parentNode ? (parentNode.clientWidth || parentNode.offsetWidth || 0) : 0;
+      parentHeight = parentNode ? (parentNode.clientHeight || parentNode.offsetHeight || 0) : 0;
+      theme = this._application && typeof this._application._resolveTheme === "function" ? this._application._resolveTheme() : null;
+      pagePadding = theme && theme.spacing ? parseFloat(theme.spacing.pagePadding) || 0 : 0;
+      if (parentWidth > 0) {
+        parentWidth = Math.max(parentWidth - (pagePadding * 2), 0);
+      }
+      if (parentHeight > 0) {
+        parentHeight = Math.max(parentHeight - (pagePadding * 2), 0);
+      }
+      viewportWidth = this._runtime.getViewportWidth();
+      viewportHeight = this._runtime.getViewportHeight();
+      targetWidth = parentWidth || viewportWidth;
+      targetHeight = parentHeight || viewportHeight;
+      reliableWidth = actualWidth >= targetWidth * 0.75;
+      reliableHeight = actualHeight >= targetHeight * 0.75;
+      panelWidth = reliableWidth ? actualWidth : targetWidth;
+      panelHeight = reliableHeight ? actualHeight : targetHeight;
+    } else if (nextState.fill && this._runtime) {
+      panelWidth = panelWidth || this._runtime.getViewportWidth();
+      panelHeight = panelHeight || this._runtime.getViewportHeight();
+    }
+
+    var right = panelWidth - padding.right;
+    var bottom = panelHeight - padding.bottom;
 
     this._children.forEach(function(child) {
       var childState = child._resolvedResponsiveState || child._state;
@@ -2363,11 +2487,149 @@
         style.height = toCssPixels(Math.max(bottom - top - margin.top - margin.bottom, 0));
       }
     });
+
+    if (nextState.fill && this._runtime && this._parent && this._parent._typeName === "Page") {
+      if (reliableWidth && reliableHeight) {
+        this._layoutSettleAttempts = 0;
+        this._layoutSettlePending = false;
+        return;
+      }
+      if (this._layoutSettlePending || this._layoutSettleAttempts >= 4 || typeof global.requestAnimationFrame !== "function") {
+        return;
+      }
+      this._layoutSettlePending = true;
+      this._layoutSettleAttempts += 1;
+      var control = this;
+      global.requestAnimationFrame(function() {
+        control._layoutSettlePending = false;
+        control.Refresh();
+        if (control._runtime) {
+          control._runtime.flush();
+        }
+      });
+    }
   };
 
   DockPanel.prototype._childUsesFlowLayout = function() {
     return false;
   };
+
+  function SplitPanel() {
+    Container.call(this, "SplitPanel");
+    this._state.orientation = "horizontal";
+    this._state.gap = 12;
+    this._state.firstPaneSize = null;
+    this._state.secondPaneSize = null;
+    this._state.responsive = null;
+  }
+
+  SplitPanel.prototype = Object.create(Container.prototype);
+  SplitPanel.prototype.constructor = SplitPanel;
+
+  SplitPanel.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("div");
+    node.className = "jog-control jog-split-panel horizontal";
+    return node;
+  };
+
+  SplitPanel.prototype._applyStateToDom = function(prevState, nextState) {
+    var control = this;
+    var resolvedSplit;
+    var firstChild;
+    var secondChild;
+    var firstSize;
+    var secondSize;
+
+    Container.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (!this._domNode) {
+      return;
+    }
+    if (this._runtime) {
+      this._runtime.trackResponsiveControl(this, !!nextState.responsive);
+    }
+
+    resolvedSplit = resolveResponsiveValues({
+      orientation: nextState.orientation,
+      gap: nextState.gap,
+      firstPaneSize: nextState.firstPaneSize,
+      secondPaneSize: nextState.secondPaneSize
+    }, nextState.responsive, this._runtime ? this._runtime.getViewportWidth() : 1280);
+
+    this._domNode.classList.remove("horizontal", "vertical");
+    this._domNode.classList.add(resolvedSplit.orientation === "vertical" ? "vertical" : "horizontal");
+    this._domNode.style.gap = toCssBox(resolvedSplit.gap != null ? resolvedSplit.gap : 12) || "12px";
+
+    this._children.forEach(function(child) {
+      if (!child._domNode) {
+        return;
+      }
+      child._domNode.style.flex = "1 1 0";
+      child._domNode.style.minWidth = "0";
+      child._domNode.style.minHeight = "0";
+      child._domNode.style.width = resolvedSplit.orientation === "horizontal" ? "" : "100%";
+      child._domNode.style.height = resolvedSplit.orientation === "vertical" ? "" : "100%";
+    });
+
+    firstChild = this._children[0];
+    secondChild = this._children[1];
+    firstSize = resolvedSplit.firstPaneSize;
+    secondSize = resolvedSplit.secondPaneSize;
+
+    if (firstChild && firstChild._domNode && isNumber(firstSize)) {
+      firstChild._domNode.style.flex = "0 0 " + toCssPixels(firstSize);
+      if (resolvedSplit.orientation === "horizontal") {
+        firstChild._domNode.style.width = toCssPixels(firstSize);
+        firstChild._domNode.style.height = "100%";
+      } else {
+        firstChild._domNode.style.height = toCssPixels(firstSize);
+        firstChild._domNode.style.width = "100%";
+      }
+    }
+
+    if (secondChild && secondChild._domNode && isNumber(secondSize)) {
+      secondChild._domNode.style.flex = "0 0 " + toCssPixels(secondSize);
+      if (resolvedSplit.orientation === "horizontal") {
+        secondChild._domNode.style.width = toCssPixels(secondSize);
+        secondChild._domNode.style.height = "100%";
+      } else {
+        secondChild._domNode.style.height = toCssPixels(secondSize);
+        secondChild._domNode.style.width = "100%";
+      }
+    }
+
+    if (this._children.length > 2) {
+      this._children.slice(2).forEach(function(child) {
+        if (!child._domNode) {
+          return;
+        }
+        child._domNode.style.flex = "1 1 0";
+      });
+    }
+  };
+
+  SplitPanel.prototype._childUsesFlowLayout = function() {
+    return true;
+  };
+
+  Object.defineProperty(SplitPanel.prototype, "Orientation", {
+    get: function() { return this._state.orientation; },
+    set: function(value) { this._setState("orientation", value === "vertical" ? "vertical" : "horizontal"); }
+  });
+
+  Object.defineProperty(SplitPanel.prototype, "FirstPaneSize", {
+    get: function() { return this._state.firstPaneSize; },
+    set: function(value) { this._setState("firstPaneSize", isNumber(value) && value >= 0 ? value : null); }
+  });
+
+  Object.defineProperty(SplitPanel.prototype, "SecondPaneSize", {
+    get: function() { return this._state.secondPaneSize; },
+    set: function(value) { this._setState("secondPaneSize", isNumber(value) && value >= 0 ? value : null); }
+  });
+
+  Object.defineProperty(SplitPanel.prototype, "Responsive", {
+    get: function() { return this._state.responsive; },
+    set: function(value) { this._setState("responsive", cloneResponsiveConfig(value, normalizeResponsiveSplitBreakpoint)); }
+  });
 
   function StackPanel() {
     Container.call(this, "StackPanel");
@@ -2530,6 +2792,18 @@
     return node;
   };
 
+  TabPage.prototype._applyStateToDom = function(prevState, nextState) {
+    Container.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (!this._domNode) {
+      return;
+    }
+    this._domNode.style.display = nextState.visible ? "flex" : "none";
+    this._domNode.style.flexDirection = "column";
+    this._domNode.style.flex = "1 1 auto";
+    this._domNode.style.minWidth = "0";
+    this._domNode.style.minHeight = "0";
+  };
+
   TabPage.prototype._childUsesFlowLayout = function() {
     return true;
   };
@@ -2668,6 +2942,10 @@
     });
 
     this._headerNode.style.display = this._children.length ? "" : "none";
+    this._bodyNode.style.display = "flex";
+    this._bodyNode.style.flex = "1 1 auto";
+    this._bodyNode.style.minWidth = "0";
+    this._bodyNode.style.minHeight = "0";
     this._lastRenderedActiveTab = activeKey;
   };
 
@@ -3799,10 +4077,19 @@
     this._closeNode.style.display = nextState.closeButtonVisible ? "" : "none";
     this._domNode.style.left = toCssPixels(nextState.left);
     this._domNode.style.top = toCssPixels(nextState.top);
+    this._domNode.style.flexDirection = "column";
+    this._domNode.style.boxSizing = "border-box";
     this._domNode.style.width = isNumber(nextState.width) ? toCssPixels(nextState.width) : "420px";
     this._domNode.style.height = isNumber(nextState.height) ? toCssPixels(nextState.height) : "";
     this._domNode.style.minWidth = isNumber(nextState.minWidth) ? toCssPixels(nextState.minWidth) : "";
     this._domNode.style.minHeight = isNumber(nextState.minHeight) ? toCssPixels(nextState.minHeight) : "";
+    if (this._contentNode) {
+      this._contentNode.style.flex = "1 1 auto";
+      this._contentNode.style.minHeight = "0";
+      this._contentNode.style.overflowX = "hidden";
+      this._contentNode.style.overflowY = "auto";
+      this._contentNode.style.boxSizing = "border-box";
+    }
     Object.keys(this._resizeHandles).forEach(function(direction) {
       this._resizeHandles[direction].style.display = nextState.resizable ? "" : "none";
     }, this);
@@ -4036,6 +4323,7 @@
   JOG.Page = Page;
   JOG.Panel = Panel;
   JOG.DockPanel = DockPanel;
+  JOG.SplitPanel = SplitPanel;
   JOG.StackPanel = StackPanel;
   JOG.MenuBar = MenuBar;
   JOG.ToolBar = ToolBar;
