@@ -5,6 +5,7 @@
 
   var nextControlId = 0;
   var runningApplications = [];
+  var hiddenFilePickerInput = null;
   var responsiveBreakpointOrder = ["base", "sm", "md", "lg", "xl"];
   var responsiveBreakpointMinWidths = {
     base: 0,
@@ -81,6 +82,12 @@
       copy[key] = state[key];
     }
     return copy;
+  }
+
+  function basename(path) {
+    var value = String(path || "");
+    var slash = Math.max(value.lastIndexOf("/"), value.lastIndexOf("\\"));
+    return slash >= 0 ? value.slice(slash + 1) : value;
   }
 
   function isPlainObject(value) {
@@ -661,6 +668,150 @@
     if (!condition) {
       throw new Error(message);
     }
+  }
+
+  function normalizeTextFileTypes(types) {
+    if (!Array.isArray(types) || !types.length) {
+      return [
+        {
+          description: "Text files",
+          accept: {
+            "text/plain": [".txt"]
+          }
+        }
+      ];
+    }
+    return types;
+  }
+
+  function buildFileAcceptAttribute(types) {
+    var values = [];
+
+    normalizeTextFileTypes(types).forEach(function(type) {
+      var accept = type && type.accept;
+      Object.keys(accept || {}).forEach(function(mimeType) {
+        var extensions = Array.isArray(accept[mimeType]) ? accept[mimeType] : [];
+        if (values.indexOf(mimeType) < 0) {
+          values.push(mimeType);
+        }
+        extensions.forEach(function(extension) {
+          if (values.indexOf(extension) < 0) {
+            values.push(extension);
+          }
+        });
+      });
+    });
+
+    return values.join(",");
+  }
+
+  function ensureHiddenFilePickerInput(accept) {
+    if (!global.document || !global.document.body || typeof global.document.createElement !== "function") {
+      throw new Error("File picker fallback requires document.body.");
+    }
+    if (!hiddenFilePickerInput) {
+      hiddenFilePickerInput = global.document.createElement("input");
+      hiddenFilePickerInput.type = "file";
+      hiddenFilePickerInput.style.display = "none";
+      global.document.body.appendChild(hiddenFilePickerInput);
+    }
+    hiddenFilePickerInput.accept = accept || "";
+    hiddenFilePickerInput.value = "";
+    return hiddenFilePickerInput;
+  }
+
+  function readTextFileWithFallback(file) {
+    return new Promise(function(resolve, reject) {
+      var reader;
+
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      if (typeof file.text === "function") {
+        file.text().then(function(text) {
+          resolve({
+            name: file.name || "",
+            text: String(text == null ? "" : text),
+            file: file,
+            handle: null,
+            method: "input"
+          });
+        }, reject);
+        return;
+      }
+      if (typeof global.FileReader !== "function") {
+        reject(new Error("File picker fallback requires FileReader support."));
+        return;
+      }
+
+      reader = new global.FileReader();
+      reader.onload = function() {
+        resolve({
+          name: file.name || "",
+          text: String(reader.result == null ? "" : reader.result),
+          file: file,
+          handle: null,
+          method: "input"
+        });
+      };
+      reader.onerror = function() {
+        reject(new Error("Unable to read selected file."));
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  function openTextFileFallback(options) {
+    var input = ensureHiddenFilePickerInput(buildFileAcceptAttribute(options.types));
+
+    return new Promise(function(resolve, reject) {
+      function finalize(result, error) {
+        input.removeEventListener("change", handleChange);
+        input.removeEventListener("cancel", handleCancel);
+        input.value = "";
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(result || null);
+      }
+
+      function handleCancel() {
+        finalize(null);
+      }
+
+      function handleChange(event) {
+        var files = event && event.target && event.target.files ? event.target.files : [];
+        if (!files.length) {
+          finalize(null);
+          return;
+        }
+        readTextFileWithFallback(files[0]).then(function(result) {
+          finalize(result);
+        }, function(error) {
+          finalize(null, error);
+        });
+      }
+
+      input.addEventListener("change", handleChange);
+      input.addEventListener("cancel", handleCancel);
+      input.click();
+    });
+  }
+
+  function saveTextByHandle(handle, text, method) {
+    return handle.createWritable().then(function(writable) {
+      return writable.write(text).then(function() {
+        return writable.close();
+      }).then(function() {
+        return {
+          name: basename(handle.name || ""),
+          handle: handle,
+          method: method
+        };
+      });
+    });
   }
 
   function clamp(value, minValue) {
@@ -4315,6 +4466,99 @@
     get: function() { return cloneTheme(activeGlobalTheme); },
     set: function(value) { JOG.SetTheme(value); }
   });
+
+  JOG.Browser = {
+    OpenTextFile: function(options) {
+      var resolved = options || {};
+      var pickerOptions = {
+        multiple: false,
+        types: normalizeTextFileTypes(resolved.types)
+      };
+
+      if (typeof global.showOpenFilePicker === "function") {
+        return global.showOpenFilePicker(pickerOptions).then(function(handles) {
+          var handle = handles && handles.length ? handles[0] : null;
+          if (!handle || typeof handle.getFile !== "function") {
+            return null;
+          }
+          return handle.getFile().then(function(file) {
+            return file.text().then(function(text) {
+              return {
+                name: file.name || "",
+                text: String(text == null ? "" : text),
+                file: file,
+                handle: handle,
+                method: "picker"
+              };
+            });
+          });
+        }).catch(function(error) {
+          if (error && error.name === "AbortError") {
+            return null;
+          }
+          throw error;
+        });
+      }
+
+      return openTextFileFallback(pickerOptions);
+    },
+
+    SaveTextFile: function(options) {
+      var resolved = options || {};
+      var text = String(resolved.text == null ? "" : resolved.text);
+      var handle = resolved.handle;
+      var suggestedName = basename(resolved.suggestedName || "untitled.txt");
+      var pickerOptions = {
+        suggestedName: suggestedName,
+        types: normalizeTextFileTypes(resolved.types)
+      };
+
+      if (!resolved.saveAs && handle && typeof handle.createWritable === "function") {
+        return saveTextByHandle(handle, text, "handle");
+      }
+
+      if (typeof global.showSaveFilePicker === "function") {
+        return global.showSaveFilePicker(pickerOptions).then(function(nextHandle) {
+          if (!nextHandle || typeof nextHandle.createWritable !== "function") {
+            return null;
+          }
+          return saveTextByHandle(nextHandle, text, "picker");
+        }).catch(function(error) {
+          if (error && error.name === "AbortError") {
+            return null;
+          }
+          throw error;
+        });
+      }
+
+      return new Promise(function(resolve, reject) {
+        var blob;
+        var link;
+        var url;
+
+        if (!global.Blob || !global.URL || typeof global.URL.createObjectURL !== "function" || !global.document || !global.document.body) {
+          reject(new Error("File save fallback requires Blob, URL, and document.body support."));
+          return;
+        }
+
+        blob = new global.Blob([text], { type: "text/plain;charset=utf-8" });
+        url = global.URL.createObjectURL(blob);
+        link = global.document.createElement("a");
+        link.href = url;
+        link.download = suggestedName;
+        global.document.body.appendChild(link);
+        link.click();
+        global.document.body.removeChild(link);
+        global.URL.revokeObjectURL(url);
+
+        resolve({
+          name: link.download || suggestedName,
+          handle: null,
+          method: "download"
+        });
+      });
+    }
+  };
 
   JOG.Application = Application;
   JOG.Component = Component;

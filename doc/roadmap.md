@@ -36,6 +36,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - application diagnostics with debug logging and tree dump
 - public theme API with global and per-application token overrides
 - built-in theme presets for selected control types
+- narrow browser text file helpers through `JOG.Browser.OpenTextFile()` and `JOG.Browser.SaveTextFile()`
 - zero-dependency Node test runner for core runtime regression checks
 - minified browser distribution build at `dist/JOG.min.js`
 - starter release bundle at `dist/starter/`
@@ -113,6 +114,8 @@ That means the next phase is not broad control expansion for its own sake. The n
 - notepad example with multi-document tabs and browser file open/save flows
 - notepad now uses fill-based tab workspace composition without manual viewport resize math
 - notepad shell now reflows correctly after document tab open and close operations
+- notepad now uses runtime-managed browser file open and save helpers instead of direct picker and fallback DOM glue
+- notepad now reports file-operation failures through a JOG dialog instead of browser `alert()` UI
 - customer admin example
 - customer admin now demonstrates a `SplitPanel` left-nav-plus-content workspace
 - customer admin shell no longer overflows on the right edge
@@ -132,7 +135,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 ### Tests
 
 - Node test runner at `test/run-v2-tests.js`
-- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, split, and stack behavior, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
+- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, split, and stack behavior, browser text file helper flows, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
 
 ## Partial
 
@@ -231,7 +234,6 @@ That means the next phase is not broad control expansion for its own sake. The n
 - add stronger support for collection updates and repeated UI structures
 - improve validation orchestration helpers
 - improve selection, dirty tracking, and derived-value patterns without turning JOG into a magic framework
-- add narrow runtime browser helpers where examples currently need DOM escape hatches, starting with a file-picker helper for `Notepad`
 - if the next flagship example needs a stronger browser-native utility story, use the planned Browser Data and Settings Utility captured in `doc/browser-data-settings-utility-prd.md`
 - keep the model explicit and JavaScript-first
 

@@ -54,6 +54,7 @@ function createNode(tagName) {
     disabled: false,
     value: "",
     checked: false,
+    files: [],
     name: "",
     size: 0,
     type: "",
@@ -91,7 +92,13 @@ function createNode(tagName) {
         return existing !== listener;
       });
     },
-    focus: function() {}
+    focus: function() {},
+    click: function() {
+      var listeners = this.eventListeners.click || [];
+      listeners.forEach(function(listener) {
+        listener({ target: node });
+      });
+    }
   };
 
   Object.defineProperty(node, "offsetWidth", {
@@ -160,6 +167,39 @@ function createJOGSandbox(options) {
     Promise: Promise,
     setTimeout: setTimeout,
     clearTimeout: clearTimeout,
+    Blob: options.Blob || function(parts, config) {
+      this.parts = parts || [];
+      this.type = config && config.type ? config.type : "";
+    },
+    FileReader: options.FileReader || function() {
+      this.result = "";
+      this.onload = null;
+      this.onerror = null;
+      this.readAsText = function(file) {
+        if (file && file._readError) {
+          if (typeof this.onerror === "function") {
+            this.onerror(new Error(file._readError));
+          }
+          return;
+        }
+        this.result = file && file._text != null ? file._text : "";
+        if (typeof this.onload === "function") {
+          this.onload({ target: this });
+        }
+      };
+    },
+    URL: options.URL || {
+      _lastObjectUrl: null,
+      _revokedObjectUrl: null,
+      createObjectURL: function() {
+        this._lastObjectUrl = "blob:test";
+        return this._lastObjectUrl;
+      },
+      revokeObjectURL: function(url) {
+        this._revokedObjectUrl = url;
+      }
+    },
+    alert: options.alert || function() {},
     requestAnimationFrame: function(callback) {
       animationFrameQueue.push(callback);
       return animationFrameQueue.length;
@@ -170,6 +210,13 @@ function createJOGSandbox(options) {
       }
     }
   };
+
+  if (options.showOpenFilePicker) {
+    sandbox.showOpenFilePicker = options.showOpenFilePicker;
+  }
+  if (options.showSaveFilePicker) {
+    sandbox.showSaveFilePicker = options.showSaveFilePicker;
+  }
 
   sandbox.window = sandbox;
   sandbox._animationFrameQueue = animationFrameQueue;
@@ -769,6 +816,142 @@ function testFillPropertySupportsTabWorkspaceEditors() {
   assertEqual(editor._domNode.style.height, "100%", "Fill should give editors full tab-page height.");
 }
 
+function testBrowserOpenTextFileUsesModernPicker() {
+  var sandbox = createJOGSandbox({
+    showOpenFilePicker: function() {
+      return Promise.resolve([
+        {
+          name: "notes.md",
+          getFile: function() {
+            return Promise.resolve({
+              name: "notes.md",
+              text: function() {
+                return Promise.resolve("# Notes");
+              }
+            });
+          }
+        }
+      ]);
+    }
+  });
+
+  return sandbox.JOG.Browser.OpenTextFile({
+    types: [
+      {
+        description: "Text files",
+        accept: {
+          "text/plain": [".txt", ".md"]
+        }
+      }
+    ]
+  }).then(function(result) {
+    assertEqual(result.name, "notes.md", "Modern picker should preserve the opened file name.");
+    assertEqual(result.text, "# Notes", "Modern picker should return file text.");
+    assertEqual(result.method, "picker", "Modern picker should report its method.");
+    assertEqual(!!result.handle, true, "Modern picker should return the file handle.");
+  });
+}
+
+function testBrowserOpenTextFileUsesFallbackInput() {
+  var sandbox = createJOGSandbox();
+  var originalAppendChild = sandbox.document.body.appendChild;
+
+  sandbox.document.body.appendChild = function(child) {
+    var appended = originalAppendChild.call(this, child);
+
+    if (child.tagName === "INPUT") {
+      child.click = function() {
+        child.files = [
+          {
+            name: "fallback.txt",
+            _text: "fallback body"
+          }
+        ];
+        (child.eventListeners.change || []).forEach(function(listener) {
+          listener({ target: child });
+        });
+      };
+    }
+
+    return appended;
+  };
+
+  return sandbox.JOG.Browser.OpenTextFile({
+    types: [
+      {
+        description: "Text files",
+        accept: {
+          "text/plain": [".txt", ".md", ".log"]
+        }
+      }
+    ]
+  }).then(function(result) {
+    assertEqual(result.name, "fallback.txt", "Fallback input should preserve the selected file name.");
+    assertEqual(result.text, "fallback body", "Fallback input should read plain text content.");
+    assertEqual(result.method, "input", "Fallback input should report its method.");
+  });
+}
+
+function testBrowserSaveTextFileUsesExistingHandle() {
+  var sandbox = createJOGSandbox();
+  var writes = [];
+  var closed = false;
+  var handle = {
+    name: "draft.txt",
+    createWritable: function() {
+      return Promise.resolve({
+        write: function(value) {
+          writes.push(value);
+          return Promise.resolve();
+        },
+        close: function() {
+          closed = true;
+          return Promise.resolve();
+        }
+      });
+    }
+  };
+
+  return sandbox.JOG.Browser.SaveTextFile({
+    text: "hello world",
+    handle: handle,
+    suggestedName: "ignored.txt"
+  }).then(function(result) {
+    assertEqual(writes.length, 1, "Existing handle save should write once.");
+    assertEqual(writes[0], "hello world", "Existing handle save should write the provided text.");
+    assertEqual(closed, true, "Existing handle save should close the writable.");
+    assertEqual(result.name, "draft.txt", "Existing handle save should return the handle name.");
+    assertEqual(result.method, "handle", "Existing handle save should report its method.");
+    assertEqual(result.handle, handle, "Existing handle save should preserve the handle.");
+  });
+}
+
+function testBrowserSaveTextFileUsesDownloadFallback() {
+  var sandbox = createJOGSandbox();
+  var createdUrls = [];
+  var revokedUrls = [];
+
+  sandbox.URL.createObjectURL = function(blob) {
+    createdUrls.push(blob);
+    return "blob:download-1";
+  };
+  sandbox.URL.revokeObjectURL = function(url) {
+    revokedUrls.push(url);
+  };
+
+  return sandbox.JOG.Browser.SaveTextFile({
+    text: "download body",
+    suggestedName: "export.txt"
+  }).then(function(result) {
+    assertEqual(createdUrls.length, 1, "Download fallback should create one object URL.");
+    assertEqual(createdUrls[0].parts[0], "download body", "Download fallback should package the provided text.");
+    assertEqual(revokedUrls[0], "blob:download-1", "Download fallback should revoke the created object URL.");
+    assertEqual(result.name, "export.txt", "Download fallback should preserve the suggested file name.");
+    assertEqual(result.method, "download", "Download fallback should report its method.");
+    assertEqual(result.handle, null, "Download fallback should not return a file handle.");
+  });
+}
+
 function testNotepadLoadsVisibleWorkspace() {
   var loaded = loadExampleApp("NotepadApp.js");
   var shell = findControl(loaded.page, function(control) {
@@ -862,6 +1045,68 @@ function testNotepadKeepsStatusBarAfterTabOpenAndClose() {
   assertEqual(status._domNode.style.top !== "0px", true, "Status bar should remain laid out after closing a tab.");
   assertEqual(tabs._domNode.style.height !== "0px", true, "Tab workspace should remain visible after closing a tab.");
   assertEqual(shell._domNode.style.height !== "0px", true, "Shell should remain visible after tab mutations.");
+}
+
+function testNotepadShowsDialogWhenOpenFails() {
+  var loaded = loadExampleApp("NotepadApp.js", {
+    showOpenFilePicker: function() {
+      return Promise.reject(new Error("Disk unavailable"));
+    },
+    alert: function() {
+      throw new Error("Notepad should not call global alert for open failures.");
+    }
+  });
+  var menu = findControl(loaded.page, function(control) {
+    return control.Name === "notepadMenu";
+  });
+  var dialog = findControl(loaded.page, function(control) {
+    return control.Name === "notepadErrorDialog";
+  });
+  var message = findControl(loaded.page, function(control) {
+    return control.Name === "notepadErrorMessage";
+  });
+
+  dispatchNodeClick(menu._itemNodes[1]);
+
+  return Promise.resolve().then(function() {
+    return Promise.resolve();
+  }).then(function() {
+    loaded.app.Runtime.flush();
+    assertEqual(dialog.Visible, true, "Notepad should show a JOG dialog when open fails.");
+    assertEqual(dialog.Title, "Open Failed", "Open failure dialog should use the open-specific title.");
+    assertEqual(message.Text, "Disk unavailable", "Open failure dialog should show the failure message.");
+  });
+}
+
+function testNotepadShowsDialogWhenSaveFails() {
+  var loaded = loadExampleApp("NotepadApp.js", {
+    showSaveFilePicker: function() {
+      return Promise.reject(new Error("Write blocked"));
+    },
+    alert: function() {
+      throw new Error("Notepad should not call global alert for save failures.");
+    }
+  });
+  var menu = findControl(loaded.page, function(control) {
+    return control.Name === "notepadMenu";
+  });
+  var dialog = findControl(loaded.page, function(control) {
+    return control.Name === "notepadErrorDialog";
+  });
+  var message = findControl(loaded.page, function(control) {
+    return control.Name === "notepadErrorMessage";
+  });
+
+  dispatchNodeClick(menu._itemNodes[3]);
+
+  return Promise.resolve().then(function() {
+    return Promise.resolve();
+  }).then(function() {
+    loaded.app.Runtime.flush();
+    assertEqual(dialog.Visible, true, "Notepad should show a JOG dialog when save fails.");
+    assertEqual(dialog.Title, "Save Failed", "Save failure dialog should use the save-specific title.");
+    assertEqual(message.Text, "Write blocked", "Save failure dialog should show the failure message.");
+  });
 }
 
 function testDockManagedFillChildrenUseDockGeometry() {
@@ -1881,10 +2126,16 @@ var tests = [
   { name: "responsive dock and stack layouts apply on mount and resize", fn: testResponsiveDockAndStackLayoutsApplyOnMountAndResize },
   { name: "split panel responsive orientation and sizing", fn: testSplitPanelResponsiveOrientationAndSizing },
   { name: "fill property supports tab workspace editors", fn: testFillPropertySupportsTabWorkspaceEditors },
+  { name: "browser open text file uses modern picker", fn: testBrowserOpenTextFileUsesModernPicker },
+  { name: "browser open text file uses fallback input", fn: testBrowserOpenTextFileUsesFallbackInput },
+  { name: "browser save text file uses existing handle", fn: testBrowserSaveTextFileUsesExistingHandle },
+  { name: "browser save text file uses download fallback", fn: testBrowserSaveTextFileUsesDownloadFallback },
   { name: "notepad loads visible workspace", fn: testNotepadLoadsVisibleWorkspace },
   { name: "notepad settles shell layout after mount", fn: testNotepadSettlesShellLayoutAfterMount },
   { name: "dock panel schedules settle pass for tiny first measure", fn: testDockPanelSchedulesSettlePassForTinyFirstMeasure },
   { name: "notepad keeps status bar after tab open and close", fn: testNotepadKeepsStatusBarAfterTabOpenAndClose },
+  { name: "notepad shows dialog when open fails", fn: testNotepadShowsDialogWhenOpenFails },
+  { name: "notepad shows dialog when save fails", fn: testNotepadShowsDialogWhenSaveFails },
   { name: "dock managed fill children use dock geometry", fn: testDockManagedFillChildrenUseDockGeometry },
   { name: "theme presets apply preset classes", fn: testThemePresetsApplyPresetClasses },
   { name: "global theme applies to mounted applications", fn: testGlobalThemeAppliesToMountedApplications },
@@ -1916,19 +2167,25 @@ var tests = [
 
 var failed = 0;
 
-tests.forEach(function(test) {
-  try {
-    test.fn();
-    console.log("PASS " + test.name);
-  } catch (error) {
-    failed += 1;
-    console.error("FAIL " + test.name);
-    console.error(error.stack || error.message);
+Promise.resolve().then(async function() {
+  var i;
+  var test;
+
+  for (i = 0; i < tests.length; i += 1) {
+    test = tests[i];
+    try {
+      await Promise.resolve(test.fn());
+      console.log("PASS " + test.name);
+    } catch (error) {
+      failed += 1;
+      console.error("FAIL " + test.name);
+      console.error(error.stack || error.message);
+    }
+  }
+
+  if (failed > 0) {
+    process.exitCode = 1;
+  } else {
+    console.log("PASS all tests (" + tests.length + ")");
   }
 });
-
-if (failed > 0) {
-  process.exitCode = 1;
-} else {
-  console.log("PASS all tests (" + tests.length + ")");
-}

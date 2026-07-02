@@ -29,6 +29,57 @@ Notes:
 - reading `JOG.Theme` returns the current merged global theme
 - assigning `JOG.Theme = {...}` is equivalent to calling `JOG.SetTheme({...})`
 
+### `JOG.Browser.OpenTextFile(options)`
+
+Opens one text file through the browser and resolves with its contents.
+
+Options supported now:
+
+- `types`
+
+Resolved result shape:
+
+- `name`
+- `text`
+- `file`
+- `handle`
+- `method`
+
+Notes:
+
+- returns `null` when the user cancels the picker
+- prefers `showOpenFilePicker()` when the browser supports it
+- falls back to a runtime-managed hidden native file input when modern picker APIs are unavailable
+- `method` is currently `picker` or `input`
+- this helper is intentionally narrow and text-file-oriented
+
+### `JOG.Browser.SaveTextFile(options)`
+
+Saves text through the browser and resolves with save metadata.
+
+Options supported now:
+
+- `text`
+- `handle`
+- `saveAs`
+- `suggestedName`
+- `types`
+
+Resolved result shape:
+
+- `name`
+- `handle`
+- `method`
+
+Notes:
+
+- returns `null` when the user cancels a picker-driven save
+- reuses `options.handle` when possible unless `saveAs` is true
+- prefers `showSaveFilePicker()` when a new handle is needed and the browser supports it
+- falls back to a runtime-managed download link when modern save-picker APIs are unavailable
+- `method` is currently `handle`, `picker`, or `download`
+- this helper is intentionally narrow and text-file-oriented
+
 ### `JOG.Application`
 
 Methods:

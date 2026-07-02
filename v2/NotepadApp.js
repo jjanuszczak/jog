@@ -34,7 +34,6 @@
     var nextDocumentId = 1;
     var activeDocumentId = "";
     var documents = [];
-    var hiddenOpenInput = null;
     var tabControl;
     var appShell;
     var menuBar;
@@ -42,6 +41,8 @@
     var fileStatus;
     var caretStatus;
     var metricStatus;
+    var errorDialog;
+    var errorMessage;
 
     this.Title = "JOG Notepad";
     this.Name = "notepadPage";
@@ -125,6 +126,15 @@
       updateStatusBar();
     }
 
+    function showErrorDialog(title, message) {
+      if (!errorDialog || !errorMessage) {
+        return;
+      }
+      errorDialog.Title = title || "Error";
+      errorMessage.Text = String(message == null ? "" : message);
+      errorDialog.ShowModal();
+    }
+
     function buildDocumentTab(record, initialText) {
       var tabPage = new JOG.TabPage();
       var editor = new JOG.TextArea();
@@ -195,15 +205,7 @@
     }
 
     function openTextFileWithPicker() {
-      if (typeof global.showOpenFilePicker !== "function") {
-        if (hiddenOpenInput) {
-          hiddenOpenInput.click();
-        }
-        return Promise.resolve();
-      }
-
-      return global.showOpenFilePicker({
-        multiple: false,
+      return JOG.Browser.OpenTextFile({
         types: [
           {
             description: "Text files",
@@ -212,39 +214,18 @@
             }
           }
         ]
-      }).then(function(handles) {
-        if (!handles || !handles.length) {
-          return;
-        }
-        return handles[0].getFile().then(function(file) {
-          return file.text().then(function(text) {
-            var record = createNewDocument(file.name || ("Opened " + nextDocumentId), text);
-            record.fileName = file.name || record.title;
-            record.handle = handles[0];
-            markDocumentDirty(record, false);
-          });
-        });
-      }).catch(function(error) {
-        if (error && error.name === "AbortError") {
-          return;
-        }
-        global.alert("Open failed: " + error.message);
-      });
-    }
+      }).then(function(result) {
+        var record;
 
-    function readFallbackFile(file) {
-      return new Promise(function(resolve, reject) {
-        var reader = new FileReader();
-        reader.onload = function() {
-          var record = createNewDocument(file.name || ("Opened " + nextDocumentId), reader.result || "");
-          record.fileName = file.name || record.title;
-          markDocumentDirty(record, false);
-          resolve(record);
-        };
-        reader.onerror = function() {
-          reject(new Error("Unable to read selected file."));
-        };
-        reader.readAsText(file);
+        if (!result) {
+          return;
+        }
+        record = createNewDocument(result.name || ("Opened " + nextDocumentId), result.text || "");
+        record.fileName = result.name || record.title;
+        record.handle = result.handle || null;
+        markDocumentDirty(record, false);
+      }).catch(function(error) {
+        showErrorDialog("Open Failed", error && error.message ? error.message : "Unable to open the selected file.");
       });
     }
 
@@ -257,84 +238,33 @@
       }
 
       text = record.textArea._domNode.value || "";
-
-      if (!saveAs && record.handle && typeof record.handle.createWritable === "function") {
-        return record.handle.createWritable().then(function(writable) {
-          return writable.write(text).then(function() {
-            return writable.close();
-          }).then(function() {
-            markDocumentDirty(record, false);
-          });
-        }).catch(function(error) {
-          global.alert("Save failed: " + error.message);
-        });
-      }
-
-      if (typeof global.showSaveFilePicker === "function") {
-        return global.showSaveFilePicker({
-          suggestedName: record.fileName || record.title || "untitled.txt",
-          types: [
-            {
-              description: "Text files",
-              accept: {
-                "text/plain": [".txt"]
-              }
+      return JOG.Browser.SaveTextFile({
+        text: text,
+        handle: record.handle,
+        saveAs: !!saveAs,
+        suggestedName: record.fileName || record.title || "untitled.txt",
+        types: [
+          {
+            description: "Text files",
+            accept: {
+              "text/plain": [".txt"]
             }
-          ]
-        }).then(function(handle) {
-          record.handle = handle;
-          return handle.createWritable().then(function(writable) {
-            return writable.write(text).then(function() {
-              return writable.close();
-            }).then(function() {
-              record.fileName = basename(handle.name || record.fileName || record.title);
-              record.title = record.fileName;
-              markDocumentDirty(record, false);
-            });
-          });
-        }).catch(function(error) {
-          if (error && error.name === "AbortError") {
-            return;
           }
-          global.alert("Save failed: " + error.message);
-        });
-      }
-
-      return new Promise(function(resolve) {
-        var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-        var url = global.URL.createObjectURL(blob);
-        var link = global.document.createElement("a");
-
-        link.href = url;
-        link.download = record.fileName || record.title || "untitled.txt";
-        global.document.body.appendChild(link);
-        link.click();
-        global.document.body.removeChild(link);
-        global.URL.revokeObjectURL(url);
-
-        record.fileName = link.download;
-        record.title = link.download;
+        ]
+      }).then(function(result) {
+        if (!result) {
+          return;
+        }
+        record.handle = result.handle || null;
+        if (result.name) {
+          record.fileName = basename(result.name);
+          record.title = record.fileName;
+        }
         markDocumentDirty(record, false);
-        resolve();
+      }).catch(function(error) {
+        showErrorDialog("Save Failed", error && error.message ? error.message : "Unable to save the current document.");
       });
     }
-
-    hiddenOpenInput = global.document.createElement("input");
-    hiddenOpenInput.type = "file";
-    hiddenOpenInput.accept = ".txt,.md,.log,text/plain";
-    hiddenOpenInput.style.display = "none";
-    hiddenOpenInput.addEventListener("change", function(event) {
-      var files = event.target.files || [];
-      if (!files.length) {
-        return;
-      }
-      readFallbackFile(files[0]).catch(function(error) {
-        global.alert(error.message);
-      }).finally(function() {
-        hiddenOpenInput.value = "";
-      });
-    });
-    global.document.body.appendChild(hiddenOpenInput);
 
     appShell = new JOG.DockPanel();
     appShell.Name = "notepadShell";
@@ -395,6 +325,46 @@
     statusBar.Add(caretStatus);
     statusBar.Add(metricStatus);
 
+    errorDialog = new JOG.Dialog();
+    errorDialog.Name = "notepadErrorDialog";
+    errorDialog.Title = "Error";
+    errorDialog.SetBounds(300, 140, 420, 220);
+    errorDialog.MinWidth = 380;
+    errorDialog.MinHeight = 200;
+    errorDialog.CloseButtonText = "Close";
+
+    var errorLayout = new JOG.StackPanel();
+    var errorTitle = new JOG.Label();
+    var errorButtonRow = new JOG.StackPanel();
+    var dismissErrorButton = new JOG.Button();
+
+    errorLayout.Name = "notepadErrorLayout";
+    errorLayout.Orientation = "vertical";
+    errorLayout.Spacing = 16;
+
+    errorTitle.Text = "The requested file operation could not be completed.";
+
+    errorMessage = new JOG.Label();
+    errorMessage.Name = "notepadErrorMessage";
+    errorMessage.Text = "";
+
+    errorButtonRow.Name = "notepadErrorFooter";
+    errorButtonRow.Orientation = "horizontal";
+    errorButtonRow.Spacing = 10;
+
+    dismissErrorButton.Name = "dismissNotepadError";
+    dismissErrorButton.Text = "Close";
+    dismissErrorButton.OnClick(function() {
+      errorDialog.Close();
+    });
+
+    errorButtonRow.Add(dismissErrorButton);
+    errorLayout.Add(errorTitle);
+    errorLayout.Add(errorMessage);
+    errorLayout.Add(errorButtonRow);
+    errorDialog.Add(errorLayout);
+    errorDialog.Hide();
+
     tabControl = new JOG.TabControl();
     tabControl.Name = "documentTabs";
     tabControl.Dock = "fill";
@@ -407,6 +377,7 @@
     appShell.Add(tabControl);
 
     this.Add(appShell);
+    this.Add(errorDialog);
 
     createNewDocument();
   }
