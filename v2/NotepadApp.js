@@ -16,10 +16,6 @@
     };
   }
 
-  function clamp(value, minValue) {
-    return Math.max(value, minValue);
-  }
-
   function createDocumentRecord(id, title) {
     return {
       id: id,
@@ -35,7 +31,6 @@
   function NotepadPage() {
     JOG.Page.call(this);
 
-    var page = this;
     var nextDocumentId = 1;
     var activeDocumentId = "";
     var documents = [];
@@ -50,36 +45,6 @@
 
     this.Title = "JOG Notepad";
     this.Name = "notepadPage";
-
-    function viewportWidth() {
-      return global.innerWidth || (global.document && global.document.body && global.document.body.clientWidth) || 1280;
-    }
-
-    function viewportHeight() {
-      return global.innerHeight || (global.document && global.document.body && global.document.body.clientHeight) || 720;
-    }
-
-    function updateLayout() {
-      var width = clamp(viewportWidth() - 64, 640);
-      var height = clamp(viewportHeight() - 64, 220);
-      var menuHeight = 58;
-      var statusHeight = 48;
-      var shellPadding = 24;
-      var tabChromeHeight = 82;
-      var editorHeight = clamp(height - menuHeight - statusHeight - shellPadding, 120);
-      var editorWidth = clamp(width - 68, 320);
-
-      appShell.Size(width, height);
-      tabControl.Height = editorHeight;
-
-      documents.forEach(function(record) {
-        if (!record.textArea) {
-          return;
-        }
-        record.textArea.Height = clamp(editorHeight - tabChromeHeight, 96);
-        record.textArea.Width = editorWidth;
-      });
-    }
 
     function activeDocument() {
       var match = null;
@@ -170,6 +135,7 @@
 
       editor.Name = "editor" + record.id;
       editor.CssClass = "jog-fill-width";
+      editor.Fill = true;
       editor.Text = initialText || "";
       editor.OnChange(function() {
         markDocumentDirty(record, true);
@@ -193,7 +159,6 @@
       documents.push(record);
       tabControl.Add(buildDocumentTab(record, text || ""));
       syncActiveDocument(record.id);
-      updateLayout();
       markDocumentDirty(record, false);
       return record;
     }
@@ -227,7 +192,6 @@
         syncActiveDocument(nextRecord.id);
       }
 
-      updateLayout();
     }
 
     function openTextFileWithPicker() {
@@ -374,6 +338,7 @@
 
     appShell = new JOG.DockPanel();
     appShell.Name = "notepadShell";
+    appShell.Fill = true;
     appShell.Padding = 12;
     appShell.MinHeight = 0;
     appShell.MinWidth = 0;
@@ -444,9 +409,6 @@
     this.Add(appShell);
 
     createNewDocument();
-    updateLayout();
-
-    global.addEventListener("resize", updateLayout);
   }
 
   NotepadPage.prototype = Object.create(JOG.Page.prototype);

@@ -68,9 +68,9 @@
 
     this.Name = "editCustomerDialog";
     this.Title = "Edit Customer";
-    this.SetBounds(260, 100, 440, 360);
-    this.MinWidth = 440;
-    this.MinHeight = 360;
+    this.SetBounds(260, 100, 460, 400);
+    this.MinWidth = 460;
+    this.MinHeight = 400;
     this.CloseButtonText = "Done";
 
     var layout = new JOG.StackPanel();
@@ -185,9 +185,7 @@
 
     var shell = new JOG.DockPanel();
     shell.Name = "customerShell";
-    shell.Width = 900;
-    shell.Height = 560;
-    shell.Location(0, 0);
+    shell.Fill = true;
     shell.Padding = 24;
 
     var topBar = new JOG.Panel();
@@ -207,13 +205,29 @@
     topBar.Add(title);
     topBar.Add(subtitle);
 
+    var workspace = new JOG.SplitPanel();
+    workspace.Name = "customerWorkspace";
+    workspace.Dock = "fill";
+    workspace.FirstPaneSize = 240;
+    workspace.Gap = 24;
+    workspace.Responsive = {
+      base: {
+        orientation: "vertical",
+        firstPaneSize: 200,
+        gap: 16
+      },
+      md: {
+        orientation: "horizontal",
+        firstPaneSize: 240,
+        gap: 24
+      }
+    };
+
     var sidebar = new JOG.SectionPanel();
     sidebar.Name = "sidebar";
     sidebar.Title = "Customers";
-    sidebar.Dock = "left";
-    sidebar.Width = 240;
     sidebar.Padding = 16;
-    sidebar.Margin = { right: 24 };
+    sidebar.Fill = true;
 
     var sidebarStack = new JOG.StackPanel();
     sidebarStack.Name = "sidebarStack";
@@ -261,8 +275,8 @@
     var detail = new JOG.SectionPanel();
     detail.Name = "detail";
     detail.Title = "Selected Customer";
-    detail.Dock = "fill";
     detail.Padding = 16;
+    detail.Fill = true;
 
     var detailStack = new JOG.StackPanel();
     detailStack.Name = "detailStack";
@@ -375,9 +389,11 @@
       });
     });
 
+    workspace.Add(sidebar);
+    workspace.Add(detail);
+
     shell.Add(topBar);
-    shell.Add(sidebar);
-    shell.Add(detail);
+    shell.Add(workspace);
 
     this.Add(shell);
     this.Add(editDialog);

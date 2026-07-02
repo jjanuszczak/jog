@@ -25,7 +25,7 @@ Implemented public surface in `v2/JOG.js`:
 - theme API: `JOG.SetTheme()`, `JOG.GetTheme()`, `JOG.Theme`, `Application.Theme`
 - application runtime: `Application`, `Page`
 - base types: `Component`, `Control`, `Container`
-- layout containers: `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, `Grid`
+- layout containers: `Panel`, `DockPanel`, `SplitPanel`, `StackPanel`, `SectionPanel`, `Grid`
 - shell controls: `MenuBar`, `ToolBar`, `StatusBar`, `TabControl`, `TabPage`
 - windows: `Window`, `Dialog`
 - controls: `DataGrid`, `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
@@ -69,6 +69,7 @@ app.Run(page);
 ```
 
 `Application.Run(page)` attaches the runtime to `document.body`, injects framework styles, attaches the page to the runtime, marks the page dirty, and flushes the initial render.
+It also schedules one follow-up viewport layout pass on the next animation frame so fill-based shell layouts can settle against real browser dimensions.
 
 `Page` is the root container. It also sets `document.title` from `page.Title`.
 
@@ -184,6 +185,9 @@ Every control is a JavaScript object with internal state. State changes do not w
 4. each control applies current state to its DOM node
 
 This is the core architectural shift from V1. It separates control state from direct DOM mutation.
+
+The runtime now also exposes a narrow `Fill` flag for controls and containers that need to stretch inside shell layouts. This is not a general flexbox abstraction. It exists so shells and tab workspaces can reduce manual width and height math.
+When a control is already dock-managed inside a `DockPanel`, `Fill` now avoids forcing raw `100%` width and height so dock geometry remains authoritative.
 
 ## Data Controls
 
@@ -406,6 +410,18 @@ Responsive dock behavior can now be driven through inherited `ResponsiveLayout` 
 
 Use it for app shells, sidebars, top bars, and detail regions.
 
+### SplitPanel
+
+`SplitPanel` is the new higher-level workspace container for two-pane layouts.
+
+- `Orientation = "horizontal"` or `"vertical"`
+- `FirstPaneSize` fixes the first pane in pixels when set
+- `SecondPaneSize` fixes the second pane in pixels when set
+- `Gap` controls the separation between panes
+- `Responsive` can switch orientation, gap, and pane sizes by breakpoint
+
+Use it for left-nav-plus-content shells, inspector layouts, and stacked mobile fallbacks where the outer shell should stay simple.
+
 ### SectionPanel
 
 `SectionPanel` wraps content in a framed card with an optional title header and a padded body.
@@ -467,7 +483,7 @@ sidebar.ResponsiveLayout = {
 };
 ```
 
-Current limitation: `Grid` now supports explicit placement, named areas, automatic row sizing, and breakpoint-based responsive overrides, while `StackPanel` and `DockPanel` now support narrower responsive behavior. There is still no higher-level layout abstraction or container-query model.
+Current limitation: `Grid` now supports explicit placement, named areas, automatic row sizing, and breakpoint-based responsive overrides, while `StackPanel`, `DockPanel`, and `SplitPanel` now cover the main shell patterns. There is still no container-query model or deeper multi-pane workspace manager.
 
 ## Window and Dialog Model
 
@@ -730,6 +746,7 @@ Calling setters on a disposed control throws.
 [v2/CustomerAdminApp.js](../v2/CustomerAdminApp.js) demonstrates:
 
 - `DockPanel` shell layout
+- `SplitPanel` left-nav-plus-content workspace composition
 - `SectionPanel` regions
 - inline store-driven updates
 - modal dialog editing
@@ -778,6 +795,11 @@ Calling setters on a disposed control throws.
 - `DataGrid` row commands with collection-backed updates
 - first-pass header drag resizing for pixel-width columns
 - built-in `ThemePreset` usage on buttons, labels, and sections
+
+[v2/NotepadApp.js](../v2/NotepadApp.js) now also demonstrates:
+
+- docked shell chrome without manual viewport resize math
+- `Fill = true` inside a tab workspace for full-height editor composition
 
 ## Guidance for Developers
 

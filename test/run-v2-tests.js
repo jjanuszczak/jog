@@ -141,23 +141,38 @@ function createDocument() {
 function createJOGSandbox(options) {
   var source = fs.readFileSync(path.join(__dirname, "..", "v2", "JOG.js"), "utf8");
   var document = createDocument();
+  var animationFrameQueue = [];
   var windowEventListeners = {};
   options = options || {};
   if (options.innerWidth) {
     document.body.clientWidth = options.innerWidth;
+  }
+  if (options.innerHeight) {
+    document.body.clientHeight = options.innerHeight;
   }
   var sandbox = {
     console: options.console || console,
     document: document,
     window: null,
     innerWidth: options.innerWidth || 1280,
+    innerHeight: options.innerHeight || 720,
     queueMicrotask: queueMicrotask,
     Promise: Promise,
     setTimeout: setTimeout,
-    clearTimeout: clearTimeout
+    clearTimeout: clearTimeout,
+    requestAnimationFrame: function(callback) {
+      animationFrameQueue.push(callback);
+      return animationFrameQueue.length;
+    },
+    cancelAnimationFrame: function(id) {
+      if (id > 0 && id <= animationFrameQueue.length) {
+        animationFrameQueue[id - 1] = null;
+      }
+    }
   };
 
   sandbox.window = sandbox;
+  sandbox._animationFrameQueue = animationFrameQueue;
   sandbox._windowEventListeners = windowEventListeners;
   sandbox.addEventListener = function(name, listener) {
     if (!windowEventListeners[name]) {
@@ -308,6 +323,18 @@ function dispatchWindowResize(sandbox, width) {
   sandbox.document.body.clientWidth = width;
   listeners.forEach(function(listener) {
     listener({ target: sandbox.window });
+  });
+}
+
+function flushAnimationFrames(sandbox) {
+  var queue = (sandbox && sandbox._animationFrameQueue) || [];
+  var callbacks = queue.slice();
+
+  queue.length = 0;
+  callbacks.forEach(function(callback) {
+    if (typeof callback === "function") {
+      callback(0);
+    }
   });
 }
 
@@ -659,6 +686,196 @@ function testResponsiveDockAndStackLayoutsApplyOnMountAndResize() {
   assertEqual(sidebar._domNode.style.width, "220px", "Responsive dock child should restore desktop width on wider resize.");
   assertEqual(actionRow._domNode.className.indexOf("horizontal") >= 0, true, "Responsive StackPanel should return to horizontal on wider resize.");
   assertEqual(actionRow._domNode.style.gap, "8px", "Responsive StackPanel should restore desktop gap on wider resize.");
+}
+
+function testSplitPanelResponsiveOrientationAndSizing() {
+  var sandbox = createJOGSandbox({ innerWidth: 560 });
+  var JOG = sandbox.JOG;
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var split = new JOG.SplitPanel();
+  var nav = new JOG.SectionPanel();
+  var content = new JOG.SectionPanel();
+
+  split.Width = 920;
+  split.Height = 520;
+  split.FirstPaneSize = 220;
+  split.Gap = 24;
+  split.Responsive = {
+    base: {
+      orientation: "vertical",
+      firstPaneSize: 160,
+      gap: 12
+    },
+    md: {
+      orientation: "horizontal",
+      firstPaneSize: 220,
+      gap: 24
+    }
+  };
+
+  nav.Fill = true;
+  content.Fill = true;
+  split.Add(nav);
+  split.Add(content);
+  page.Add(split);
+  app.Run(page);
+
+  assertEqual(split._domNode.className.indexOf("vertical") >= 0, true, "SplitPanel should use vertical orientation on narrow mount.");
+  assertEqual(split._domNode.style.gap, "12px", "SplitPanel should apply responsive mobile gap.");
+  assertEqual(nav._domNode.style.height, "160px", "SplitPanel should size the first pane height on vertical layout.");
+  assertEqual(nav._domNode.style.width, "100%", "SplitPanel should stretch first pane width on vertical layout.");
+
+  dispatchWindowResize(sandbox, 980);
+  app.Runtime.flush();
+
+  assertEqual(split._domNode.className.indexOf("horizontal") >= 0, true, "SplitPanel should restore horizontal orientation on wide resize.");
+  assertEqual(split._domNode.style.gap, "24px", "SplitPanel should restore desktop gap.");
+  assertEqual(nav._domNode.style.width, "220px", "SplitPanel should size the first pane width on horizontal layout.");
+  assertEqual(nav._domNode.style.height, "100%", "SplitPanel should stretch first pane height on horizontal layout.");
+}
+
+function testFillPropertySupportsTabWorkspaceEditors() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var shell = new JOG.DockPanel();
+  var tabs = new JOG.TabControl();
+  var tab = new JOG.TabPage();
+  var editor = new JOG.TextArea();
+
+  shell.Fill = true;
+  shell.Width = 900;
+  shell.Height = 620;
+
+  tabs.Dock = "fill";
+  tabs.Fill = true;
+
+  tab.Title = "Document";
+  tab.TabKey = "doc";
+
+  editor.Fill = true;
+  editor.CssClass = "jog-fill-width";
+
+  tab.Add(editor);
+  tabs.Add(tab);
+  shell.Add(tabs);
+  page.Add(shell);
+  app.Run(page);
+
+  assertEqual(tabs._domNode.style.flex, "1 1 auto", "Fill should let TabControl stretch inside a workspace shell.");
+  assertEqual(tab._domNode.style.display, "flex", "TabPage should use flex layout for fill content.");
+  assertEqual(editor._domNode.style.flex, "1 1 auto", "Fill should let editors stretch inside tab pages.");
+  assertEqual(editor._domNode.style.height, "100%", "Fill should give editors full tab-page height.");
+}
+
+function testNotepadLoadsVisibleWorkspace() {
+  var loaded = loadExampleApp("NotepadApp.js");
+  var shell = findControl(loaded.page, function(control) {
+    return control.Name === "notepadShell";
+  });
+  var tabs = findControl(loaded.page, function(control) {
+    return control.Name === "documentTabs";
+  });
+  var firstEditor = findControl(loaded.page, function(control) {
+    return control.Name === "editordoc-1";
+  });
+
+  assert(!!shell, "Notepad should render its shell.");
+  assert(!!tabs, "Notepad should render its tab workspace.");
+  assert(!!firstEditor, "Notepad should create its first document editor on load.");
+  assertEqual(shell._domNode.style.height !== "0px", true, "Notepad shell should not collapse to zero height.");
+  assertEqual(tabs._domNode.style.height !== "0px", true, "Notepad tab workspace should not collapse to zero height.");
+  assertEqual(firstEditor._domNode.style.height, "100%", "Notepad editor should stretch inside the visible tab workspace.");
+}
+
+function testNotepadSettlesShellLayoutAfterMount() {
+  var loaded = loadExampleApp("NotepadApp.js", { innerWidth: 0, innerHeight: 0 });
+  var shell = findControl(loaded.page, function(control) {
+    return control.Name === "notepadShell";
+  });
+  var tabs = findControl(loaded.page, function(control) {
+    return control.Name === "documentTabs";
+  });
+  var status = findControl(loaded.page, function(control) {
+    return control.Name === "notepadStatus";
+  });
+
+  loaded.sandbox.innerWidth = 1280;
+  loaded.sandbox.innerHeight = 720;
+  loaded.sandbox.document.body.clientWidth = 1280;
+  loaded.sandbox.document.body.clientHeight = 720;
+  flushAnimationFrames(loaded.sandbox);
+
+  assertEqual(shell._domNode.style.width, "100%", "Notepad shell should remain fill-sized after the deferred layout pass.");
+  assertEqual(tabs._domNode.style.width !== "0px", true, "Notepad tab workspace should expand after the deferred layout pass.");
+  assertEqual(tabs._domNode.style.height !== "0px", true, "Notepad tab workspace should gain height after the deferred layout pass.");
+  assertEqual(status._domNode.style.top !== "0px", true, "Notepad status bar should be laid out by the deferred layout pass.");
+}
+
+function testDockPanelSchedulesSettlePassForTinyFirstMeasure() {
+  var loaded = loadExampleApp("NotepadApp.js");
+  var shell = findControl(loaded.page, function(control) {
+    return control.Name === "notepadShell";
+  });
+
+  shell._domNode.clientWidth = 48;
+  shell._domNode.clientHeight = 72;
+  shell.Refresh();
+  loaded.app.Runtime.flush();
+
+  assertEqual(loaded.sandbox._animationFrameQueue.length > 0, true, "A page-level fill DockPanel should schedule a settle pass when first measured tiny.");
+
+  shell._domNode.clientWidth = 1248;
+  shell._domNode.clientHeight = 656;
+  flushAnimationFrames(loaded.sandbox);
+
+  assertEqual(shell._layoutSettlePending, false, "DockPanel settle pass should clear after the follow-up frame runs.");
+}
+
+function testNotepadKeepsStatusBarAfterTabOpenAndClose() {
+  var loaded = loadExampleApp("NotepadApp.js");
+  var menu = findControl(loaded.page, function(control) {
+    return control.Name === "notepadMenu";
+  });
+  var shell = findControl(loaded.page, function(control) {
+    return control.Name === "notepadShell";
+  });
+  var status = findControl(loaded.page, function(control) {
+    return control.Name === "notepadStatus";
+  });
+  var tabs = findControl(loaded.page, function(control) {
+    return control.Name === "documentTabs";
+  });
+
+  dispatchNodeClick(menu._itemNodes[0]);
+  loaded.app.Runtime.flush();
+
+  assertEqual(tabs.Children.length, 2, "Notepad should add a second tab from the New menu item.");
+  assertEqual(status._domNode.style.top !== "0px", true, "Status bar should remain laid out after opening a tab.");
+  assertEqual(tabs._domNode.style.height !== "0px", true, "Tab workspace should remain visible after opening a tab.");
+
+  dispatchNodeClick(menu._itemNodes[4]);
+  loaded.app.Runtime.flush();
+
+  assertEqual(tabs.Children.length, 1, "Notepad should close the active tab from the Close Tab menu item.");
+  assertEqual(status._domNode.style.top !== "0px", true, "Status bar should remain laid out after closing a tab.");
+  assertEqual(tabs._domNode.style.height !== "0px", true, "Tab workspace should remain visible after closing a tab.");
+  assertEqual(shell._domNode.style.height !== "0px", true, "Shell should remain visible after tab mutations.");
+}
+
+function testDockManagedFillChildrenUseDockGeometry() {
+  var loaded = loadExampleApp("CustomerAdminApp.js");
+  var shell = findControl(loaded.page, function(control) {
+    return control.Name === "customerShell";
+  });
+  var workspace = findControl(loaded.page, function(control) {
+    return control.Name === "customerWorkspace";
+  });
+
+  assertEqual(workspace._domNode.style.width !== "100%", true, "Dock-managed fill children should not keep a raw 100% width override.");
+  assertEqual(workspace._domNode.style.height !== "100%", true, "Dock-managed fill children should not keep a raw 100% height override.");
+  assertEqual(workspace._domNode.style.left !== "", true, "Customer workspace should still receive dock positioning.");
 }
 
 function testThemePresetsApplyPresetClasses() {
@@ -1087,11 +1304,17 @@ function testCustomerAdminDialogIntegrationFlow() {
     return control._typeName === "Button" && control.Text === "Save Customer";
   });
 
+  assertEqual(dialog.Visible, false, "Edit dialog should start hidden.");
+  assertEqual(dialog._domNode.style.display, "none", "Hidden dialog should not force itself visible on initial render.");
+
   editButton._raiseEvent("Click", null);
   app.Runtime.flush();
 
   assertEqual(dialog.Visible, true, "Edit button should open the dialog.");
   assertEqual(app.Runtime._modalWindows.length, 1, "Opened dialog should register in modal stack.");
+  assertEqual(dialog._contentNode.style.overflowY, "auto", "Dialog content should scroll vertically when content exceeds the window body.");
+  assertEqual(dialog._contentNode.style.overflowX, "hidden", "Dialog content should clip horizontal overflow inside the window body.");
+  assertEqual(dialog._contentNode.style.flex, "1 1 auto", "Dialog content should stretch within the window shell.");
 
   dispatchTextInput(dialogName, "No");
   dispatchTextInput(dialogStatus, "Unknown");
@@ -1656,6 +1879,13 @@ var tests = [
   { name: "Grid supports named areas and auto rows", fn: testGridSupportsNamedAreasAndAutoRows },
   { name: "Grid responsive breakpoints apply on mount and resize", fn: testGridResponsiveBreakpointsApplyOnMountAndResize },
   { name: "responsive dock and stack layouts apply on mount and resize", fn: testResponsiveDockAndStackLayoutsApplyOnMountAndResize },
+  { name: "split panel responsive orientation and sizing", fn: testSplitPanelResponsiveOrientationAndSizing },
+  { name: "fill property supports tab workspace editors", fn: testFillPropertySupportsTabWorkspaceEditors },
+  { name: "notepad loads visible workspace", fn: testNotepadLoadsVisibleWorkspace },
+  { name: "notepad settles shell layout after mount", fn: testNotepadSettlesShellLayoutAfterMount },
+  { name: "dock panel schedules settle pass for tiny first measure", fn: testDockPanelSchedulesSettlePassForTinyFirstMeasure },
+  { name: "notepad keeps status bar after tab open and close", fn: testNotepadKeepsStatusBarAfterTabOpenAndClose },
+  { name: "dock managed fill children use dock geometry", fn: testDockManagedFillChildrenUseDockGeometry },
   { name: "theme presets apply preset classes", fn: testThemePresetsApplyPresetClasses },
   { name: "global theme applies to mounted applications", fn: testGlobalThemeAppliesToMountedApplications },
   { name: "application theme overrides global theme", fn: testApplicationThemeOverridesGlobalTheme },
