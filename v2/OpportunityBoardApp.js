@@ -473,7 +473,7 @@
     this.Title = "JOG V2 Opportunity Board";
     this.Name = "opportunityBoardPage";
 
-    var shell = new JOG.DockPanel();
+    var shell = new JOG.WorkspaceShell();
     shell.Name = "opportunityBoardShell";
     shell.Width = 1180;
     shell.Height = 760;
@@ -485,7 +485,6 @@
 
     var topBar = new JOG.PageHeader();
     topBar.Name = "opportunityTopBar";
-    topBar.Dock = "top";
     topBar.Gap = 16;
     topBar.TitleText = "Opportunity Board";
     topBar.SubtitleText = "A CRM-style sample using Collection plus DataGrid for selection, summaries, and row commands.";
@@ -493,7 +492,6 @@
     var sidebar = new JOG.SectionPanel();
     sidebar.Name = "opportunitySidebar";
     sidebar.Title = "Pipeline Snapshot";
-    sidebar.Dock = "left";
     sidebar.Width = 270;
     sidebar.Padding = 12;
     sidebar.Gap = 24;
@@ -553,7 +551,6 @@
     var boardSection = new JOG.SectionPanel();
     boardSection.Name = "opportunityBoardSection";
     boardSection.Title = "Active Opportunities";
-    boardSection.Dock = "fill";
     boardSection.Padding = 12;
     boardSection.Responsive = {
       base: {
@@ -735,9 +732,9 @@
       syncSelectionStatus();
     });
 
-    shell.Add(topBar);
-    shell.Add(sidebar);
-    shell.Add(boardSection);
+    shell.Header = topBar;
+    shell.Sidebar = sidebar;
+    shell.Content = boardSection;
 
     this.Add(shell);
     this.Add(editorDialog);

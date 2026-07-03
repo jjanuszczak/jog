@@ -26,7 +26,7 @@ Implemented public surface in `v2/JOG.js`:
 - browser helpers: `JOG.Browser.OpenTextFile()`, `JOG.Browser.SaveTextFile()`
 - application runtime: `Application`, `Page`
 - base types: `Component`, `Control`, `Container`
-- layout containers: `Panel`, `DockPanel`, `SplitPanel`, `StackPanel`, `SectionPanel`, `Grid`
+- layout containers: `Panel`, `DockPanel`, `WorkspaceShell`, `SplitPanel`, `StackPanel`, `SectionPanel`, `Grid`
 - shell controls: `MenuBar`, `ToolBar`, `StatusBar`, `PageHeader`, `TabControl`, `TabPage`
 - windows: `Window`, `Dialog`
 - controls: `DataGrid`, `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
@@ -239,7 +239,7 @@ This is the core architectural shift from V1. It separates control state from di
 
 The runtime now also exposes a narrow `Fill` flag for controls and containers that need to stretch inside shell layouts. This is not a general flexbox abstraction. It exists so shells and tab workspaces can reduce manual width and height math.
 When a control is already dock-managed inside a `DockPanel`, `Fill` now avoids forcing raw `100%` width and height so dock geometry remains authoritative.
-`DockPanel` now also honors `Gap` as shell spacing between docked regions. A docked child can override that spacing with its own `Gap` when one region needs a different separation than the rest of the shell.
+`DockPanel` now also honors `Gap` as shell spacing between docked regions. A docked child can override that spacing with its own `Gap` when one region needs a different separation than the rest of the shell. `WorkspaceShell` builds on that dock behavior with explicit `Header`, `Sidebar`, and `Content` slots for the most common app-shell composition.
 
 ## Data Controls
 
@@ -470,6 +470,18 @@ Responsive dock behavior can now be driven through inherited `ResponsiveLayout` 
 
 Use it for app shells, sidebars, top bars, and detail regions.
 
+### WorkspaceShell
+
+`WorkspaceShell` is a higher-level dock-based shell container for the common header plus sidebar plus content pattern.
+
+- `Header` defaults to `Dock = "top"`
+- `Sidebar` defaults to `Dock = "left"`
+- `Content` defaults to `Dock = "fill"`
+- keeps those slotted children ordered correctly even if you assign them in a different sequence
+- still honors `Padding`, `Gap`, and child `ResponsiveLayout` so sidebars can collapse to top regions on narrow widths
+
+Use it when you want a page shell primitive instead of wiring `DockPanel` child order and default docking by hand.
+
 ### SplitPanel
 
 `SplitPanel` is the new higher-level workspace container for two-pane layouts.
@@ -560,7 +572,7 @@ sidebar.ResponsiveLayout = {
 };
 ```
 
-Current limitation: `Grid` now supports explicit placement, named areas, automatic row sizing, and breakpoint-based responsive overrides, while `StackPanel`, `DockPanel`, and `SplitPanel` now cover the main shell patterns. There is still no container-query model or deeper multi-pane workspace manager.
+Current limitation: `Grid` now supports explicit placement, named areas, automatic row sizing, and breakpoint-based responsive overrides, while `StackPanel`, `DockPanel`, `WorkspaceShell`, and `SplitPanel` now cover the main shell patterns. There is still no container-query model or deeper multi-pane workspace manager.
 
 ## Window and Dialog Model
 

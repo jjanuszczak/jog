@@ -799,6 +799,67 @@ function testDockPanelGapSupportsShellSpacingOnMountAndResize() {
   assertEqual(content._domNode.style.left, "264px", "DockPanel should preserve left-dock gap after responsive resize.");
 }
 
+function testWorkspaceShellAssignsSlotsAndMaintainsResponsiveLayout() {
+  var sandbox = createJOGSandbox({ innerWidth: 560 });
+  var JOG = sandbox.JOG;
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var shell = new JOG.WorkspaceShell();
+  var header = new JOG.PageHeader();
+  var sidebar = new JOG.SectionPanel();
+  var content = new JOG.SectionPanel();
+
+  shell.Width = 960;
+  shell.Height = 640;
+  shell.Padding = 20;
+
+  header.Name = "workspaceHeader";
+  header.Height = 88;
+  header.Gap = 12;
+  header.TitleText = "Workspace";
+  header.SubtitleText = "Header slot";
+
+  sidebar.Name = "workspaceSidebar";
+  sidebar.Width = 220;
+  sidebar.Gap = 18;
+  sidebar.ResponsiveLayout = {
+    base: {
+      dock: "top",
+      width: null,
+      height: 120,
+      gap: 14
+    },
+    md: {
+      dock: "left",
+      width: 220,
+      height: null,
+      gap: 18
+    }
+  };
+
+  content.Name = "workspaceContent";
+
+  shell.Content = content;
+  shell.Sidebar = sidebar;
+  shell.Header = header;
+
+  page.Add(shell);
+  app.Run(page);
+
+  assertEqual(shell._children[0], header, "WorkspaceShell should keep the header first even when assigned last.");
+  assertEqual(shell._children[1], sidebar, "WorkspaceShell should keep the sidebar second.");
+  assertEqual(shell._children[2], content, "WorkspaceShell should keep the content third.");
+  assertEqual(header.Dock, "top", "WorkspaceShell should default the header to top docking.");
+  assertEqual(sidebar._domNode.style.top, "120px", "WorkspaceShell should let the responsive sidebar dock above content on narrow mount.");
+  assertEqual(content._domNode.style.top, "254px", "WorkspaceShell should place content after the header and responsive sidebar gaps on narrow mount.");
+
+  dispatchWindowResize(sandbox, 980);
+  app.Runtime.flush();
+
+  assertEqual(sidebar._domNode.style.left, "20px", "WorkspaceShell should restore the sidebar to left docking on wide resize.");
+  assertEqual(content._domNode.style.left, "258px", "WorkspaceShell should place fill content after the sidebar gap on wide resize.");
+}
+
 function testSectionPanelResponsiveTitleAndPadding() {
   var sandbox = createJOGSandbox({ innerWidth: 560 });
   var JOG = sandbox.JOG;
@@ -1217,6 +1278,7 @@ function testDockManagedFillChildrenUseDockGeometry() {
   assertEqual(workspace._domNode.style.width !== "100%", true, "Dock-managed fill children should not keep a raw 100% width override.");
   assertEqual(workspace._domNode.style.height !== "100%", true, "Dock-managed fill children should not keep a raw 100% height override.");
   assertEqual(workspace._domNode.style.left !== "", true, "Customer workspace should still receive dock positioning.");
+  assertEqual(shell._typeName, "WorkspaceShell", "Customer shell should use the shared workspace shell primitive.");
 }
 
 function testThemePresetsApplyPresetClasses() {
@@ -2214,6 +2276,9 @@ function testDataGridSupportsResizablePixelWidthColumns() {
 
 function testOpportunityBoardUsesCollectionAndDataGridFlow() {
   var loaded = loadExampleApp("OpportunityBoardApp.js");
+  var shell = findControl(loaded.page, function(control) {
+    return control.Name === "opportunityBoardShell";
+  });
   var header = findControl(loaded.page, function(control) {
     return control.Name === "opportunityTopBar";
   });
@@ -2227,6 +2292,7 @@ function testOpportunityBoardUsesCollectionAndDataGridFlow() {
     return control._typeName === "Label" && control.Text.indexOf("Status:") === 0;
   });
 
+  assertEqual(shell._typeName, "WorkspaceShell", "OpportunityBoard should use the shared workspace shell primitive.");
   assertEqual(header._typeName, "PageHeader", "OpportunityBoard should use the shared page header primitive.");
   assertEqual(header._domNode.style.height !== "0px", true, "OpportunityBoard header should size itself without a fixed height.");
   assert(!!grid, "OpportunityBoard should render a DataGrid.");
@@ -2258,6 +2324,7 @@ var tests = [
   { name: "Grid responsive breakpoints apply on mount and resize", fn: testGridResponsiveBreakpointsApplyOnMountAndResize },
   { name: "responsive dock and stack layouts apply on mount and resize", fn: testResponsiveDockAndStackLayoutsApplyOnMountAndResize },
   { name: "dock panel gap supports shell spacing on mount and resize", fn: testDockPanelGapSupportsShellSpacingOnMountAndResize },
+  { name: "workspace shell assigns slots and maintains responsive layout", fn: testWorkspaceShellAssignsSlotsAndMaintainsResponsiveLayout },
   { name: "section panel responsive title and padding", fn: testSectionPanelResponsiveTitleAndPadding },
   { name: "split panel responsive orientation and sizing", fn: testSplitPanelResponsiveOrientationAndSizing },
   { name: "fill property supports tab workspace editors", fn: testFillPropertySupportsTabWorkspaceEditors },

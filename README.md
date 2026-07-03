@@ -17,9 +17,9 @@ JOG V2 is functional and actively evolving. It already includes:
 
 - application and page bootstrapping
 - controls such as `MenuBar`, `ToolBar`, `StatusBar`, `TabControl`, `DataGrid`, `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, and `ListBox`
-- layout containers such as `Panel`, `DockPanel`, `StackPanel`, `SectionPanel`, and `Grid`
+- layout containers such as `Panel`, `DockPanel`, `WorkspaceShell`, `StackPanel`, `SectionPanel`, and `Grid`
 - breakpoint-aware responsive overrides for `Grid`
-- responsive layout helpers for `StackPanel` and `DockPanel`
+- responsive layout helpers for `StackPanel`, `DockPanel`, and `WorkspaceShell`
 - dialogs and windows with dragging, stacked modal behavior, and lower-right resizing
 - explicit store-based binding plus first-pass collection state
 - control-level validation state
@@ -68,9 +68,9 @@ What they cover:
 - `hello-world.html`: the smallest runnable JOG app, one page and one label
 - `example.html`: small runtime sanity check, first `MenuBar`, `ToolBar`, `StatusBar`, and `TabControl` usage, default-versus-custom theme switching, stacked modal dialogs, resize behavior
 - `notepad.html`: multi-document notepad shell with a docked menu, docked status bar, responsive editor area, browser file open and save flows, and one document per tab
-- `customer-admin.html`: CRUD-style page shell with shared inline and dialog validation
+- `customer-admin.html`: CRUD-style page shell with shared inline and dialog validation, using the shared workspace shell primitive
 - `form-demo.html`: form layout, responsive grid collapse, explicit store binding, reusable validation summary wiring, inline errors, radio-group invalid state
-- `opportunity-board.html`: CRM-style opportunity board using `Collection` plus `DataGrid` for row selection, edit and delete commands, dirty-state tracking, derived summaries, and first-pass resizable columns
+- `opportunity-board.html`: CRM-style opportunity board using `Collection` plus `DataGrid` for row selection, edit and delete commands, dirty-state tracking, derived summaries, first-pass resizable columns, and the shared workspace shell primitive
 
 ## Installing JOG Today
 

@@ -183,7 +183,7 @@
       selectedStatusError: ""
     });
 
-    var shell = new JOG.DockPanel();
+    var shell = new JOG.WorkspaceShell();
     shell.Name = "customerShell";
     shell.Fill = true;
     shell.Padding = 24;
@@ -191,13 +191,11 @@
 
     var topBar = new JOG.PageHeader();
     topBar.Name = "topBar";
-    topBar.Dock = "top";
     topBar.TitleText = "Customer Admin";
     topBar.SubtitleText = "A quieter CRUD-style test app for the V2 runtime.";
 
     var workspace = new JOG.SplitPanel();
     workspace.Name = "customerWorkspace";
-    workspace.Dock = "fill";
     workspace.FirstPaneSize = 240;
     workspace.Gap = 24;
     workspace.Responsive = {
@@ -382,8 +380,8 @@
     workspace.Add(sidebar);
     workspace.Add(detail);
 
-    shell.Add(topBar);
-    shell.Add(workspace);
+    shell.Header = topBar;
+    shell.Content = workspace;
 
     this.Add(shell);
     this.Add(editDialog);
