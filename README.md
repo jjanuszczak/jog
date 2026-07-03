@@ -27,6 +27,7 @@ JOG V2 is functional and actively evolving. It already includes:
 - control-level validation state
 - public theme API with global and per-app token overrides
 - built-in theme presets for selected control types
+- first-pass third-party control registration, compatibility checks, style-block registration, extension lifecycle hooks, and a stable window-shell helper for third-party dialogs
 - runtime diagnostics
 - a zero-dependency Node test runner
 - a minified browser distribution build at `dist/JOG.min.js`
@@ -52,7 +53,7 @@ If you are new to the project, read these in order:
 
 The developer guide explains the runtime model. The API reference documents what exists now. The roadmap tells you what is implemented, what is partial, and what should happen next.
 
-For proposed future extensibility work around custom control packages, see [doc/third-party-control-spec.md](doc/third-party-control-spec.md). That document is a design target, not a description of implemented runtime behavior.
+JOG now includes a first-pass public third-party control API. The current contract and remaining direction are documented in [doc/third-party-control-spec.md](doc/third-party-control-spec.md).
 
 ## Running The Examples
 
@@ -64,6 +65,7 @@ Open these files directly in a browser:
 - [v2/customer-admin.html](v2/customer-admin.html)
 - [v2/form-demo.html](v2/form-demo.html)
 - [v2/opportunity-board.html](v2/opportunity-board.html)
+- [v2/third-party-demo.html](v2/third-party-demo.html)
 
 What they cover:
 
@@ -73,6 +75,7 @@ What they cover:
 - `customer-admin.html`: CRUD-style page shell with shared inline and dialog validation, using the shared workspace shell primitive
 - `form-demo.html`: form layout, responsive grid collapse, explicit store binding, derived summary wiring, `FormState` validation orchestration, inline errors, and radio-group invalid state
 - `opportunity-board.html`: CRM-style opportunity board using `Collection` plus `DataGrid` for row selection, edit and delete commands, dirty-state tracking, sortable, filterable, and inline-editable grid views, derived summaries, collection-to-store binding helpers, `Repeater`-driven sidebar rows, first-pass resizable columns, a bounded flexible notes column for wider datasets, and the shared workspace shell primitive
+- `third-party-demo.html`: sample `AcmeJOG` and `BeaconJOG` packages showing registered primitive, composite, and dialog controls built outside the core runtime source
 
 ## Installing JOG Today
 
@@ -83,12 +86,14 @@ Today, the install model is direct browser usage, with GitHub Releases as the pr
 1. download the latest release artifacts from GitHub Releases, or build them locally
 2. copy `dist/JOG.min.js` into your project for the minified release build, or copy [v2/JOG.js](v2/JOG.js) for a readable source build
 3. optionally start from the files in `dist/starter/`
-4. load your app code after the runtime
+4. load any third-party JOG control packages after the runtime
+5. load your app code after the runtime and any third-party packages
 
 Example:
 
 ```html
 <script src="JOG.min.js"></script>
+<script src="acme-jog-controls.js"></script>
 <script src="MyApp.js"></script>
 ```
 

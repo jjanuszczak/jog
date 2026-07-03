@@ -92,7 +92,12 @@ function createNode(tagName) {
         return existing !== listener;
       });
     },
-    focus: function() {},
+    ownerDocument: null,
+    focus: function() {
+      if (this.ownerDocument) {
+        this.ownerDocument.activeElement = this;
+      }
+    },
     click: function() {
       var listeners = this.eventListeners.click || [];
       listeners.forEach(function(listener) {
@@ -122,9 +127,12 @@ function createDocument() {
     title: "",
     head: createNode("head"),
     body: createNode("body"),
+    activeElement: null,
     eventListeners: {},
     createElement: function(tagName) {
-      return createNode(tagName);
+      var node = createNode(tagName);
+      node.ownerDocument = document;
+      return node;
     },
     addEventListener: function(name, listener) {
       if (!this.eventListeners[name]) {
@@ -139,6 +147,9 @@ function createDocument() {
       });
     }
   };
+
+  document.head.ownerDocument = document;
+  document.body.ownerDocument = document;
 
   document.body.clientWidth = 1280;
   document.body.clientHeight = 720;
@@ -242,10 +253,15 @@ function loadJOG(options) {
   return createJOGSandbox(options).JOG;
 }
 
-function loadExampleApp(scriptName, options) {
-  var sandbox = createJOGSandbox(options);
+function loadScriptIntoSandbox(sandbox, scriptName) {
   var source = fs.readFileSync(path.join(__dirname, "..", "v2", scriptName), "utf8");
+  vm.runInContext(source, sandbox, { filename: "v2/" + scriptName });
+}
+
+function loadExampleApp(scriptName, options, setupScripts) {
+  var sandbox = createJOGSandbox(options);
   var originalRun = sandbox.JOG.Application.prototype.Run;
+  var scripts = Array.isArray(setupScripts) ? setupScripts.slice() : [];
 
   sandbox.JOG.Application.prototype.Run = function(page) {
     sandbox.__lastApp = this;
@@ -253,7 +269,10 @@ function loadExampleApp(scriptName, options) {
     return originalRun.call(this, page);
   };
 
-  vm.runInContext(source, sandbox, { filename: "v2/" + scriptName });
+  scripts.forEach(function(dependency) {
+    loadScriptIntoSandbox(sandbox, dependency);
+  });
+  loadScriptIntoSandbox(sandbox, scriptName);
 
   (sandbox._windowEventListeners.load || []).forEach(function(listener) {
     listener();
@@ -371,11 +390,21 @@ function dispatchDocumentMouseUp(document, clientX, clientY) {
   });
 }
 
-function dispatchNodeKeyDown(node, key) {
+function dispatchNodeKeyDown(node, key, options) {
   var listeners = (node && node.eventListeners && node.eventListeners.keydown) || [];
+  var event;
 
   assertEqual(listeners.length > 0, true, "Node should expose a keydown listener.");
-  listeners[0]({ target: node, key: key });
+  options = options || {};
+  event = {
+    target: node,
+    key: key,
+    shiftKey: !!options.shiftKey,
+    preventDefault: function() {},
+    stopPropagation: function() {}
+  };
+  listeners[0](event);
+  return event;
 }
 
 function dispatchNodeBlur(node) {
@@ -787,6 +816,380 @@ function testApplicationDetailedDumpTreeShowsRicherState() {
   assert(dump.indexOf("span=(2,1)") >= 0, "Detailed tree dump should include span values.");
   assert(dump.indexOf("invalid=true") >= 0, "Detailed tree dump should include invalid state.");
   assert(dump.indexOf('error="Required"') >= 0, "Detailed tree dump should include error text.");
+}
+
+function testThirdPartyControlRegistrationSupportsMetadataLookupAndVersionChecks() {
+  var JOG = loadJOG();
+
+  function SampleControl() {
+    JOG.Control.call(this, "SampleControl");
+  }
+
+  SampleControl.prototype = Object.create(JOG.Control.prototype);
+  SampleControl.prototype.constructor = SampleControl;
+
+  var registration = JOG.RegisterControl({
+    fullName: "Acme.SampleControl",
+    version: "1.2.0",
+    jogVersionRange: "^2.0.0",
+    constructor: SampleControl,
+    metadata: {
+      baseType: "Control",
+      properties: ["Value"],
+      events: ["OnChange"],
+      methods: ["BindValue"]
+    }
+  });
+
+  assertEqual(registration.fullName, "Acme.SampleControl", "RegisterControl should return the stored full name.");
+  assertEqual(registration.metadata.baseType, "Control", "RegisterControl should preserve declared base type.");
+  assertEqual(JOG.GetRegisteredControl("Acme.SampleControl").version, "1.2.0", "GetRegisteredControl should look up controls by full name.");
+  assertEqual(JOG.GetRegisteredControl(SampleControl).metadata.shortName, "SampleControl", "GetRegisteredControl should also support constructor lookup.");
+  assertEqual(JOG.ListRegisteredControls().length, 1, "ListRegisteredControls should enumerate registered controls.");
+  assert(JOG.DumpRegisteredControls().indexOf("Acme.SampleControl@1.2.0") >= 0, "DumpRegisteredControls should report full names and versions.");
+  assertEqual(JOG.IsVersionCompatible("^2.0.0"), true, "IsVersionCompatible should accept the current major range.");
+  assertEqual(JOG.IsVersionCompatible("^3.0.0"), false, "IsVersionCompatible should reject incompatible major ranges.");
+}
+
+function testThirdPartyControlRegistrationRejectsDuplicatesAndIncompatibleVersions() {
+  var JOG = loadJOG();
+  var duplicateThrew = false;
+  var incompatibleThrew = false;
+
+  function SampleControl() {
+    JOG.Control.call(this, "SampleControl");
+  }
+
+  function FutureControl() {
+    JOG.Control.call(this, "FutureControl");
+  }
+
+  SampleControl.prototype = Object.create(JOG.Control.prototype);
+  SampleControl.prototype.constructor = SampleControl;
+  FutureControl.prototype = Object.create(JOG.Control.prototype);
+  FutureControl.prototype.constructor = FutureControl;
+
+  JOG.RegisterControl({
+    fullName: "Acme.SampleControl",
+    version: "1.0.0",
+    jogVersionRange: "^2.0.0",
+    constructor: SampleControl,
+    metadata: { baseType: "Control" }
+  });
+
+  try {
+    JOG.RegisterControl({
+      fullName: "Acme.SampleControl",
+      version: "1.0.1",
+      jogVersionRange: "^2.0.0",
+      constructor: SampleControl,
+      metadata: { baseType: "Control" }
+    });
+  } catch (error) {
+    duplicateThrew = /already registered/.test(error.message);
+  }
+
+  try {
+    JOG.RegisterControl({
+      fullName: "Acme.FutureControl",
+      version: "1.0.0",
+      jogVersionRange: "^3.0.0",
+      constructor: FutureControl,
+      metadata: { baseType: "Control" }
+    });
+  } catch (error) {
+    incompatibleThrew = /unsupported JOG version range/.test(error.message);
+  }
+
+  assert(duplicateThrew, "RegisterControl should reject duplicate control names.");
+  assert(incompatibleThrew, "RegisterControl should reject incompatible JOG version ranges.");
+}
+
+function testSampleThirdPartyControlsRegisterRenderAndBindWithoutPrivateRuntimeAccess() {
+  var sandbox = createJOGSandbox();
+  var JOG;
+  var AcmeJOG;
+  var app;
+  var page;
+  var store;
+  var picker;
+  var card;
+  var label;
+  var dump;
+
+  loadScriptIntoSandbox(sandbox, "AcmeJOG.Controls.js");
+  JOG = sandbox.JOG;
+  AcmeJOG = sandbox.AcmeJOG;
+
+  assertEqual(JOG.ListRegisteredControls().length, 3, "The sample package should register a primitive, a composite container, and a dialog.");
+  assertEqual(JOG.GetRegisteredControl("AcmeJOG.TagPicker").metadata.baseType, "Control", "The primitive sample control should register as a Control.");
+  assertEqual(JOG.GetRegisteredControl("AcmeJOG.TagPicker").metadata.capabilities.supportsKeyboard, true, "The primitive sample control should advertise keyboard support.");
+  assertEqual(JOG.GetRegisteredControl("AcmeJOG.InspectorCard").metadata.baseType, "Container", "The composite sample control should register as a Container.");
+  assertEqual(JOG.GetRegisteredControl("AcmeJOG.CommandPaletteDialog").metadata.baseType, "Dialog", "The sample package should also register a dialog control.");
+
+  app = new JOG.Application();
+  page = new JOG.Page();
+  store = new JOG.Store({ stage: "qualified", stageError: "" });
+  picker = new AcmeJOG.TagPicker();
+  card = new AcmeJOG.InspectorCard();
+  label = new JOG.Label();
+
+  picker.Name = "thirdPartyPicker";
+  picker.Items = ["qualified", "proposal", "negotiation"];
+  picker.BindValue(store, "stage");
+  picker.BindError(store, "stageError");
+
+  card.Name = "thirdPartyCard";
+  card.TitleText = "Selection";
+  card.FooterText = "Composite host";
+
+  label.Text = "Inside the composite third-party container.";
+  card.Add(label);
+  page.Add(picker);
+  page.Add(card);
+  app.Run(page);
+
+  assertEqual(picker._buttonNodes.length, 3, "The third-party picker should render one button per item.");
+  assertEqual(picker._domNode.attributes.role, "radiogroup", "The third-party picker should expose a radiogroup role.");
+  assertEqual(picker._buttonNodes[0].attributes.role, "radio", "Each third-party picker option should expose a radio role.");
+  assertEqual(picker._buttonNodes[0].attributes["aria-checked"], "true", "The selected third-party picker option should expose its checked state.");
+  assert(label._domNode.parentNode === card._bodyNode, "The composite third-party container should host ordinary child controls in its custom body node.");
+
+  dispatchNodeClick(picker._buttonNodes[1]);
+  app.Runtime.flush();
+
+  assertEqual(picker.Value, "proposal", "The third-party picker should update its value through the public property model.");
+  assertEqual(store.Get("stage"), "proposal", "BindValue should keep the store in sync for the third-party picker.");
+  assertEqual(picker._buttonNodes[1].className.indexOf("is-selected") >= 0, true, "The selected third-party picker button should render its active style.");
+
+  store.Set("stageError", "Pick a valid stage");
+  assertEqual(picker.Invalid, true, "The third-party picker should participate in the shared validation contract.");
+  assertEqual(picker.ErrorText, "Pick a valid stage", "BindError should flow error text into the third-party picker.");
+
+  dispatchNodeKeyDown(picker._buttonNodes[1], "ArrowRight");
+  app.Runtime.flush();
+  assertEqual(picker.Value, "negotiation", "Arrow navigation should move keyboard selection through the third-party picker.");
+  assertEqual(store.Get("stage"), "negotiation", "Keyboard navigation should keep bound store state in sync.");
+  assertEqual(picker._buttonNodes[2].attributes["aria-checked"], "true", "Keyboard selection should update the exposed checked state.");
+  assertEqual(app.Runtime.document.activeElement, picker._buttonNodes[2], "Keyboard navigation should restore focus onto the newly selected third-party picker option after rerender.");
+
+  dispatchNodeKeyDown(picker._buttonNodes[2], "ArrowLeft");
+  app.Runtime.flush();
+  assertEqual(picker.Value, "proposal", "Arrow navigation should continue working after the control rerenders.");
+  assertEqual(app.Runtime.document.activeElement, picker._buttonNodes[1], "Repeated keyboard navigation should keep focus on the current option after rerender.");
+
+  dump = app.DumpTree({ detailed: true });
+  assert(dump.indexOf("AcmeJOG.TagPicker(thirdPartyPicker)") >= 0, "Tree dump should use registered third-party control names.");
+  assert(dump.indexOf("registered=AcmeJOG.TagPicker@1.0.0") >= 0, "Detailed tree dump should report registered control metadata.");
+}
+
+function testThirdPartyDialogUsesPublicWindowShellHooks() {
+  var sandbox = createJOGSandbox();
+  var JOG;
+  var AcmeJOG;
+  var app;
+  var page;
+  var dialog;
+  var message;
+  var events = [];
+  var shell;
+
+  loadScriptIntoSandbox(sandbox, "AcmeJOG.Controls.js");
+  JOG = sandbox.JOG;
+  AcmeJOG = sandbox.AcmeJOG;
+
+  app = new JOG.Application();
+  page = new JOG.Page();
+  dialog = new AcmeJOG.CommandPaletteDialog();
+  message = new JOG.Label();
+
+  dialog.Name = "thirdPartyDialog";
+  dialog.Title = "Review stage";
+  dialog.SubtitleText = "Built through the public Window extension surface.";
+  dialog.StatusText = "Board mode";
+  dialog.FooterNoteText = "Current stage: proposal";
+  dialog.ActionText = "Commit";
+  dialog.SetBounds(80, 40, 420, 240);
+  dialog.Hide();
+
+  message.Text = "Dialog body content should mount inside the custom child host.";
+  dialog.Add(message);
+  dialog.OnShow(function() {
+    events.push("show");
+  });
+  dialog.OnClose(function() {
+    events.push("close");
+  });
+  dialog.OnCommit(function(args) {
+    events.push("commit:" + args.Value);
+  });
+
+  page.Add(dialog);
+  app.Run(page);
+
+  shell = dialog.GetWindowShell();
+  assert(!!shell, "Third-party dialog should expose the stable window shell helper after mount.");
+  assertEqual(shell.content.className.indexOf("acme-command-dialog-content") >= 0, true, "Third-party dialog should customize the built-in window content shell.");
+  assert(message._domNode.parentNode === dialog._bodyNode, "Third-party dialog children should mount inside the custom body host.");
+
+  dialog.ShowModal();
+  app.Runtime.flush();
+
+  assertEqual(events[0], "show", "Showing the third-party dialog should raise the inherited show lifecycle event.");
+  assertEqual(app.Runtime._modalWindows.length, 1, "Third-party dialog should participate in the shared modal stack.");
+  assertEqual(dialog.Visible, true, "ShowModal should make the third-party dialog visible.");
+  assertEqual(shell.title.textContent, "Review stage", "Third-party dialog should reuse the built-in title node through the public shell helper.");
+  assertEqual(dialog._statusNode.textContent, "Board mode", "Third-party dialog should apply its custom shell state.");
+
+  dispatchNodeClick(dialog._actionButton);
+  app.Runtime.flush();
+  assertEqual(events[1], "commit:Commit", "Third-party dialog action button should raise its custom event through the public event helpers.");
+
+  dispatchNodeKeyDown(dialog._domNode, "Escape");
+  app.Runtime.flush();
+  assertEqual(dialog.Visible, false, "Escape should close the third-party dialog through the inherited window behavior.");
+  assertEqual(events[2], "close", "Closing the third-party dialog should raise the inherited close lifecycle event.");
+  assertEqual(app.Runtime._modalWindows.length, 0, "Closing the third-party dialog should clear the shared modal stack.");
+}
+
+function testThirdPartyControlErrorsReportPackageDiagnosticsClearly() {
+  var sandbox = createJOGSandbox({
+    console: {
+      log: function() {},
+      error: function(message) {
+        capturedErrors.push(String(message));
+      }
+    }
+  });
+  var capturedErrors = [];
+  var JOG;
+  var AcmeJOG;
+  var app;
+  var page;
+  var picker;
+  var thrown = null;
+
+  loadScriptIntoSandbox(sandbox, "AcmeJOG.Controls.js");
+  JOG = sandbox.JOG;
+  AcmeJOG = sandbox.AcmeJOG;
+
+  app = new JOG.Application();
+  page = new JOG.Page();
+  picker = new AcmeJOG.TagPicker();
+
+  picker.Items = ["qualified"];
+  picker.OnChange(function() {
+    throw new Error("Third-party boom");
+  });
+
+  page.Add(picker);
+  app.Run(page);
+
+  try {
+    dispatchNodeClick(picker._buttonNodes[0]);
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert(!!thrown, "Third-party event errors should still throw.");
+  assertEqual(thrown.message, "Third-party boom", "Third-party event errors should preserve the original message.");
+  assertEqual(capturedErrors.length, 1, "Third-party event errors should produce one formatted runtime error.");
+  assert(capturedErrors[0].indexOf("Control: AcmeJOG.TagPicker") >= 0, "Formatted third-party error output should include the registered control name.");
+  assert(capturedErrors[0].indexOf("Package: AcmeJOG@1.0.0") >= 0, "Formatted third-party error output should include the package version.");
+}
+
+function testMultipleThirdPartyPackagesRegisterAndCoexistCleanly() {
+  var sandbox = createJOGSandbox();
+  var JOG;
+  var AcmeJOG;
+  var BeaconJOG;
+  var app;
+  var page;
+  var store;
+  var picker;
+  var viewSwitch;
+  var metricCard;
+  var accessoryLabel;
+  var dump;
+
+  loadScriptIntoSandbox(sandbox, "AcmeJOG.Controls.js");
+  loadScriptIntoSandbox(sandbox, "BeaconJOG.Controls.js");
+  JOG = sandbox.JOG;
+  AcmeJOG = sandbox.AcmeJOG;
+  BeaconJOG = sandbox.BeaconJOG;
+
+  assertEqual(JOG.ListRegisteredControls().length, 5, "Two third-party packages should register five controls side by side.");
+  assertEqual(JOG.GetRegisteredControl("BeaconJOG.ViewSwitch").metadata.baseType, "Control", "BeaconJOG.ViewSwitch should register as a Control.");
+  assertEqual(JOG.GetRegisteredControl("BeaconJOG.ViewSwitch").metadata.capabilities.supportsKeyboard, true, "BeaconJOG.ViewSwitch should advertise keyboard support.");
+  assertEqual(JOG.GetRegisteredControl("BeaconJOG.MetricCard").metadata.baseType, "Container", "BeaconJOG.MetricCard should register as a Container.");
+  assert(JOG.DumpRegisteredControls().indexOf("BeaconJOG.ViewSwitch@1.0.0") >= 0, "The registry dump should include the second package.");
+
+  app = new JOG.Application();
+  page = new JOG.Page();
+  store = new JOG.Store({ stage: "qualified", view: "overview" });
+  picker = new AcmeJOG.TagPicker();
+  viewSwitch = new BeaconJOG.ViewSwitch();
+  metricCard = new BeaconJOG.MetricCard();
+  accessoryLabel = new JOG.Label();
+
+  picker.Items = ["qualified", "proposal", "negotiation"];
+  picker.BindValue(store, "stage");
+
+  viewSwitch.Name = "beaconViewSwitch";
+  viewSwitch.Items = [
+    { value: "overview", text: "Overview" },
+    { value: "board", text: "Board" },
+    { value: "audit", text: "Audit", enabled: false }
+  ];
+  viewSwitch.BindValue(store, "view");
+
+  metricCard.Name = "beaconMetricCard";
+  metricCard.EyebrowText = "Beacon";
+  metricCard.ValueText = "overview";
+  metricCard.DetailText = "Overview mode";
+  metricCard.FooterText = "Composed from core JOG controls.";
+  accessoryLabel.Text = "Stage: qualified";
+  metricCard.SetAccessory(accessoryLabel);
+
+  viewSwitch.OnChange(function(args) {
+    metricCard.ValueText = args.Value;
+    metricCard.DetailText = "Current view: " + args.Value;
+    accessoryLabel.Text = "Stage: " + store.Get("stage");
+  });
+
+  page.Add(picker);
+  page.Add(viewSwitch);
+  page.Add(metricCard);
+  app.Run(page);
+
+  assertEqual(viewSwitch._buttonNodes.length, 3, "The second package primitive control should render all configured options.");
+  assertEqual(viewSwitch._domNode.attributes.role, "radiogroup", "BeaconJOG.ViewSwitch should expose radiogroup semantics.");
+  assertEqual(viewSwitch._buttonNodes[2].disabled, true, "BeaconJOG.ViewSwitch should honor disabled items.");
+  assert(accessoryLabel._domNode.parentNode === metricCard._accessoryHost._domNode, "BeaconJOG.MetricCard should host its accessory through the named slot container.");
+  assertEqual(accessoryLabel._domNode.style.position, "", "BeaconJOG.MetricCard accessory content should participate in flow layout instead of absolute overlap.");
+
+  dispatchNodeKeyDown(viewSwitch._buttonNodes[0], "ArrowRight");
+  app.Runtime.flush();
+  assertEqual(viewSwitch.Value, "board", "BeaconJOG.ViewSwitch should advance keyboard selection to the next enabled item.");
+  assertEqual(store.Get("view"), "board", "BeaconJOG.ViewSwitch keyboard selection should keep store state in sync.");
+  assertEqual(metricCard.ValueText, "board", "BeaconJOG.MetricCard should reflect view-switch changes through public properties.");
+  assertEqual(app.Runtime.document.activeElement, viewSwitch._buttonNodes[1], "BeaconJOG.ViewSwitch should restore focus after rerender.");
+
+  dispatchNodeKeyDown(viewSwitch._buttonNodes[1], "ArrowRight");
+  app.Runtime.flush();
+  assertEqual(viewSwitch.Value, "overview", "BeaconJOG.ViewSwitch should skip disabled items and wrap to the next enabled option.");
+  assertEqual(app.Runtime.document.activeElement, viewSwitch._buttonNodes[0], "Focus should follow the wrapped enabled option.");
+
+  dispatchNodeClick(picker._buttonNodes[2]);
+  app.Runtime.flush();
+  dispatchNodeKeyDown(viewSwitch._buttonNodes[0], "End");
+  app.Runtime.flush();
+  assertEqual(viewSwitch.Value, "board", "End should land on the last enabled item when the last configured option is disabled.");
+  assertEqual(accessoryLabel.Text, "Stage: negotiation", "The second package composite should stay in sync alongside the first package primitive control.");
+
+  dump = app.DumpTree({ detailed: true });
+  assert(dump.indexOf("BeaconJOG.ViewSwitch(beaconViewSwitch)") >= 0, "Tree dump should include the second package primitive control.");
+  assert(dump.indexOf("BeaconJOG.MetricCard(beaconMetricCard)") >= 0, "Tree dump should include the second package composite control.");
 }
 
 function testGridSupportsNamedAreasAndAutoRows() {
@@ -1679,6 +2082,101 @@ function testModalWindowsShareOverlayAndCloseInStackOrder() {
 
   assertEqual(app.Runtime._activeModalOverlay, null, "Closing the last modal should remove overlay.");
   assertEqual(app.Runtime._modalWindows.length, 0, "Closing the last modal should clear modal stack.");
+}
+
+function testModalFocusTrapCyclesAndRestoresFocus() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var launchButton = new JOG.Button();
+  var dialog = new JOG.Dialog();
+  var body = new JOG.StackPanel();
+  var firstButton = new JOG.Button();
+  var secondButton = new JOG.Button();
+
+  launchButton.Text = "Launch";
+  dialog.Name = "focusTrapDialog";
+  dialog.Title = "Focus trap";
+  dialog.SetBounds(40, 40, 320, 220);
+  dialog.Hide();
+
+  body.Orientation = "vertical";
+  body.Spacing = 10;
+  firstButton.Text = "First action";
+  secondButton.Text = "Second action";
+  body.Add(firstButton);
+  body.Add(secondButton);
+  dialog.Add(body);
+
+  page.Add(launchButton);
+  page.Add(dialog);
+  app.Run(page);
+
+  launchButton._domNode.focus();
+  assertEqual(app.Runtime.document.activeElement, launchButton._domNode, "Test should start with focus on the launch button.");
+
+  dialog.ShowModal();
+  app.Runtime.flush();
+
+  assertEqual(app.Runtime.document.activeElement, firstButton._domNode, "Opening a modal should move focus to the first focusable control inside the dialog.");
+
+  dispatchNodeKeyDown(dialog._domNode, "Tab");
+  assertEqual(app.Runtime.document.activeElement, secondButton._domNode, "Tab should advance focus within the modal body.");
+
+  dispatchNodeKeyDown(dialog._domNode, "Tab");
+  assertEqual(app.Runtime.document.activeElement, dialog._closeNode, "Tab should continue to the dialog chrome after body controls.");
+
+  dispatchNodeKeyDown(dialog._domNode, "Tab");
+  assertEqual(app.Runtime.document.activeElement, firstButton._domNode, "Tab should wrap to the first modal control instead of escaping the dialog.");
+
+  dispatchNodeKeyDown(dialog._domNode, "Tab", { shiftKey: true });
+  assertEqual(app.Runtime.document.activeElement, dialog._closeNode, "Shift+Tab should wrap backward inside the modal.");
+
+  dialog.Close();
+  app.Runtime.flush();
+  assertEqual(app.Runtime.document.activeElement, launchButton._domNode, "Closing the last modal should restore focus to the previously focused element.");
+}
+
+function testNestedModalsRestoreFocusToUnderlyingDialog() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var first = new JOG.Dialog();
+  var second = new JOG.Dialog();
+  var firstBody = new JOG.StackPanel();
+  var firstAction = new JOG.Button();
+  var secondBody = new JOG.StackPanel();
+  var secondAction = new JOG.Button();
+
+  first.Hide();
+  second.Hide();
+  first.Title = "First";
+  second.Title = "Second";
+  first.SetBounds(20, 20, 320, 180);
+  second.SetBounds(60, 60, 320, 180);
+
+  firstBody.Add(firstAction);
+  secondBody.Add(secondAction);
+  firstAction.Text = "Underlying";
+  secondAction.Text = "Top";
+  first.Add(firstBody);
+  second.Add(secondBody);
+
+  page.Add(first);
+  page.Add(second);
+  app.Run(page);
+
+  first.ShowModal();
+  app.Runtime.flush();
+  firstAction._domNode.focus();
+
+  second.ShowModal();
+  app.Runtime.flush();
+  assertEqual(app.Runtime.document.activeElement, secondAction._domNode, "Top modal should take focus when it opens.");
+
+  second.Close();
+  app.Runtime.flush();
+  assertEqual(app.Runtime.document.activeElement, firstAction._domNode, "Closing the top modal should restore focus to the underlying dialog.");
 }
 
 function testWindowLifecycleEventsTrackLoadShowAndHide() {
@@ -2671,6 +3169,12 @@ var tests = [
   { name: "ValidationSummary can build summary from error keys", fn: testValidationSummaryCanBuildSummaryFromErrorKeys },
   { name: "application tree dump reports hierarchy", fn: testApplicationDumpTree },
   { name: "application detailed tree dump shows richer state", fn: testApplicationDetailedDumpTreeShowsRicherState },
+  { name: "third-party control registration supports metadata lookup and version checks", fn: testThirdPartyControlRegistrationSupportsMetadataLookupAndVersionChecks },
+  { name: "third-party control registration rejects duplicates and incompatible versions", fn: testThirdPartyControlRegistrationRejectsDuplicatesAndIncompatibleVersions },
+  { name: "sample third-party controls register render and bind without private runtime access", fn: testSampleThirdPartyControlsRegisterRenderAndBindWithoutPrivateRuntimeAccess },
+  { name: "third-party dialog uses public window shell hooks", fn: testThirdPartyDialogUsesPublicWindowShellHooks },
+  { name: "third-party control errors report package diagnostics clearly", fn: testThirdPartyControlErrorsReportPackageDiagnosticsClearly },
+  { name: "multiple third-party packages register and coexist cleanly", fn: testMultipleThirdPartyPackagesRegisterAndCoexistCleanly },
   { name: "Grid supports named areas and auto rows", fn: testGridSupportsNamedAreasAndAutoRows },
   { name: "Grid responsive breakpoints apply on mount and resize", fn: testGridResponsiveBreakpointsApplyOnMountAndResize },
   { name: "responsive dock and stack layouts apply on mount and resize", fn: testResponsiveDockAndStackLayoutsApplyOnMountAndResize },
@@ -2696,6 +3200,8 @@ var tests = [
   { name: "resizable window shows resize handle", fn: testResizableWindowShowsHandle },
   { name: "resizable window supports edge resize", fn: testResizableWindowSupportsEdgeResize },
   { name: "modal windows share overlay and close in stack order", fn: testModalWindowsShareOverlayAndCloseInStackOrder },
+  { name: "modal focus trap cycles and restores focus", fn: testModalFocusTrapCyclesAndRestoresFocus },
+  { name: "nested modals restore focus to underlying dialog", fn: testNestedModalsRestoreFocusToUnderlyingDialog },
   { name: "window lifecycle events track load show and hide", fn: testWindowLifecycleEventsTrackLoadShowAndHide },
   { name: "example app theme switching flow", fn: testExampleAppThemeSwitchingFlow },
   { name: "property setters normalize state", fn: testPropertySettersNormalizeState },

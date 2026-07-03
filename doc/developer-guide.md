@@ -34,6 +34,7 @@ Implemented public surface in `v2/JOG.js`:
 - event payload type: `EventArgs`
 - control-level validation state: `Invalid`, `ErrorText`, `SetError()`, `ClearError()`, `BindError()`, `ValidationMessage`, `ValidationSummary`
 - application diagnostics: `Debug`, `DumpTree()`, `LogTree()`
+- third-party extensibility: `JOG.Version`, `JOG.RegisterControl()`, `JOG.GetRegisteredControl()`, `JOG.ListRegisteredControls()`, `JOG.DumpRegisteredControls()`, `JOG.IsVersionCompatible()`, `JOG.RegisterStyleBlock()`, `JOG.DefineControlProperty()`
 
 Test entrypoint:
 
@@ -47,6 +48,7 @@ Example apps:
 - [v2/customer-admin.html](../v2/customer-admin.html)
 - [v2/form-demo.html](../v2/form-demo.html)
 - [v2/opportunity-board.html](../v2/opportunity-board.html)
+- [v2/third-party-demo.html](../v2/third-party-demo.html)
 
 Distribution build:
 
@@ -57,9 +59,9 @@ Distribution build:
 
 Third-party control extensibility status:
 
-- there is not yet a public runtime API for third-party control registration or extension
-- the proposed future model is documented in [third-party-control-spec.md](third-party-control-spec.md)
-- treat that specification as roadmap direction, not current implementation truth
+- JOG now exposes a first-pass public registration and extension surface for third-party controls
+- the current contract is implemented in `v2/JOG.js` and exercised by [AcmeJOG.Controls.js](../v2/AcmeJOG.Controls.js) plus [BeaconJOG.Controls.js](../v2/BeaconJOG.Controls.js)
+- the broader direction and remaining gaps are documented in [third-party-control-spec.md](third-party-control-spec.md)
 
 ## Application Model
 
@@ -225,6 +227,85 @@ Behavior implemented now:
 - both helpers return `null` on user cancel instead of treating cancel as an error
 
 This should stay narrow. The intent is to remove obvious browser DOM escape hatches from app code, not to turn JOG into a broad browser-services layer.
+
+## Third-Party Controls
+
+JOG now includes a first-pass public extension contract for third-party controls.
+
+Current public extension entrypoints:
+
+- `JOG.Version`
+- `JOG.RegisterControl(definition)`
+- `JOG.GetRegisteredControl(nameOrConstructor)`
+- `JOG.ListRegisteredControls()`
+- `JOG.DumpRegisteredControls()`
+- `JOG.IsVersionCompatible(range)`
+- `JOG.RegisterStyleBlock(name, cssText)`
+- `JOG.DefineControlProperty(target, propertyName, options)`
+
+Stable base-class hooks available to third-party authors:
+
+- `CreateDom(doc)`
+- `ApplyState(prevState, nextState)`
+- `BindDomEvents()`
+- `OnAttached()`
+- `OnDisposed()`
+- `GetChildHostNode()`
+- `RegisterEvent(name, listener)`
+- `RaiseEvent(name, originalEvent, extras)`
+- `GetStateValue(key)`
+- `SetStateValue(key, value)`
+- `MarkDirty()`
+- `TrackBinding(unsubscribe)`
+- `GetRegistration()`
+
+Window-specific helper available to third-party floating shells:
+
+- `GetWindowShell()`
+
+Registration shape implemented now:
+
+```js
+JOG.RegisterControl({
+  fullName: "AcmeJOG.TagPicker",
+  version: "1.0.0",
+  jogVersionRange: "^2.0.0",
+  constructor: TagPicker,
+  metadata: {
+    baseType: "Control",
+    properties: ["Items", "Value", "Placeholder"],
+    events: ["OnChange"],
+    methods: ["BindValue"],
+    capabilities: {
+      supportsValidation: true
+    }
+  }
+});
+```
+
+Behavior implemented now:
+
+- registration enforces unique full names
+- registration rejects unsupported JOG version ranges against `JOG.Version`
+- diagnostics and tree dumps use registered third-party full names
+- diagnostics include third-party package version information on runtime event and render failures
+- style blocks can be registered once per package through `JOG.RegisterStyleBlock()`
+- third-party controls can define plain properties without reaching into private runtime fields through `JOG.DefineControlProperty()`
+- the sample `AcmeJOG.TagPicker` now also demonstrates first-pass keyboard selection and radio-group accessibility semantics
+- `JOG.Window.GetWindowShell()` now gives third-party `Window` and `Dialog` subclasses a stable way to reuse the built-in chrome without reaching into private fields
+
+Current sample package:
+
+- [AcmeJOG.Controls.js](../v2/AcmeJOG.Controls.js) registers `AcmeJOG.TagPicker` as a primitive control and `AcmeJOG.InspectorCard` as a composite container with a custom child host
+- [AcmeJOG.Controls.js](../v2/AcmeJOG.Controls.js) also registers `AcmeJOG.CommandPaletteDialog` as a third-party dialog that reuses the built-in window shell through `GetWindowShell()`
+- [BeaconJOG.Controls.js](../v2/BeaconJOG.Controls.js) registers `BeaconJOG.ViewSwitch` as a second primitive control and `BeaconJOG.MetricCard` as a composite control built largely from existing JOG controls
+- [ThirdPartyDemoApp.js](../v2/ThirdPartyDemoApp.js) and [third-party-demo.html](../v2/third-party-demo.html) show both packages used side by side from outside `v2/JOG.js`
+
+Current limits:
+
+- the public extension contract is first-pass, not yet frozen as a long-term compatibility promise
+- the sample primitive control now proves first-pass keyboard interaction, but not yet deeper screen-reader validation across real browsers
+- there is not yet higher-level tooling for serialization, designers, or package discovery
 
 ## Control Model
 
@@ -587,6 +668,8 @@ Current behaviors:
 - absolute positioning
 - modal overlay support
 - stacked modal overlay support across multiple visible dialogs
+- modal focus trap that keeps `Tab` and `Shift+Tab` inside the top modal window
+- focus restoration to the previous control when the last modal closes, and back to the underlying dialog when nested modals unwind
 - draggable by title bar
 - close button
 - escape-to-close when enabled

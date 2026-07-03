@@ -6,6 +6,10 @@ This reference covers the implemented public API in [v2/JOG.js](../v2/JOG.js). I
 
 ## Application Types
 
+### `JOG.Version`
+
+Returns the current runtime version string used for third-party compatibility checks.
+
 ### `JOG.SetTheme(theme)`
 
 Sets the global default theme for JOG applications.
@@ -80,6 +84,81 @@ Notes:
 - `method` is currently `handle`, `picker`, or `download`
 - this helper is intentionally narrow and text-file-oriented
 
+### `JOG.RegisterControl(definition)`
+
+Registers a third-party JOG control.
+
+Required fields:
+
+- `fullName`
+- `version`
+- `jogVersionRange`
+- `constructor`
+- `metadata.baseType`
+
+Supported `metadata.baseType` values:
+
+- `Control`
+- `Container`
+- `Window`
+- `Dialog`
+
+Notes:
+
+- `fullName` must be unique across registered controls
+- duplicate registrations throw
+- `version` must be a semantic version such as `1.0.0`
+- `jogVersionRange` is validated against `JOG.Version`
+- supported range forms today are `*`, exact versions such as `2.0.0`, caret ranges such as `^2.0.0`, and comparator chains such as `>=2.0.0 <3.0.0`
+- registered metadata is used by diagnostics and tree dumps
+
+### `JOG.GetRegisteredControl(nameOrConstructor)`
+
+Returns one registered control definition by full name, unambiguous short name, or constructor.
+
+Notes:
+
+- returns `null` when no matching control exists
+- returns `null` for ambiguous short-name lookups
+
+### `JOG.ListRegisteredControls()`
+
+Returns an array of registered control definitions.
+
+### `JOG.DumpRegisteredControls()`
+
+Returns a newline-delimited diagnostic dump of registered third-party controls.
+
+### `JOG.IsVersionCompatible(range)`
+
+Returns `true` when `range` matches the current `JOG.Version`.
+
+### `JOG.RegisterStyleBlock(name, cssText)`
+
+Registers one package-scoped stylesheet block.
+
+Notes:
+
+- duplicate names are allowed only when the CSS text is identical
+- registered style blocks are injected during app startup and immediately when possible
+
+### `JOG.DefineControlProperty(target, propertyName, options)`
+
+Defines a plain property backed by the public control state helpers.
+
+Common options:
+
+- `stateKey`
+- `normalize`
+- `get`
+- `set`
+
+Notes:
+
+- intended for third-party control prototypes
+- the default getter reads `GetStateValue(stateKey)`
+- the default setter writes `SetStateValue(stateKey, value)`
+
 ### `JOG.Application`
 
 Methods:
@@ -108,7 +187,7 @@ Notes:
 - `Theme` accepts a partial theme object that overrides the global JOG theme for that application only
 - runtime render and event failures are logged with structured `[JOG][Error][...]` diagnostics before the original error is rethrown
 - `DumpTree()` returns a text representation of the current control tree
-- `DumpTree({ detailed: true })` includes richer control state such as text, title, docking, grid placement, validation state, and child counts when relevant
+- `DumpTree({ detailed: true })` includes richer control state such as text, title, docking, grid placement, validation state, child counts, and registered third-party package metadata when relevant
 - `LogTree()` writes that control tree to the console
 - `LogTree({ detailed: true })` writes the richer tree format to the console
 
@@ -355,6 +434,19 @@ Common methods:
 - `BindError(store, key)`
 - `BindVisible(store, key, transform)`
 - `BindEnabled(store, key, transform)`
+- `CreateDom(doc)`
+- `ApplyState(prevState, nextState)`
+- `BindDomEvents()`
+- `OnAttached()`
+- `OnDisposed()`
+- `GetChildHostNode()`
+- `RegisterEvent(name, listener)`
+- `RaiseEvent(name, originalEvent, extras)`
+- `GetStateValue(key)`
+- `SetStateValue(key, value)`
+- `MarkDirty()`
+- `TrackBinding(unsubscribe)`
+- `GetRegistration()`
 
 Notes:
 - `Fill` stretches ordinary flow-layout controls with flex and `100%` sizing when appropriate
@@ -374,6 +466,12 @@ Notes:
 - `BindError(store, key)` binds control error state to a store key whose value is an error string or empty
 - `BindVisible(store, key, transform)` binds control visibility to a store key, with an optional mapper
 - `BindEnabled(store, key, transform)` binds control enabled state to a store key, with an optional mapper
+- `CreateDom(doc)`, `ApplyState(prevState, nextState)`, `BindDomEvents()`, `OnAttached()`, `OnDisposed()`, and `GetChildHostNode()` are the public extension lifecycle hooks for third-party controls
+- `RegisterEvent(name, listener)` and `RaiseEvent(name, originalEvent, extras)` let third-party controls define and emit `OnX`-style events without binding to private runtime internals
+- `GetStateValue(key)` and `SetStateValue(key, value)` are the public state helpers for custom properties
+- `TrackBinding(unsubscribe)` lets third-party controls clean up custom subscriptions during disposal
+- `GetRegistration()` returns the registered third-party definition for that instance, or `null` for core controls
+- the sample `AcmeJOG.TagPicker` uses these hooks to implement a keyboard-accessible single-select control with `radiogroup` and `radio` semantics
 
 ### `JOG.Control`
 
@@ -892,6 +990,7 @@ Methods:
 - `ShowModal()`
 - `Close()`
 - `BringToFront()`
+- `GetWindowShell()`
 - `OnLoad(listener)`
 - `OnShow(listener)`
 - `OnHide(listener)`
@@ -903,9 +1002,12 @@ Notes:
 - resize behavior respects `MinWidth` and `MinHeight`
 - width defaults to `420px` if not set
 - visible modal windows share one overlay, which stays under the top modal and above lower modal windows
+- modal windows now trap `Tab` and `Shift+Tab` inside the top modal surface
+- closing the last modal restores focus to the previously focused control, and closing a nested modal restores focus to the underlying dialog when possible
 - `OnLoad(listener)` fires once after the window mounts
 - `OnShow(listener)` fires when the rendered window becomes visible, including the first visible mount
 - `OnHide(listener)` fires when the rendered window becomes hidden, but not for an initially hidden mount
+- `GetWindowShell()` returns the mounted built-in shell nodes `{ root, titleBar, title, closeButton, content, resizeHandle, resizeHandles }` for third-party `Window` and `Dialog` subclasses that want to customize the chrome without relying on private fields
 
 ### `JOG.Dialog`
 

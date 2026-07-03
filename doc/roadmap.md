@@ -39,6 +39,11 @@ That means the next phase is not broad control expansion for its own sake. The n
 - application diagnostics with debug logging and tree dump
 - public theme API with global and per-application token overrides
 - built-in theme presets for selected control types
+- first-pass public third-party control registration API through `JOG.RegisterControl()`
+- first-pass third-party compatibility checks against `JOG.Version`
+- first-pass public extension lifecycle hooks on `Component`, `Control`, `Container`, `Window`, and `Dialog`
+- package-scoped third-party style-block registration through `JOG.RegisterStyleBlock()`
+- registry inspection helpers through `JOG.GetRegisteredControl()`, `JOG.ListRegisteredControls()`, and `JOG.DumpRegisteredControls()`
 - narrow browser text file helpers through `JOG.Browser.OpenTextFile()` and `JOG.Browser.SaveTextFile()`
 - zero-dependency Node test runner for core runtime regression checks
 - minified browser distribution build at `dist/JOG.min.js`
@@ -160,11 +165,17 @@ That means the next phase is not broad control expansion for its own sake. The n
 - opportunity board shell now uses dock gap spacing instead of manual header and sidebar margin coordination
 - opportunity board now demonstrates responsive `SectionPanel` title and padding changes
 - opportunity board use of built-in theme presets
+- third-party controls demo with a registered primitive `AcmeJOG.TagPicker`
+- `AcmeJOG.TagPicker` now demonstrates first-pass keyboard selection and radio-group accessibility semantics
+- third-party controls demo with a registered composite `AcmeJOG.InspectorCard`
+- third-party dialog sample with `AcmeJOG.CommandPaletteDialog`, proving a custom floating shell through the public `Window` helper
+- third-party controls demo with a second package, including `BeaconJOG.ViewSwitch` and `BeaconJOG.MetricCard`
 
 ### Tests
 
 - Node test runner at `test/run-v2-tests.js`
-- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, dock-gap shell spacing, workspace-shell slot behavior, split, stack, section, and page-header behavior, browser text file helper flows, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
+- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, dock-gap shell spacing, workspace-shell slot behavior, split, stack, section, and page-header behavior, browser text file helper flows, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, third-party registration, third-party compatibility checks, third-party diagnostics, third-party primitive and composite sample controls, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
+- baseline coverage now also includes modal focus trap behavior and focus restoration across single and nested dialogs
 
 ## Partial
 
@@ -172,8 +183,6 @@ That means the next phase is not broad control expansion for its own sake. The n
 
 - modal stacking, drag, resize, and lifecycle hooks are working
 - window and dialog content panes now scroll internally when body content exceeds the available height
-- modal focus trap is not implemented yet
-- focus restoration after dialog close is not implemented yet
 - broader keyboard-first dialog behavior still needs hardening
 - the window system is usable, but not yet production-grade from an accessibility standpoint
 
@@ -211,7 +220,14 @@ That means the next phase is not broad control expansion for its own sake. The n
 - the runtime, examples, and current developer docs now center the authoring model around `new`, property assignment, `Add`, `OnX`, and `Application.Run(page)`
 - older rationale documents still contain outdated or broader examples, including `Click(listener)`-first guidance and older future-control framing
 - the public contract needs to be reconciled so contributors have one canonical programming model
-- a third-party control specification now exists in `doc/third-party-control-spec.md`, but the runtime does not yet expose a public extension API that implements it
+
+### Third-Party Extensibility
+
+- JOG now exposes a first-pass public extension contract through `JOG.RegisterControl()`, `JOG.RegisterStyleBlock()`, `JOG.DefineControlProperty()`, and public lifecycle hooks on the base classes
+- duplicate control registration and incompatible JOG version ranges are rejected cleanly
+- diagnostics and tree dumps now include registered third-party control names and package versions
+- the `AcmeJOG.Controls.js` and `BeaconJOG.Controls.js` sample packages now prove multiple primitive and composite third-party controls built outside `v2/JOG.js`
+- the sample primitive control now covers first-pass keyboard interaction, but richer accessibility coverage and broader package tooling still need hardening before the extension model should be treated as long-term stable
 
 ### Styling
 
@@ -261,7 +277,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 
 1. Shell and layout hardening
 2. DataGrid depth and behavior hardening
-3. Third-party control extensibility
+3. Third-party control hardening
 4. Accessibility and keyboard model
 5. Deeper shell-control behavior
 6. Browser-level interaction verification
@@ -279,15 +295,13 @@ That means the next phase is not broad control expansion for its own sake. The n
 - keep resized column widths in memory only for now, then later decide whether apps need hooks for saved views or per-user persistence
 - keep `TreeView` behind deeper `DataGrid` maturity unless a concrete app need pulls it forward
 
-### 3. Third-Party Control Extensibility
+### 3. Third-Party Control Hardening
 
-- implement a formal third-party control registration model instead of relying on runtime patching or private internals
-- define and document the supported extension contract for `Control`, `Container`, `Window`, and `Dialog`
-- expose documented extension lifecycle hooks so third-party controls do not need to bind to underscored runtime details
-- add control-package metadata and compatibility checks so JOG can reject duplicate or incompatible registrations cleanly
-- make diagnostics aware of registered third-party control names and package versions
-- prove the docs by building at least one real third-party control package outside the core runtime source using only the published third-party developer specification
-- feed anything awkward or missing from that proof build back into the runtime contract and the developer docs before calling the model stable
+- keep the new registration and lifecycle contract narrow, documented, and free of private-runtime leakage
+- harden the accessibility and keyboard quality bar for custom primitive controls before calling the contract stable
+- keep proving the docs with real third-party packages outside `v2/JOG.js`, not just one sample package
+- keep the new `GetWindowShell()` helper narrow and stable rather than opening broader DOM escape hatches for floating shells
+- add any missing metadata or diagnostics hooks that third-party authors uncover while building real packages
 
 ## Remaining From Initial Data Scope
 
@@ -296,8 +310,6 @@ That means the next phase is not broad control expansion for its own sake. The n
 
 ### 4. Accessibility And Keyboard Model
 
-- add modal focus trap
-- restore focus after dialog close
 - add keyboard navigation for `MenuBar`
 - add keyboard navigation for `TabControl`
 - review control labeling and semantics
