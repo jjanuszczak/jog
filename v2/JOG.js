@@ -2,10 +2,15 @@
   "use strict";
 
   var JOG = {};
+  var JOG_RUNTIME_VERSION = "2.0.0";
 
   var nextControlId = 0;
   var runningApplications = [];
   var hiddenFilePickerInput = null;
+  var registeredControlsByFullName = {};
+  var registeredControlOrder = [];
+  var registeredStyleBlocksByName = {};
+  var registeredStyleBlockOrder = [];
   var responsiveBreakpointOrder = ["base", "sm", "md", "lg", "xl"];
   var responsiveBreakpointMinWidths = {
     base: 0,
@@ -92,6 +97,28 @@
 
   function isPlainObject(value) {
     return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function deepCloneValue(value) {
+    var copy;
+    var key;
+
+    if (Array.isArray(value)) {
+      return value.map(function(item) {
+        return deepCloneValue(item);
+      });
+    }
+    if (!isPlainObject(value)) {
+      return value;
+    }
+
+    copy = {};
+    for (key in value) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        copy[key] = deepCloneValue(value[key]);
+      }
+    }
+    return copy;
   }
 
   function cloneResponsiveConfig(value, normalizer) {
@@ -888,10 +915,15 @@
   }
 
   function controlDebugName(control) {
+    var registration;
+    var typeName;
+
     if (!control || !control._state) {
       return "Unknown";
     }
-    return control._typeName + "(" + (control._state.name || control._state.id) + ")";
+    registration = getControlRegistrationForInstance(control);
+    typeName = registration ? registration.fullName : control._typeName;
+    return typeName + "(" + (control._state.name || control._state.id) + ")";
   }
 
   function normalizeTreeDumpOptions(options) {
@@ -906,8 +938,56 @@
     };
   }
 
+  function nodeContains(parentNode, childNode) {
+    var current = childNode;
+    while (current) {
+      if (current === parentNode) {
+        return true;
+      }
+      current = current.parentNode;
+    }
+    return false;
+  }
+
+  function isFocusableNode(node) {
+    var tagName;
+    var tabIndex;
+
+    if (!node || node.disabled || !node.style || node.style.display === "none") {
+      return false;
+    }
+
+    tagName = node.tagName || "";
+    if (tagName === "BUTTON" || tagName === "INPUT" || tagName === "SELECT" || tagName === "TEXTAREA") {
+      return true;
+    }
+
+    if (node.attributes && node.attributes.tabindex != null) {
+      tabIndex = parseInt(node.attributes.tabindex, 10);
+      return !isNaN(tabIndex) && tabIndex >= 0;
+    }
+
+    return isNumber(node.tabIndex) && node.tabIndex >= 0;
+  }
+
+  function collectFocusableNodes(rootNode, results, seen) {
+    if (!rootNode || !results || !rootNode.style || rootNode.style.display === "none") {
+      return;
+    }
+
+    if (isFocusableNode(rootNode) && !seen.has(rootNode)) {
+      seen.add(rootNode);
+      results.push(rootNode);
+    }
+
+    ensureArray(rootNode.children).forEach(function(child) {
+      collectFocusableNodes(child, results, seen);
+    });
+  }
+
   function appendDetailedTreeSummary(summary, control, state) {
     var children = ensureArray(control._children);
+    var registration = getControlRegistrationForInstance(control);
 
     if (state.text) {
       summary.push('text="' + state.text + '"');
@@ -938,6 +1018,9 @@
     }
     if (children.length) {
       summary.push("children=" + children.length);
+    }
+    if (registration) {
+      summary.push("registered=" + registration.fullName + "@" + registration.version);
     }
   }
 
@@ -992,6 +1075,283 @@
     this.RowIndex = extras.RowIndex;
     this.SortKey = extras.SortKey;
     this.SortDirection = extras.SortDirection;
+  }
+
+  function parseVersionString(value) {
+    var text = String(value == null ? "" : value).trim();
+    var match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(text);
+
+    if (!match) {
+      return null;
+    }
+
+    return {
+      major: parseInt(match[1], 10),
+      minor: parseInt(match[2], 10),
+      patch: parseInt(match[3], 10)
+    };
+  }
+
+  function compareVersions(left, right) {
+    if (left.major !== right.major) {
+      return left.major - right.major;
+    }
+    if (left.minor !== right.minor) {
+      return left.minor - right.minor;
+    }
+    return left.patch - right.patch;
+  }
+
+  function versionSatisfiesComparator(parsedVersion, token) {
+    var operator = null;
+    var targetText = String(token || "").trim();
+    var targetVersion;
+    var prefixes = [">=", "<=", ">", "<", "="];
+    var i;
+
+    for (i = 0; i < prefixes.length; i += 1) {
+      if (targetText.indexOf(prefixes[i]) === 0) {
+        operator = prefixes[i];
+        targetText = targetText.slice(prefixes[i].length).trim();
+        break;
+      }
+    }
+
+    targetVersion = parseVersionString(targetText);
+    if (!targetVersion) {
+      return false;
+    }
+
+    if (!operator || operator === "=") {
+      return compareVersions(parsedVersion, targetVersion) === 0;
+    }
+    if (operator === ">") {
+      return compareVersions(parsedVersion, targetVersion) > 0;
+    }
+    if (operator === ">=") {
+      return compareVersions(parsedVersion, targetVersion) >= 0;
+    }
+    if (operator === "<") {
+      return compareVersions(parsedVersion, targetVersion) < 0;
+    }
+    if (operator === "<=") {
+      return compareVersions(parsedVersion, targetVersion) <= 0;
+    }
+
+    return false;
+  }
+
+  function versionSatisfiesRange(version, range) {
+    var parsedVersion = parseVersionString(version);
+    var trimmed = String(range == null ? "*" : range).trim();
+    var caretTarget;
+    var lowerBound;
+    var upperBound;
+    var tokens;
+
+    if (!parsedVersion) {
+      return false;
+    }
+    if (!trimmed || trimmed === "*") {
+      return true;
+    }
+    if (trimmed.indexOf("^") === 0) {
+      caretTarget = parseVersionString(trimmed.slice(1));
+      if (!caretTarget) {
+        return false;
+      }
+      lowerBound = caretTarget;
+      upperBound = {
+        major: caretTarget.major + 1,
+        minor: 0,
+        patch: 0
+      };
+      return compareVersions(parsedVersion, lowerBound) >= 0 && compareVersions(parsedVersion, upperBound) < 0;
+    }
+
+    tokens = trimmed.split(/\s+/).filter(function(token) {
+      return !!token;
+    });
+    if (!tokens.length) {
+      return true;
+    }
+
+    return tokens.every(function(token) {
+      return versionSatisfiesComparator(parsedVersion, token);
+    });
+  }
+
+  function normalizeRegisteredBaseTypeName(value) {
+    var text = String(value == null ? "" : value).trim();
+
+    if (text === "Control" || text === "Container" || text === "Window" || text === "Dialog") {
+      return text;
+    }
+
+    return "";
+  }
+
+  function inferRegisteredBaseTypeName(constructor) {
+    if (!constructor || !constructor.prototype) {
+      return "";
+    }
+    if (constructor.prototype instanceof Dialog) {
+      return "Dialog";
+    }
+    if (constructor.prototype instanceof Window) {
+      return "Window";
+    }
+    if (constructor.prototype instanceof Container) {
+      return "Container";
+    }
+    if (constructor.prototype instanceof Control) {
+      return "Control";
+    }
+    return "";
+  }
+
+  function constructorMatchesRegisteredBaseType(constructor, baseType) {
+    if (!constructor || !constructor.prototype) {
+      return false;
+    }
+    if (baseType === "Dialog") {
+      return constructor === Dialog || constructor.prototype instanceof Dialog;
+    }
+    if (baseType === "Window") {
+      return constructor === Window || constructor.prototype instanceof Window;
+    }
+    if (baseType === "Container") {
+      return constructor === Container || constructor.prototype instanceof Container;
+    }
+    if (baseType === "Control") {
+      return constructor === Control || constructor.prototype instanceof Control;
+    }
+    return false;
+  }
+
+  function cloneControlRegistration(registration) {
+    if (!registration) {
+      return null;
+    }
+
+    return {
+      fullName: registration.fullName,
+      shortName: registration.shortName,
+      packageName: registration.packageName,
+      version: registration.version,
+      jogVersionRange: registration.jogVersionRange,
+      constructor: registration.constructor,
+      metadata: deepCloneValue(registration.metadata)
+    };
+  }
+
+  function getControlRegistration(nameOrConstructor) {
+    var registration;
+    var matches;
+    var i;
+
+    if (!nameOrConstructor) {
+      return null;
+    }
+
+    if (typeof nameOrConstructor === "function") {
+      for (i = 0; i < registeredControlOrder.length; i += 1) {
+        if (registeredControlOrder[i].constructor === nameOrConstructor) {
+          return registeredControlOrder[i];
+        }
+      }
+      return null;
+    }
+
+    registration = registeredControlsByFullName[String(nameOrConstructor)];
+    if (registration) {
+      return registration;
+    }
+
+    matches = registeredControlOrder.filter(function(entry) {
+      return entry.shortName === nameOrConstructor;
+    });
+
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  function getControlRegistrationForInstance(control) {
+    if (!control || !control.constructor) {
+      return null;
+    }
+    return getControlRegistration(control.constructor);
+  }
+
+  function buildControlRegistration(definition) {
+    var metadata;
+    var fullName;
+    var version;
+    var jogVersionRange;
+    var constructor = definition.constructor;
+    var baseType;
+    var nameParts;
+
+    invariant(!!definition && typeof definition === "object", "JOG.RegisterControl requires a registration object.");
+    invariant(typeof constructor === "function", "JOG.RegisterControl requires a constructor function.");
+
+    fullName = String(definition.fullName == null ? "" : definition.fullName).trim();
+    invariant(fullName.length > 0, "JOG.RegisterControl requires a fullName.");
+    invariant(registeredControlsByFullName[fullName] == null, "Control already registered: " + fullName);
+
+    version = String(definition.version == null ? "" : definition.version).trim();
+    invariant(!!parseVersionString(version), "JOG.RegisterControl requires a semantic version such as 1.0.0.");
+
+    jogVersionRange = String(definition.jogVersionRange == null ? "*" : definition.jogVersionRange).trim();
+    invariant(versionSatisfiesRange(JOG_RUNTIME_VERSION, jogVersionRange), "Control " + fullName + " targets unsupported JOG version range " + jogVersionRange + " for runtime " + JOG_RUNTIME_VERSION + ".");
+
+    metadata = deepCloneValue(definition.metadata || {});
+    nameParts = fullName.split(".");
+    baseType = normalizeRegisteredBaseTypeName(metadata.baseType || inferRegisteredBaseTypeName(constructor));
+    invariant(!!baseType, "JOG.RegisterControl requires metadata.baseType or a constructor that extends JOG.Control, JOG.Container, JOG.Window, or JOG.Dialog.");
+    invariant(constructorMatchesRegisteredBaseType(constructor, baseType), "Control " + fullName + " does not extend the declared base type " + baseType + ".");
+
+    metadata.fullName = fullName;
+    metadata.shortName = metadata.shortName || nameParts[nameParts.length - 1];
+    metadata.packageName = metadata.packageName || (nameParts.length > 1 ? nameParts.slice(0, -1).join(".") : fullName);
+    metadata.packageVersion = metadata.packageVersion || version;
+    metadata.jogVersionRange = metadata.jogVersionRange || jogVersionRange;
+    metadata.baseType = baseType;
+    metadata.properties = ensureArray(metadata.properties).slice();
+    metadata.events = ensureArray(metadata.events).slice();
+    metadata.methods = ensureArray(metadata.methods).slice();
+    metadata.themePresets = ensureArray(metadata.themePresets).slice();
+    metadata.capabilities = isPlainObject(metadata.capabilities) ? deepCloneValue(metadata.capabilities) : {};
+
+    return {
+      fullName: fullName,
+      shortName: metadata.shortName,
+      packageName: metadata.packageName,
+      version: version,
+      jogVersionRange: jogVersionRange,
+      constructor: constructor,
+      metadata: metadata
+    };
+  }
+
+  function injectRegisteredStyleBlock(doc, block) {
+    var style;
+
+    if (!doc || !doc.head || !block || block._styleNode) {
+      return;
+    }
+
+    style = doc.createElement("style");
+    style.type = "text/css";
+    style.setAttribute("data-jog-style-block", block.name);
+    style.textContent = block.cssText;
+    doc.head.appendChild(style);
+    block._styleNode = style;
+  }
+
+  function injectRegisteredStyleBlocks(doc) {
+    registeredStyleBlockOrder.forEach(function(block) {
+      injectRegisteredStyleBlock(doc, block);
+    });
   }
 
   function normalizeDebugTopics(value) {
@@ -1693,6 +2053,7 @@
   Runtime.prototype.reportError = function(phase, error, details) {
     var message;
     var lines;
+    var registration;
 
     if (!global.console || typeof global.console.error !== "function") {
       return;
@@ -1703,6 +2064,10 @@
 
     if (details.control) {
       lines.push("Control: " + controlDebugName(details.control));
+      registration = getControlRegistrationForInstance(details.control);
+      if (registration) {
+        lines.push("Package: " + registration.packageName + "@" + registration.version);
+      }
     }
 
     if (details.eventName) {
@@ -1779,9 +2144,103 @@
     this.syncModalOverlay();
   };
 
+  Runtime.prototype._getTopModalWindow = function() {
+    var topModal = null;
+    var topZIndex = -1;
+
+    this._modalWindows.forEach(function(windowControl) {
+      var zIndex = windowControl && windowControl._windowZIndex ? windowControl._windowZIndex : 0;
+      if (!windowControl || !windowControl._domNode || windowControl._lifecycle === "Disposed" || !windowControl.Visible || !windowControl.Modal) {
+        return;
+      }
+      if (zIndex >= topZIndex) {
+        topModal = windowControl;
+        topZIndex = zIndex;
+      }
+    });
+
+    return topModal;
+  };
+
+  Runtime.prototype._getModalFocusableNodes = function(windowControl) {
+    var nodes = [];
+    var seen = new Set();
+
+    if (!windowControl || !windowControl._domNode) {
+      return nodes;
+    }
+
+    collectFocusableNodes(windowControl._contentNode, nodes, seen);
+    collectFocusableNodes(windowControl._titleBarNode, nodes, seen);
+    return nodes;
+  };
+
+  Runtime.prototype.enforceModalFocus = function(windowControl) {
+    var topModal = windowControl || this._getTopModalWindow();
+    var activeElement;
+    var focusables;
+
+    if (!topModal || !topModal._domNode || !this.document) {
+      return;
+    }
+
+    activeElement = this.document.activeElement;
+    if (activeElement && nodeContains(topModal._domNode, activeElement)) {
+      return;
+    }
+
+    focusables = this._getModalFocusableNodes(topModal);
+    if (focusables.length) {
+      focusables[0].focus();
+      return;
+    }
+
+    if (typeof topModal._domNode.focus === "function") {
+      topModal._domNode.focus();
+    }
+  };
+
+  Runtime.prototype.trapModalTab = function(windowControl, event) {
+    var topModal = this._getTopModalWindow();
+    var focusables;
+    var activeElement;
+    var currentIndex;
+    var nextIndex;
+
+    if (!event || event.key !== "Tab" || !topModal || topModal !== windowControl) {
+      return false;
+    }
+
+    focusables = this._getModalFocusableNodes(topModal);
+    if (!focusables.length) {
+      this.enforceModalFocus(topModal);
+      if (typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      return true;
+    }
+
+    activeElement = this.document ? this.document.activeElement : null;
+    currentIndex = focusables.indexOf(activeElement);
+    if (currentIndex < 0) {
+      nextIndex = event.shiftKey ? (focusables.length - 1) : 0;
+    } else {
+      nextIndex = (currentIndex + (event.shiftKey ? -1 : 1) + focusables.length) % focusables.length;
+    }
+
+    focusables[nextIndex].focus();
+    if (typeof event.preventDefault === "function") {
+      event.preventDefault();
+    }
+    return true;
+  };
+
   Runtime.prototype.updateModalWindow = function(windowControl, forceVisible) {
     var isVisible = forceVisible;
     var index;
+    var previousTopModal;
+    var removedWindow = null;
+    var nextTopModal;
 
     if (!windowControl) {
       this.syncModalOverlay();
@@ -1792,17 +2251,41 @@
       isVisible = !!(windowControl.Modal && windowControl.Visible && windowControl._lifecycle !== "Disposed");
     }
 
+    previousTopModal = this._getTopModalWindow();
     index = this._modalWindows.indexOf(windowControl);
 
     if (isVisible) {
       if (index < 0) {
+        windowControl._focusReturnNode = this.document ? this.document.activeElement : null;
         this._modalWindows.push(windowControl);
       }
     } else if (index >= 0) {
+      removedWindow = windowControl;
       this._modalWindows.splice(index, 1);
     }
 
     this.syncModalOverlay();
+
+    nextTopModal = this._getTopModalWindow();
+    if (nextTopModal) {
+      if (
+        removedWindow &&
+        removedWindow._focusReturnNode &&
+        nodeContains(nextTopModal._domNode, removedWindow._focusReturnNode) &&
+        typeof removedWindow._focusReturnNode.focus === "function"
+      ) {
+        removedWindow._focusReturnNode.focus();
+        return;
+      }
+      if (isVisible || previousTopModal !== nextTopModal || !this.document || !nodeContains(nextTopModal._domNode, this.document.activeElement)) {
+        this.enforceModalFocus(nextTopModal);
+      }
+      return;
+    }
+
+    if (removedWindow && removedWindow._focusReturnNode && typeof removedWindow._focusReturnNode.focus === "function") {
+      removedWindow._focusReturnNode.focus();
+    }
   };
 
   Runtime.prototype.syncModalOverlay = function() {
@@ -2031,6 +2514,7 @@
       ".jog-modal-overlay { position: fixed; inset: 0; background: var(--jog-overlay); z-index: 1000; }"
     ].join("\n");
     document.head.appendChild(style);
+    injectRegisteredStyleBlocks(document);
     this._stylesInjected = true;
   };
 
@@ -2116,7 +2600,7 @@
     }
     this._runtime.debugLog("Lifecycle", "Render " + controlDebugName(this));
     this._ensureMounted();
-    this._applyStateToDom(this._previousState, this._state);
+    this.ApplyState(this._previousState, this._state);
     this._previousState = cloneState(this._state);
   };
 
@@ -2128,10 +2612,11 @@
     if (!host) {
       return;
     }
-    this._domNode = this._createDomNode(this._runtime.document);
+    this._domNode = this.CreateDom(this._runtime.document);
     host.appendChild(this._domNode);
-    this._bindDomEvents();
+    this.BindDomEvents();
     this._lifecycle = this._state.visible ? "Shown" : "Hidden";
+    this.OnAttached();
     this._runtime.debugLog("Lifecycle", "Mounted " + controlDebugName(this));
   };
 
@@ -2139,7 +2624,7 @@
     if (!this._parent) {
       return this._runtime.rootHost;
     }
-    return this._parent._getChildHostNode();
+    return this._parent.GetChildHostNode();
   };
 
   Component.prototype._getChildHostNode = function() {
@@ -2237,6 +2722,26 @@
 
   Component.prototype._bindDomEvents = function() {};
 
+  Component.prototype.CreateDom = function(doc) {
+    return this._createDomNode(doc);
+  };
+
+  Component.prototype.ApplyState = function(prevState, nextState) {
+    this._applyStateToDom(prevState, nextState);
+  };
+
+  Component.prototype.BindDomEvents = function() {
+    this._bindDomEvents();
+  };
+
+  Component.prototype.OnAttached = function() {};
+
+  Component.prototype.OnDisposed = function() {};
+
+  Component.prototype.GetChildHostNode = function() {
+    return this._getChildHostNode();
+  };
+
   Component.prototype._raiseEvent = function(name, originalEvent, extras) {
     var handlers = ensureArray(this._eventHandlers[name]).slice();
     var eventArgs = new EventArgs(this, name, originalEvent, extras);
@@ -2268,6 +2773,37 @@
     this._eventHandlers[name].push(listener);
   };
 
+  Component.prototype.RegisterEvent = function(name, listener) {
+    this._registerEvent(name, listener);
+  };
+
+  Component.prototype.RaiseEvent = function(name, originalEvent, extras) {
+    return this._raiseEvent(name, originalEvent, extras);
+  };
+
+  Component.prototype.GetStateValue = function(key) {
+    return this._state[key];
+  };
+
+  Component.prototype.SetStateValue = function(key, value) {
+    this._setState(key, value);
+  };
+
+  Component.prototype.MarkDirty = function() {
+    this._markDirty("public");
+  };
+
+  Component.prototype.TrackBinding = function(unsubscribe) {
+    if (typeof unsubscribe === "function") {
+      this._bindings.push({ unsubscribe: unsubscribe });
+    }
+    return unsubscribe;
+  };
+
+  Component.prototype.GetRegistration = function() {
+    return cloneControlRegistration(getControlRegistrationForInstance(this));
+  };
+
   Component.prototype.Show = function() {
     invariant(this._lifecycle !== "Disposed", "Cannot show a disposed control.");
     this.Visible = true;
@@ -2292,6 +2828,7 @@
       }
     });
     this._bindings = [];
+    this.OnDisposed();
     if (this._domNode && this._domNode.parentNode) {
       this._domNode.parentNode.removeChild(this._domNode);
     }
@@ -5221,6 +5758,7 @@
     this._titleNode.textContent = nextState.title || "";
     this._closeNode.textContent = nextState.closeButtonText || "Close";
     this._closeNode.style.display = nextState.closeButtonVisible ? "" : "none";
+    this._domNode.tabIndex = -1;
     this._domNode.style.left = toCssPixels(nextState.left);
     this._domNode.style.top = toCssPixels(nextState.top);
     this._domNode.style.flexDirection = "column";
@@ -5282,6 +5820,11 @@
     });
 
     this._domNode.addEventListener("keydown", function(event) {
+      if (event.key === "Tab" && control._runtime && control.Modal) {
+        if (control._runtime.trapModalTab(control, event)) {
+          return;
+        }
+      }
       if (event.key === "Escape" && control._state.closeOnEscape) {
         control.Close();
       }
@@ -5380,6 +5923,22 @@
     if (this._runtime) {
       this._runtime.assignWindowZIndex(this);
     }
+  };
+
+  Window.prototype.GetWindowShell = function() {
+    var rootNode = this._domNode || (this._titleBarNode ? this._titleBarNode.parentNode : null);
+    if (!rootNode || !this._titleBarNode || !this._titleNode || !this._closeNode || !this._contentNode) {
+      return null;
+    }
+    return {
+      root: rootNode,
+      titleBar: this._titleBarNode,
+      title: this._titleNode,
+      closeButton: this._closeNode,
+      content: this._contentNode,
+      resizeHandle: this._resizeHandleNode,
+      resizeHandles: this._resizeHandles
+    };
   };
 
   Window.prototype.Dispose = function() {
@@ -5553,6 +6112,94 @@
         });
       });
     }
+  };
+
+  JOG.Version = JOG_RUNTIME_VERSION;
+
+  JOG.RegisterControl = function(definition) {
+    var registration = buildControlRegistration(definition);
+
+    registeredControlsByFullName[registration.fullName] = registration;
+    registeredControlOrder.push(registration);
+    registration.constructor.prototype._jogRegistration = registration;
+
+    return cloneControlRegistration(registration);
+  };
+
+  JOG.GetRegisteredControl = function(nameOrConstructor) {
+    return cloneControlRegistration(getControlRegistration(nameOrConstructor));
+  };
+
+  JOG.ListRegisteredControls = function() {
+    return registeredControlOrder.map(function(registration) {
+      return cloneControlRegistration(registration);
+    });
+  };
+
+  JOG.DumpRegisteredControls = function() {
+    if (!registeredControlOrder.length) {
+      return "(no registered third-party controls)";
+    }
+
+    return registeredControlOrder.map(function(registration) {
+      return registration.fullName + "@" + registration.version + " base=" + registration.metadata.baseType + " jog=" + registration.jogVersionRange;
+    }).join("\n");
+  };
+
+  JOG.IsVersionCompatible = function(range) {
+    return versionSatisfiesRange(JOG_RUNTIME_VERSION, range);
+  };
+
+  JOG.RegisterStyleBlock = function(name, cssText) {
+    var key = String(name == null ? "" : name).trim();
+    var text = String(cssText == null ? "" : cssText);
+    var existing;
+    var block;
+
+    invariant(!!key, "JOG.RegisterStyleBlock requires a name.");
+
+    existing = registeredStyleBlocksByName[key];
+    if (existing) {
+      invariant(existing.cssText === text, "Style block already registered with different content: " + key);
+      return key;
+    }
+
+    block = {
+      name: key,
+      cssText: text,
+      _styleNode: null
+    };
+    registeredStyleBlocksByName[key] = block;
+    registeredStyleBlockOrder.push(block);
+    if (typeof document !== "undefined") {
+      injectRegisteredStyleBlock(document, block);
+    }
+    return key;
+  };
+
+  JOG.DefineControlProperty = function(target, propertyName, options) {
+    var config = options || {};
+    var stateKey = config.stateKey || (propertyName.charAt(0).toLowerCase() + propertyName.slice(1));
+
+    invariant(!!target && (typeof target === "object" || typeof target === "function"), "JOG.DefineControlProperty requires a target object.");
+    invariant(!!propertyName, "JOG.DefineControlProperty requires a propertyName.");
+
+    Object.defineProperty(target, propertyName, {
+      get: function() {
+        if (typeof config.get === "function") {
+          return config.get.call(this);
+        }
+        return this.GetStateValue(stateKey);
+      },
+      set: function(value) {
+        var nextValue = typeof config.normalize === "function" ? config.normalize.call(this, value) : value;
+        if (typeof config.set === "function") {
+          config.set.call(this, nextValue);
+          return;
+        }
+        this.SetStateValue(stateKey, nextValue);
+      }
+    });
   };
 
   JOG.Application = Application;

@@ -2,9 +2,12 @@
 
 ## Status
 
-This document is a design specification for future JOG extensibility work. It does not describe implemented runtime behavior in `v2/JOG.js` today.
+This document now serves two roles:
 
-Use this document to define the contract JOG should eventually expose to third-party control authors so custom controls can be built and reused across projects without falling off the core JOG programming model.
+- it describes the first-pass public third-party control contract implemented in `v2/JOG.js`
+- it keeps the remaining direction and quality bar explicit where the runtime is not yet fully hardened
+
+Use this document alongside `doc/developer-guide.md` and `doc/api-reference.md` when building third-party controls.
 
 ## Goal
 
@@ -46,7 +49,7 @@ The extension contract should hold these lines:
 
 ## Current Reality
 
-JOG V2 already has the right architectural direction for eventual extensibility:
+JOG V2 now has a first-pass public extension API for third-party controls:
 
 - controls are stateful JavaScript objects
 - rendering is dirty-queue based
@@ -54,8 +57,15 @@ JOG V2 already has the right architectural direction for eventual extensibility:
 - containers compose through `Add`
 - themes are token-based
 - validation and visibility bindings are explicit
+- controls can register through `JOG.RegisterControl()`
+- package styles can register through `JOG.RegisterStyleBlock()`
+- custom properties can be defined through `JOG.DefineControlProperty()`
+- the public extension lifecycle now includes `CreateDom()`, `ApplyState()`, `BindDomEvents()`, `OnAttached()`, `OnDisposed()`, and `GetChildHostNode()`
+- `JOG.Window` now also exposes `GetWindowShell()` so third-party `Window` and `Dialog` subclasses can reuse the built-in floating chrome without touching private node fields
+- modal focus trapping and focus restoration are runtime-managed for core and third-party dialogs through the shared `Window` behavior
 
-What JOG does not yet have is a documented public extension API for third-party controls. This specification defines that target.
+What still remains unfinished is long-term hardening around accessibility, keyboard depth, and broader package tooling.
+The sample `AcmeJOG.TagPicker` now demonstrates first-pass keyboard navigation and radio-group semantics, `AcmeJOG.CommandPaletteDialog` proves a third-party floating shell through the documented `Window` helper, and the additional `BeaconJOG` sample package proves that a second package with a different authoring style can coexist cleanly. That still does not replace broader real-browser accessibility verification.
 
 ## Extension Targets
 
@@ -109,7 +119,7 @@ Recommended package layers:
 
 ## Registration Model
 
-JOG should eventually expose a formal registration API instead of relying on global monkey-patching.
+JOG now exposes a formal registration API instead of relying on global monkey-patching.
 
 Recommended direction:
 
@@ -132,7 +142,7 @@ Registration should enforce:
 - version-range validation against the running JOG runtime
 - clear diagnostics when a package targets an unsupported JOG version
 
-JOG should also expose lookup and inspection helpers later if designer tooling, serialization, or diagnostics need them.
+JOG now also exposes first-pass lookup and inspection helpers through `JOG.GetRegisteredControl()`, `JOG.ListRegisteredControls()`, and `JOG.DumpRegisteredControls()`. Designer tooling and serialization-specific helpers are still future work if they become necessary.
 
 ## Required Metadata
 
@@ -197,7 +207,7 @@ Bad API examples:
 
 ## Lifecycle Contract
 
-JOG should eventually expose a narrow, documented extension lifecycle.
+JOG now exposes a narrow, documented extension lifecycle.
 
 Recommended protected hooks:
 
@@ -207,6 +217,7 @@ Recommended protected hooks:
 - `OnAttached()`
 - `OnDisposed()`
 - `GetChildHostNode()` for controls that host child controls internally
+- `GetWindowShell()` for `Window` and `Dialog` subclasses that need to customize the built-in floating shell
 
 The important rule is simple: third-party controls should code against documented hooks, not private runtime internals.
 
@@ -383,7 +394,7 @@ Future npm or package-manager distribution can sit on top of the same control co
 
 This is the hardest part of a control ecosystem and should be explicit from the start.
 
-JOG should define:
+JOG now defines, at a first-pass level:
 
 - a stable public extension contract
 - a private internal runtime surface
@@ -393,14 +404,19 @@ Third-party controls should depend only on documented extension APIs, not on run
 
 ## Diagnostics And Tooling
 
-When JOG adds third-party control support, diagnostics should treat those controls as first-class citizens.
+Now that JOG has third-party control support, diagnostics should treat those controls as first-class citizens.
 
-Recommended additions:
+Implemented today:
 
 - include registered control full names in tree dumps and error output
 - report extension-package version mismatches clearly
 - expose a runtime registry dump for debugging loaded controls
 - let docs and future tooling read control metadata without instantiating controls
+
+Still missing:
+
+- designer or serialization-focused tooling on top of that registry
+- broader diagnostic helpers for package loading order or multi-package conflict analysis
 
 ## Documentation Standard For Third-Party Controls
 
