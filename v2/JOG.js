@@ -437,8 +437,25 @@
         field: field,
         title: normalized.title != null ? String(normalized.title) : key,
         width: normalized.width != null && normalized.width !== "" ? String(normalized.width) : "1fr",
+        minWidth: parsePixelWidth(normalized.minWidth),
+        maxWidth: parsePixelWidth(normalized.maxWidth),
         align: normalized.align === "center" || normalized.align === "right" ? normalized.align : "left",
         formatter: typeof normalized.formatter === "function" ? normalized.formatter : null,
+        sortValue: typeof normalized.sortValue === "function" ? normalized.sortValue : null,
+        filterValue: typeof normalized.filterValue === "function" ? normalized.filterValue : null,
+        parseValue: typeof normalized.parseValue === "function" ? normalized.parseValue : null,
+        editable: normalized.editable === undefined ? false : normalized.editable,
+        editor: normalized.editor === "textarea" || normalized.editor === "select" ? normalized.editor : "text",
+        options: ensureArray(normalized.options).map(function(option, optionIndex) {
+          var normalizedOption = isPlainObject(option) ? option : {};
+
+          return {
+            value: normalizedOption.value != null ? String(normalizedOption.value) : String(optionIndex),
+            text: normalizedOption.text != null ? String(normalizedOption.text) : String(normalizedOption.value != null ? normalizedOption.value : optionIndex)
+          };
+        }),
+        sortable: normalized.sortable !== false,
+        overflow: normalized.overflow === "wrap" || normalized.overflow === "clip" ? normalized.overflow : "truncate",
         resizable: normalized.resizable !== false
       };
     });
@@ -972,6 +989,9 @@
     this.Column = extras.Column;
     this.Command = extras.Command;
     this.Index = extras.Index;
+    this.RowIndex = extras.RowIndex;
+    this.SortKey = extras.SortKey;
+    this.SortDirection = extras.SortDirection;
   }
 
   function normalizeDebugTopics(value) {
@@ -1952,6 +1972,8 @@
       ".jog-data-grid-header, .jog-data-grid-row { display: grid; align-items: stretch; min-width: max-content; }",
       ".jog-data-grid-header { background: var(--jog-surface-muted); border-bottom: 1px solid var(--jog-border-soft); }",
       ".jog-data-grid-header-cell { position: relative; padding: 10px 12px; font-size: var(--jog-caption-size); font-weight: 600; color: var(--jog-text); border-right: 1px solid var(--jog-border-soft); }",
+      ".jog-data-grid-header-cell.jog-sortable { cursor: pointer; user-select: none; }",
+      ".jog-data-grid-header-cell.jog-sorted { color: var(--jog-primary); }",
       ".jog-data-grid-header-cell:last-child { border-right: 0; }",
       ".jog-data-grid-resize-handle { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 1; }",
       ".jog-data-grid-body { position: relative; }",
@@ -1960,11 +1982,15 @@
       ".jog-data-grid-row.jog-selected { background: rgba(15, 23, 42, 0.06); }",
       ".jog-data-grid-row.jog-dirty { box-shadow: inset 3px 0 0 var(--jog-primary); }",
       ".jog-data-grid-cell { padding: 12px; color: var(--jog-text-muted); border-right: 1px solid var(--jog-border-soft); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }",
+      ".jog-data-grid-cell.jog-data-grid-cell-wrap { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }",
+      ".jog-data-grid-cell.jog-data-grid-cell-clip { text-overflow: clip; }",
       ".jog-data-grid-cell:last-child { border-right: 0; }",
       ".jog-data-grid-cell.align-right { text-align: right; }",
       ".jog-data-grid-cell.align-center { text-align: center; }",
       ".jog-data-grid-command-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }",
       ".jog-data-grid-command { padding-left: 10px; padding-right: 10px; }",
+      ".jog-data-grid-editor { width: 100%; box-sizing: border-box; font: inherit; color: var(--jog-text-strong); border: 1px solid var(--jog-border); border-radius: var(--jog-radius-control); background: var(--jog-surface); padding: 8px 10px; }",
+      ".jog-data-grid-editor-textarea { min-height: 84px; resize: vertical; }",
       ".jog-data-grid-empty { padding: 18px 12px; color: var(--jog-text-muted); }",
       ".jog-window { position: absolute; display: flex; flex-direction: column; box-sizing: border-box; border: 1px solid var(--jog-border); border-radius: var(--jog-radius-window); background: var(--jog-surface); box-shadow: var(--jog-shadow-window); overflow: hidden; }",
       ".jog-window-titlebar { background: var(--jog-surface-muted); color: var(--jog-text); padding: 12px 16px; font-weight: 600; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--jog-border-soft); }",
@@ -2866,6 +2892,7 @@
     this._headerChild = null;
     this._sidebarChild = null;
     this._contentChild = null;
+    this._state.sidebarLayout = null;
   }
 
   WorkspaceShell.prototype = Object.create(DockPanel.prototype);
@@ -2953,9 +2980,39 @@
         this._children.push(child);
         child._markDirty("parent");
       }
+      if (slotName === "_sidebarChild") {
+        this._applySidebarLayoutHelper();
+      }
     }
 
     this._syncWorkspaceChildren();
+  };
+
+  WorkspaceShell.prototype._applySidebarLayoutHelper = function() {
+    var sidebar = this._sidebarChild;
+    var layout = this._state.sidebarLayout;
+    var base;
+
+    if (!sidebar || !layout) {
+      return;
+    }
+
+    base = layout.base || {};
+
+    if (base.dock !== undefined) {
+      sidebar.Dock = base.dock;
+    }
+    if (base.width !== undefined) {
+      sidebar.Width = isNumber(base.width) ? base.width : null;
+    }
+    if (base.height !== undefined) {
+      sidebar.Height = isNumber(base.height) ? base.height : null;
+    }
+    if (base.gap !== undefined) {
+      sidebar.Gap = isNumber(base.gap) ? base.gap : 0;
+    }
+
+    sidebar.ResponsiveLayout = layout;
   };
 
   WorkspaceShell.prototype.Remove = function(child) {
@@ -2996,6 +3053,14 @@
   Object.defineProperty(WorkspaceShell.prototype, "Content", {
     get: function() { return this._contentChild; },
     set: function(value) { this._setShellRoleChild("_contentChild", value, "fill"); }
+  });
+
+  Object.defineProperty(WorkspaceShell.prototype, "SidebarLayout", {
+    get: function() { return this._state.sidebarLayout; },
+    set: function(value) {
+      this._setState("sidebarLayout", cloneResponsiveConfig(value, normalizeResponsiveLayoutBreakpoint));
+      this._applySidebarLayoutHelper();
+    }
   });
 
   function SplitPanel() {
@@ -3751,6 +3816,11 @@
     this._state.emptyText = "No rows.";
     this._state.selectionMode = "single";
     this._state.resizableColumns = false;
+    this._state.sortKey = "";
+    this._state.sortDirection = "";
+    this._state.filterText = "";
+    this._state.filterColumns = [];
+    this._state.filterPredicate = null;
     this._state.collection = null;
     this._headerNode = null;
     this._bodyNode = null;
@@ -3760,6 +3830,7 @@
     this._commandNodes = {};
     this._resizeHandleNodes = {};
     this._activeResize = null;
+    this._activeEditor = null;
   }
 
   DataGrid.prototype = Object.create(Control.prototype);
@@ -3815,8 +3886,325 @@
     });
   };
 
+  DataGrid.prototype._getColumnByKey = function(columnKey) {
+    var found = null;
+
+    this._getResolvedColumns().some(function(column) {
+      if (column.key === columnKey) {
+        found = column;
+        return true;
+      }
+      return false;
+    });
+
+    return found;
+  };
+
+  DataGrid.prototype._getColumnSortValue = function(column, row, rowIndex, rowId) {
+    var value = row[column.field];
+
+    if (column.sortValue) {
+      value = column.sortValue(value, row, {
+        rowId: rowId,
+        rowIndex: rowIndex,
+        column: column,
+        collection: this._state.collection
+      });
+    }
+
+    return value;
+  };
+
+  DataGrid.prototype._getColumnFilterValue = function(column, row, rowIndex, rowId) {
+    var value = row[column.field];
+
+    if (column.filterValue) {
+      value = column.filterValue(value, row, {
+        rowId: rowId,
+        rowIndex: rowIndex,
+        column: column,
+        collection: this._state.collection
+      });
+    } else if (column.formatter) {
+      value = column.formatter(value, row, {
+        rowId: rowId,
+        rowIndex: rowIndex,
+        column: column,
+        collection: this._state.collection
+      });
+    }
+
+    return value == null ? "" : String(value);
+  };
+
+  DataGrid.prototype._compareSortValues = function(left, right) {
+    if (left == null && right == null) {
+      return 0;
+    }
+    if (left == null) {
+      return -1;
+    }
+    if (right == null) {
+      return 1;
+    }
+    if (isNumber(left) && isNumber(right)) {
+      return left === right ? 0 : (left < right ? -1 : 1);
+    }
+
+    left = String(left).toLowerCase();
+    right = String(right).toLowerCase();
+    if (left === right) {
+      return 0;
+    }
+    return left < right ? -1 : 1;
+  };
+
+  DataGrid.prototype._canEditColumn = function(column, row, rowIndex) {
+    if (!column) {
+      return false;
+    }
+    if (typeof column.editable === "function") {
+      return !!column.editable(row, rowIndex, this._state.collection);
+    }
+    return !!column.editable;
+  };
+
+  DataGrid.prototype._createEditorNode = function(editorState) {
+    var doc = this._runtime.document;
+    var column = editorState.column;
+    var inputNode;
+
+    if (column.editor === "textarea") {
+      inputNode = doc.createElement("textarea");
+      inputNode.className = "jog-data-grid-editor jog-data-grid-editor-textarea";
+      inputNode.value = editorState.initialValue;
+      return inputNode;
+    }
+
+    if (column.editor === "select") {
+      inputNode = doc.createElement("select");
+      inputNode.className = "jog-data-grid-editor jog-data-grid-editor-select";
+      column.options.forEach(function(option) {
+        var optionNode = doc.createElement("option");
+
+        optionNode.value = option.value;
+        optionNode.textContent = option.text;
+        inputNode.appendChild(optionNode);
+      });
+      inputNode.value = editorState.initialValue;
+      return inputNode;
+    }
+
+    inputNode = doc.createElement("input");
+    inputNode.className = "jog-data-grid-editor jog-data-grid-editor-input";
+    inputNode.type = "text";
+    inputNode.value = editorState.initialValue;
+    return inputNode;
+  };
+
+  DataGrid.prototype._focusEditorNode = function(editorState) {
+    var inputNode;
+
+    if (!editorState || !editorState.pendingFocus) {
+      return;
+    }
+    inputNode = editorState.inputNode;
+    if (!inputNode || typeof inputNode.focus !== "function") {
+      return;
+    }
+    editorState.pendingFocus = false;
+    inputNode.focus();
+    if (typeof inputNode.select === "function" && editorState.column.editor !== "select") {
+      inputNode.select();
+    }
+  };
+
+  DataGrid.prototype._cancelActiveEditor = function() {
+    if (!this._activeEditor) {
+      return;
+    }
+    this._activeEditor = null;
+    this.Refresh();
+  };
+
+  DataGrid.prototype._commitActiveEditor = function() {
+    var editorState = this._activeEditor;
+    var collection;
+    var row;
+    var rawValue;
+    var nextValue;
+
+    if (!editorState) {
+      return;
+    }
+
+    collection = this._state.collection;
+    row = collection ? collection.GetRow(editorState.rowId) : null;
+    rawValue = editorState.inputNode ? editorState.inputNode.value : "";
+    nextValue = editorState.column.parseValue
+      ? editorState.column.parseValue(rawValue, row, {
+          rowId: editorState.rowId,
+          rowIndex: editorState.rowIndex,
+          column: editorState.column,
+          collection: collection
+        })
+      : rawValue;
+
+    this._activeEditor = null;
+    if (collection && row && row[editorState.column.field] !== nextValue) {
+      collection.Update(editorState.rowId, function(currentRow) {
+        var nextRow = cloneCollectionRow(currentRow);
+
+        nextRow[editorState.column.field] = nextValue;
+        return nextRow;
+      });
+    } else {
+      this.Refresh();
+    }
+
+    this._raiseEvent("CellEditCommit", null, {
+      RowId: editorState.rowId,
+      Row: collection && row ? collection.GetRow(editorState.rowId) : row,
+      Column: editorState.column,
+      Value: nextValue,
+      Index: editorState.rowIndex
+    });
+  };
+
+  DataGrid.prototype._beginCellEdit = function(column, row, rowIndex, rowId) {
+    var control = this;
+    var editorState;
+    var inputNode;
+
+    if (!this._runtime || !this._state.collection || !this._canEditColumn(column, row, rowIndex)) {
+      return;
+    }
+    if (
+      this._activeEditor &&
+      this._activeEditor.rowId === rowId &&
+      this._activeEditor.column.key === column.key
+    ) {
+      return;
+    }
+    if (this._activeEditor) {
+      this._commitActiveEditor();
+    }
+
+    editorState = {
+      rowId: rowId,
+      rowIndex: rowIndex,
+      column: column,
+      initialValue: row[column.field] == null ? "" : String(row[column.field]),
+      inputNode: null,
+      pendingFocus: true
+    };
+    inputNode = this._createEditorNode(editorState);
+    editorState.inputNode = inputNode;
+    ["mousedown", "click", "dblclick"].forEach(function(eventName) {
+      inputNode.addEventListener(eventName, function(event) {
+        if (event && typeof event.stopPropagation === "function") {
+          event.stopPropagation();
+        }
+      });
+    });
+    inputNode.addEventListener("blur", function() {
+      control._commitActiveEditor();
+    });
+    inputNode.addEventListener("keydown", function(event) {
+      if (event && event.key === "Escape") {
+        control._cancelActiveEditor();
+        return;
+      }
+      if (event && event.key === "Enter" && column.editor !== "textarea") {
+        control._commitActiveEditor();
+      }
+    });
+    if (column.editor === "select") {
+      inputNode.addEventListener("change", function() {
+        control._commitActiveEditor();
+      });
+    }
+
+    this._activeEditor = editorState;
+    this.Refresh();
+    this._raiseEvent("CellEditStart", null, {
+      RowId: rowId,
+      Row: cloneCollectionRow(row),
+      Column: column,
+      Value: row[column.field],
+      Index: rowIndex
+    });
+  };
+
+  DataGrid.prototype._getViewRows = function(collection, columns, nextState) {
+    var control = this;
+    var rows = collection && typeof collection.GetRows === "function" ? collection.GetRows() : [];
+    var filterText = String(nextState.filterText || "").trim().toLowerCase();
+    var sortKey = nextState.sortKey || "";
+    var sortDirection = nextState.sortDirection === "desc" ? "desc" : (nextState.sortDirection === "asc" ? "asc" : "");
+    var sortColumn = sortKey ? this._getColumnByKey(sortKey) : null;
+    var filterColumnKeys = ensureArray(nextState.filterColumns).map(function(key) {
+      return String(key);
+    });
+    var filterColumns = filterColumnKeys.length
+      ? columns.filter(function(column) { return filterColumnKeys.indexOf(column.key) >= 0; })
+      : columns.slice();
+    var output = rows.map(function(row, index) {
+      return {
+        row: row,
+        rowId: collection ? collection.GetRowId(row) : String(index),
+        rowIndex: index
+      };
+    });
+
+    if (filterText) {
+      output = output.filter(function(entry) {
+        if (typeof nextState.filterPredicate === "function") {
+          return !!nextState.filterPredicate(entry.row, {
+            rowId: entry.rowId,
+            rowIndex: entry.rowIndex,
+            filterText: filterText,
+            columns: filterColumns,
+            collection: collection
+          });
+        }
+
+        return filterColumns.some(function(column) {
+          return control._getColumnFilterValue(column, entry.row, entry.rowIndex, entry.rowId).toLowerCase().indexOf(filterText) >= 0;
+        });
+      });
+    }
+
+    if (sortColumn && sortColumn.sortable !== false && sortDirection) {
+      output.sort(function(left, right) {
+        var comparison = control._compareSortValues(
+          control._getColumnSortValue(sortColumn, left.row, left.rowIndex, left.rowId),
+          control._getColumnSortValue(sortColumn, right.row, right.rowIndex, right.rowId)
+        );
+
+        if (comparison === 0) {
+          return left.rowIndex - right.rowIndex;
+        }
+        return sortDirection === "desc" ? comparison * -1 : comparison;
+      });
+    }
+
+    return output;
+  };
+
   DataGrid.prototype._getGridTemplateColumns = function(columns, includeCommands) {
     var tracks = columns.map(function(column) {
+      if ((!column.width || column.width === "1fr") && column.minWidth != null && column.maxWidth != null) {
+        return "minmax(" + Math.round(column.minWidth) + "px, " + Math.round(column.maxWidth) + "px)";
+      }
+      if (!column.width || column.width === "1fr") {
+        if (column.minWidth != null) {
+          return "minmax(" + Math.round(column.minWidth) + "px, 1fr)";
+        }
+        if (column.maxWidth != null) {
+          return "minmax(0px, " + Math.round(column.maxWidth) + "px)";
+        }
+      }
       return column.width || "1fr";
     });
 
@@ -3835,7 +4223,15 @@
 
   DataGrid.prototype._setColumnWidth = function(columnKey, widthPx) {
     var overrides = Object.assign({}, this._state.columnWidthOverrides || {});
-    overrides[columnKey] = Math.max(80, Math.round(widthPx)) + "px";
+    var column = this._getColumnByKey(columnKey);
+    var minWidth = column && column.minWidth != null ? column.minWidth : 80;
+    var maxWidth = column && column.maxWidth != null ? column.maxWidth : null;
+    var clampedWidth = Math.max(minWidth, Math.round(widthPx));
+
+    if (maxWidth != null) {
+      clampedWidth = Math.min(clampedWidth, maxWidth);
+    }
+    overrides[columnKey] = clampedWidth + "px";
     this._setState("columnWidthOverrides", overrides);
   };
 
@@ -3914,7 +4310,7 @@
     var control = this;
     var collection = nextState.collection;
     var columns = this._getResolvedColumns();
-    var rows = collection && typeof collection.GetRows === "function" ? collection.GetRows() : [];
+    var rows = this._getViewRows(collection, columns, nextState);
     var includeCommands = cloneDataGridCommands(nextState.rowCommands).length > 0;
 
     Control.prototype._applyStateToDom.call(this, prevState, nextState);
@@ -3936,8 +4332,39 @@
 
     columns.forEach(function(column) {
       var headerCell = control._runtime.document.createElement("div");
+      var sortIndicator = "";
+
       headerCell.className = "jog-data-grid-header-cell" + (column.align === "right" ? " align-right" : (column.align === "center" ? " align-center" : ""));
-      headerCell.textContent = column.title;
+      if (nextState.sortKey === column.key && nextState.sortDirection === "asc") {
+        sortIndicator = " ▲";
+        headerCell.classList.add("jog-sorted");
+      } else if (nextState.sortKey === column.key && nextState.sortDirection === "desc") {
+        sortIndicator = " ▼";
+        headerCell.classList.add("jog-sorted");
+      }
+      headerCell.textContent = column.title + sortIndicator;
+      if (column.sortable !== false) {
+        headerCell.classList.add("jog-sortable");
+        headerCell.addEventListener("click", function(event) {
+          var nextDirection = "asc";
+
+          if (control._state.sortKey === column.key) {
+            if (control._state.sortDirection === "asc") {
+              nextDirection = "desc";
+            } else if (control._state.sortDirection === "desc") {
+              nextDirection = "";
+            }
+          }
+          control.SetSort(column.key, nextDirection);
+          control._raiseEvent("SortChange", event, {
+            Key: column.key,
+            Column: column,
+            Value: nextDirection,
+            SortKey: nextDirection ? column.key : "",
+            SortDirection: nextDirection
+          });
+        });
+      }
       if (control._canResizeColumn(column)) {
         var handle = control._runtime.document.createElement("div");
         handle.className = "jog-data-grid-resize-handle";
@@ -3967,10 +4394,12 @@
     this._emptyNode.textContent = nextState.emptyText || "No rows.";
     this._emptyNode.style.display = rows.length ? "none" : "";
 
-    rows.forEach(function(row, rowIndex) {
-      var rowId = collection ? collection.GetRowId(row) : "";
+    rows.forEach(function(entry, visibleRowIndex) {
+      var row = entry.row;
+      var rowId = entry.rowId;
+      var sourceRowIndex = entry.rowIndex;
       var rowNode = control._runtime.document.createElement("div");
-      var commands = control._getVisibleCommands(row, rowIndex);
+      var commands = control._getVisibleCommands(row, sourceRowIndex);
 
       rowNode.className = "jog-data-grid-row";
       rowNode.style.gridTemplateColumns = control._getGridTemplateColumns(columns, commands.length > 0);
@@ -3990,7 +4419,7 @@
             RowId: rowId,
             Row: cloneCollectionRow(row),
             Value: rowId,
-            Index: rowIndex
+            Index: sourceRowIndex
           });
         });
       }
@@ -3998,7 +4427,26 @@
       columns.forEach(function(column) {
         var cell = control._runtime.document.createElement("div");
         cell.className = "jog-data-grid-cell" + (column.align === "right" ? " align-right" : (column.align === "center" ? " align-center" : ""));
-        cell.textContent = control._resolveCellText(column, row, rowIndex, rowId);
+        if (column.overflow === "wrap") {
+          cell.classList.add("jog-data-grid-cell-wrap");
+        } else if (column.overflow === "clip") {
+          cell.classList.add("jog-data-grid-cell-clip");
+        }
+        if (
+          control._activeEditor &&
+          control._activeEditor.rowId === rowId &&
+          control._activeEditor.column.key === column.key
+        ) {
+          cell.appendChild(control._activeEditor.inputNode);
+          control._focusEditorNode(control._activeEditor);
+        } else {
+          cell.textContent = control._resolveCellText(column, row, sourceRowIndex, rowId);
+          if (control._canEditColumn(column, row, sourceRowIndex)) {
+            cell.addEventListener("dblclick", function() {
+              control._beginCellEdit(column, row, sourceRowIndex, rowId);
+            });
+          }
+        }
         rowNode.appendChild(cell);
       });
 
@@ -4009,20 +4457,24 @@
         control._commandNodes[rowId] = {};
         commands.forEach(function(command, commandIndex) {
           var button = control._runtime.document.createElement("button");
-          var enabled = typeof command.enabled === "function" ? !!command.enabled(row, rowIndex) : command.enabled !== false;
+          var enabled = typeof command.enabled === "function" ? !!command.enabled(row, sourceRowIndex) : command.enabled !== false;
 
           button.className = "jog-button jog-data-grid-command" + (command.themePreset ? " jog-theme-preset-" + command.themePreset : "");
           button.type = "button";
           button.textContent = command.text;
           button.disabled = !enabled;
           button.addEventListener("click", function(event) {
+            if (event && typeof event.stopPropagation === "function") {
+              event.stopPropagation();
+            }
             control._raiseEvent("RowCommand", event, {
               Key: command.key,
               Command: command,
               RowId: rowId,
               Row: cloneCollectionRow(row),
               Value: rowId,
-              Index: commandIndex
+              Index: commandIndex,
+              RowIndex: sourceRowIndex
             });
           });
           commandCell.appendChild(button);
@@ -4037,6 +4489,7 @@
   };
 
   DataGrid.prototype.Dispose = function() {
+    this._activeEditor = null;
     if (this._activeResize && this._runtime && this._runtime.document) {
       this._runtime.document.removeEventListener("mousemove", this._activeResize.onMove);
       this._runtime.document.removeEventListener("mouseup", this._activeResize.onUp);
@@ -4055,6 +4508,29 @@
 
   DataGrid.prototype.OnSelectionChange = function(listener) {
     this._registerEvent("SelectionChange", listener);
+  };
+
+  DataGrid.prototype.OnSortChange = function(listener) {
+    this._registerEvent("SortChange", listener);
+  };
+
+  DataGrid.prototype.OnCellEditStart = function(listener) {
+    this._registerEvent("CellEditStart", listener);
+  };
+
+  DataGrid.prototype.OnCellEditCommit = function(listener) {
+    this._registerEvent("CellEditCommit", listener);
+  };
+
+  DataGrid.prototype.SetSort = function(columnKey, direction) {
+    var nextDirection = direction === "desc" ? "desc" : (direction === "asc" ? "asc" : "");
+
+    this._setState("sortKey", nextDirection ? String(columnKey || "") : "");
+    this._setState("sortDirection", nextDirection);
+  };
+
+  DataGrid.prototype.ClearSort = function() {
+    this.SetSort("", "");
   };
 
   Object.defineProperty(DataGrid.prototype, "Columns", {
@@ -4083,6 +4559,39 @@
   Object.defineProperty(DataGrid.prototype, "ResizableColumns", {
     get: function() { return !!this._state.resizableColumns; },
     set: function(value) { this._setState("resizableColumns", !!value); }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "SortKey", {
+    get: function() { return this._state.sortKey; },
+    set: function(value) {
+      this._setState("sortKey", value == null ? "" : String(value));
+    }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "SortDirection", {
+    get: function() { return this._state.sortDirection; },
+    set: function(value) {
+      this._setState("sortDirection", value === "desc" ? "desc" : (value === "asc" ? "asc" : ""));
+    }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "FilterText", {
+    get: function() { return this._state.filterText; },
+    set: function(value) { this._setState("filterText", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "FilterColumns", {
+    get: function() { return ensureArray(this._state.filterColumns).slice(); },
+    set: function(value) {
+      this._setState("filterColumns", ensureArray(value).map(function(key) {
+        return String(key);
+      }));
+    }
+  });
+
+  Object.defineProperty(DataGrid.prototype, "FilterPredicate", {
+    get: function() { return this._state.filterPredicate; },
+    set: function(value) { this._setState("filterPredicate", typeof value === "function" ? value : null); }
   });
 
   Object.defineProperty(DataGrid.prototype, "Collection", {

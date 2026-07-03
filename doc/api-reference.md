@@ -462,12 +462,14 @@ Properties:
 - `Header`
 - `Sidebar`
 - `Content`
+- `SidebarLayout`
 
 Notes:
 
 - provides explicit shell slots for header plus sidebar plus content composition
 - defaults `Header` children to `Dock = "top"` when no explicit dock is already set
 - defaults `Sidebar` children to `Dock = "left"` when no explicit dock is already set
+- `SidebarLayout` projects a shell-owned responsive dock, width, height, and gap pattern onto the sidebar child
 - defaults `Content` children to `Dock = "fill"` when no explicit dock is already set
 - keeps slotted children ordered as header, sidebar, then content even if assigned in a different sequence
 - slotted children can still use inherited `ResponsiveLayout`, so a sidebar can collapse to a top region on smaller widths
@@ -607,11 +609,24 @@ Properties:
 - `EmptyText`
 - `SelectionMode`
 - `ResizableColumns`
+- `SortKey`
+- `SortDirection`
+- `FilterText`
+- `FilterColumns`
+- `FilterPredicate`
 
 Events:
 
 - `OnSelectionChange(listener)`
 - `OnRowCommand(listener)`
+- `OnSortChange(listener)`
+- `OnCellEditStart(listener)`
+- `OnCellEditCommit(listener)`
+
+Methods:
+
+- `SetSort(columnKey, direction)`
+- `ClearSort()`
 
 Column shape supported now:
 
@@ -619,8 +634,18 @@ Column shape supported now:
 - `field`
 - `title`
 - `width`
+- `minWidth`
+- `maxWidth`
 - `align`
 - `formatter`
+- `sortValue`
+- `filterValue`
+- `parseValue`
+- `editable`
+- `editor`
+- `options`
+- `sortable`
+- `overflow`
 - `resizable`
 
 Row command shape supported now:
@@ -637,9 +662,18 @@ Notes:
 - renders a header row plus one rendered row per collection record
 - supports single-row selection or `SelectionMode = "none"`
 - `ResizableColumns = true` enables mouse-driven header resizing for columns that already use explicit pixel widths
+- `SortKey` plus `SortDirection` control the current view-level sort
+- `FilterText` plus `FilterColumns` or `FilterPredicate` filter visible rows without mutating the underlying collection
+- inline editing supports text, textarea, and select editors, and commits collection updates directly through the bound row id
+- moving directly from one editable cell to another commits the current edit before opening the next editor
+- `minWidth` plus `maxWidth` bound mouse-driven pixel-width resizing
+- `minWidth` plus `maxWidth` also bound flexible `1fr` columns without forcing a fixed pixel width
+- `overflow` accepts `truncate`, `wrap`, or `clip`
 - row command events expose `args.Key`, `args.RowId`, `args.Row`, and `args.Command`
+- sort-change events expose the current column and direction
+- cell-edit events expose the edited row, column, and committed value
 - dirty and selected rows receive built-in styling
-- sorting, filtering, inline editing, virtualization, touch resizing, and keyboard navigation are not implemented yet
+- virtualization, touch resizing, and keyboard navigation are not implemented yet
 
 ## Controls
 

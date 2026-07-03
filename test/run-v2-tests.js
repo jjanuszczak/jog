@@ -318,7 +318,22 @@ function dispatchNodeClick(node) {
   var listeners = (node && node.eventListeners && node.eventListeners.click) || [];
 
   assertEqual(listeners.length > 0, true, "Node should expose a click listener.");
-  listeners[0]({ target: node });
+  listeners[0]({
+    target: node,
+    stopPropagation: function() {},
+    preventDefault: function() {}
+  });
+}
+
+function dispatchNodeDoubleClick(node) {
+  var listeners = (node && node.eventListeners && node.eventListeners.dblclick) || [];
+
+  assertEqual(listeners.length > 0, true, "Node should expose a double-click listener.");
+  listeners[0]({
+    target: node,
+    stopPropagation: function() {},
+    preventDefault: function() {}
+  });
 }
 
 function dispatchNodeMouseDown(node, clientX, clientY) {
@@ -361,6 +376,13 @@ function dispatchNodeKeyDown(node, key) {
 
   assertEqual(listeners.length > 0, true, "Node should expose a keydown listener.");
   listeners[0]({ target: node, key: key });
+}
+
+function dispatchNodeBlur(node) {
+  var listeners = (node && node.eventListeners && node.eventListeners.blur) || [];
+
+  assertEqual(listeners.length > 0, true, "Node should expose a blur listener.");
+  listeners[0]({ target: node });
 }
 
 function dispatchWindowResize(sandbox, width) {
@@ -985,17 +1007,7 @@ function testWorkspaceShellAssignsSlotsAndMaintainsResponsiveLayout() {
   shell.Width = 960;
   shell.Height = 640;
   shell.Padding = 20;
-
-  header.Name = "workspaceHeader";
-  header.Height = 88;
-  header.Gap = 12;
-  header.TitleText = "Workspace";
-  header.SubtitleText = "Header slot";
-
-  sidebar.Name = "workspaceSidebar";
-  sidebar.Width = 220;
-  sidebar.Gap = 18;
-  sidebar.ResponsiveLayout = {
+  shell.SidebarLayout = {
     base: {
       dock: "top",
       width: null,
@@ -1010,6 +1022,14 @@ function testWorkspaceShellAssignsSlotsAndMaintainsResponsiveLayout() {
     }
   };
 
+  header.Name = "workspaceHeader";
+  header.Height = 88;
+  header.Gap = 12;
+  header.TitleText = "Workspace";
+  header.SubtitleText = "Header slot";
+
+  sidebar.Name = "workspaceSidebar";
+
   content.Name = "workspaceContent";
 
   shell.Content = content;
@@ -1023,6 +1043,7 @@ function testWorkspaceShellAssignsSlotsAndMaintainsResponsiveLayout() {
   assertEqual(shell._children[1], sidebar, "WorkspaceShell should keep the sidebar second.");
   assertEqual(shell._children[2], content, "WorkspaceShell should keep the content third.");
   assertEqual(header.Dock, "top", "WorkspaceShell should default the header to top docking.");
+  assertEqual(sidebar.ResponsiveLayout.md.width, 220, "WorkspaceShell should project SidebarLayout onto the sidebar child.");
   assertEqual(sidebar._domNode.style.top, "120px", "WorkspaceShell should let the responsive sidebar dock above content on narrow mount.");
   assertEqual(content._domNode.style.top, "254px", "WorkspaceShell should place content after the header and responsive sidebar gaps on narrow mount.");
 
@@ -2426,7 +2447,7 @@ function testDataGridSupportsResizablePixelWidthColumns() {
 
   grid.ResizableColumns = true;
   grid.Columns = [
-    { key: "account", title: "Account", width: "180px" },
+    { key: "account", title: "Account", width: "180px", minWidth: 160, maxWidth: 260 },
     { key: "stage", title: "Stage", width: "120px" }
   ];
   grid.Collection = collection;
@@ -2445,6 +2466,124 @@ function testDataGridSupportsResizablePixelWidthColumns() {
   assertEqual(grid._rowNodes[0].style.gridTemplateColumns, "230px 120px", "Dragging a resize handle should update row track widths.");
 
   dispatchDocumentMouseUp(app.Runtime.document, 230, 0);
+
+  dispatchNodeMouseDown(grid._resizeHandleNodes.account, 230, 0);
+  dispatchDocumentMouseMove(app.Runtime.document, 80, 0);
+  app.Runtime.flush();
+  assertEqual(grid._headerNode.style.gridTemplateColumns, "160px 120px", "Column resizing should respect configured minimum widths.");
+  dispatchDocumentMouseUp(app.Runtime.document, 80, 0);
+
+  dispatchNodeMouseDown(grid._resizeHandleNodes.account, 160, 0);
+  dispatchDocumentMouseMove(app.Runtime.document, 360, 0);
+  app.Runtime.flush();
+  assertEqual(grid._headerNode.style.gridTemplateColumns, "260px 120px", "Column resizing should respect configured maximum widths.");
+  dispatchDocumentMouseUp(app.Runtime.document, 360, 0);
+}
+
+function testDataGridSupportsBoundedFlexibleColumns() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var collection = new JOG.Collection({
+    rows: [
+      { id: "1", account: "Northwind", nextStep: "Coordinate the rollout with legal and operations." }
+    ]
+  });
+  var grid = new JOG.DataGrid();
+
+  grid.Columns = [
+    { key: "account", title: "Account", width: "180px" },
+    { key: "nextStep", title: "Next Step", minWidth: 220, maxWidth: 420, overflow: "wrap" }
+  ];
+  grid.Collection = collection;
+
+  page.Add(grid);
+  app.Run(page);
+
+  assertEqual(
+    grid._headerNode.style.gridTemplateColumns,
+    "180px minmax(220px, 420px)",
+    "Flexible columns should honor both minimum and maximum bounds in the grid track."
+  );
+  assertEqual(
+    grid._rowNodes[0].style.gridTemplateColumns,
+    "180px minmax(220px, 420px)",
+    "Row tracks should mirror bounded flexible column sizing."
+  );
+}
+
+function testDataGridSupportsSortingFilteringAndOverflowModes() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var collection = new JOG.Collection({
+    rows: [
+      { id: "1", account: "Northwind", value: 100, nextStep: "Send revised pricing" },
+      { id: "2", account: "Atlas", value: 220, nextStep: "Review rollout plan with operations" },
+      { id: "3", account: "Beacon", value: 150, nextStep: "Confirm executive sponsor" }
+    ]
+  });
+  var grid = new JOG.DataGrid();
+  var capturedSort = "";
+  var capturedEdit = "";
+
+  grid.Columns = [
+    { key: "account", title: "Account", width: "160px", editable: true },
+    { key: "value", title: "Value", width: "120px", align: "right", sortValue: function(value) { return value; } },
+    { key: "nextStep", title: "Next Step", width: "220px", overflow: "wrap", editable: true }
+  ];
+  grid.Collection = collection;
+  grid.FilterColumns = ["account", "nextStep"];
+  grid.OnSortChange(function(args) {
+    capturedSort = args.SortKey + ":" + args.SortDirection;
+  });
+  grid.OnCellEditCommit(function(args) {
+    capturedEdit = args.Column.key + ":" + args.Value;
+  });
+
+  page.Add(grid);
+  app.Run(page);
+
+  dispatchNodeClick(grid._headerNode.children[1]);
+  app.Runtime.flush();
+  assertEqual(capturedSort, "value:asc", "Sorting should raise SortChange with the column key and direction.");
+  assertEqual(grid.SortKey, "value", "Sorting should persist the selected sort key.");
+  assertEqual(grid._rowNodes[0].children[0].textContent, "Northwind", "Ascending sort should place the lowest value first.");
+
+  dispatchNodeClick(grid._headerNode.children[1]);
+  app.Runtime.flush();
+  assertEqual(grid.SortDirection, "desc", "Clicking the same header again should reverse the sort direction.");
+  assertEqual(grid._rowNodes[0].children[0].textContent, "Atlas", "Descending sort should place the highest value first.");
+
+  grid.FilterText = "pricing";
+  app.Runtime.flush();
+  assertEqual(grid._rowNodes.length, 1, "FilterText should reduce the grid to matching rows.");
+  assertEqual(grid._rowNodes[0].children[0].textContent, "Northwind", "Filtering should match configured filter columns.");
+  assertEqual(grid._rowNodes[0].children[2].className.indexOf("jog-data-grid-cell-wrap") >= 0, true, "Wrap overflow should apply a dedicated cell class.");
+
+  grid.ClearSort();
+  grid.FilterText = "";
+  app.Runtime.flush();
+  assertEqual(grid._rowNodes.length, 3, "Clearing the filter should restore all rows.");
+  assertEqual(grid.SortDirection, "", "ClearSort should reset the sort direction.");
+
+  dispatchNodeDoubleClick(grid._rowNodes[0].children[0]);
+  app.Runtime.flush();
+  assertEqual(grid._rowNodes[0].children[0].children[0].tagName, "INPUT", "Editable cells should swap in an editor on double click.");
+  dispatchNodeClick(grid._rowNodes[0].children[0].children[0]);
+  app.Runtime.flush();
+  assertEqual(grid._rowNodes[0].children[0].children[0].tagName, "INPUT", "Clicking into the active editor should not collapse edit mode.");
+  grid._rowNodes[0].children[0].children[0].value = "Northwind Labs";
+  dispatchNodeDoubleClick(grid._rowNodes[0].children[2]);
+  app.Runtime.flush();
+  assertEqual(grid._rowNodes[0].children[2].children[0].tagName, "INPUT", "Editing a second cell should move the active editor.");
+  assertEqual(collection.GetRow("1").account, "Northwind Labs", "Moving to a new editable cell should commit the previous edit first.");
+  grid._rowNodes[0].children[2].children[0].value = "Share the updated rollout plan";
+  dispatchNodeKeyDown(grid._rowNodes[0].children[2].children[0], "Enter");
+  app.Runtime.flush();
+  assertEqual(collection.GetRow("1").nextStep, "Share the updated rollout plan", "Enter should commit a text-cell edit.");
+  assertEqual(collection.GetRow("1").account, "Northwind Labs", "Inline editing should commit collection updates.");
+  assertEqual(capturedEdit, "nextStep:Share the updated rollout plan", "Inline editing should raise a commit event with the updated value.");
 }
 
 function testOpportunityBoardUsesCollectionAndDataGridFlow() {
@@ -2464,6 +2603,9 @@ function testOpportunityBoardUsesCollectionAndDataGridFlow() {
   var grid = findControl(loaded.page, function(control) {
     return control.Name === "opportunityDataGrid";
   });
+  var filterInput = findControl(loaded.page, function(control) {
+    return control.Name === "opportunityFilterInput";
+  });
   var accountRepeater = findControl(loaded.page, function(control) {
     return control.Name === "opportunityAccountRepeater";
   });
@@ -2480,6 +2622,7 @@ function testOpportunityBoardUsesCollectionAndDataGridFlow() {
   assertEqual(clearSelectionButton.Enabled, false, "OpportunityBoard should disable Clear Selection until a row is selected.");
   assertEqual(markCleanButton.Enabled, false, "OpportunityBoard should disable Mark Clean until local changes exist.");
   assert(!!grid, "OpportunityBoard should render a DataGrid.");
+  assertEqual(filterInput.Text, "", "OpportunityBoard should start with an empty grid filter.");
   assertEqual(accountRepeater._typeName, "Repeater", "OpportunityBoard should use the repeater helper for sidebar account rows.");
   assertEqual(accountRepeater.Children.length, 3, "OpportunityBoard repeater should render seeded opportunity rows.");
   assertEqual(grid.Collection.GetRows().length, 3, "OpportunityBoard should start with seeded collection rows.");
@@ -2500,6 +2643,16 @@ function testOpportunityBoardUsesCollectionAndDataGridFlow() {
   loaded.app.Runtime.flush();
   assertEqual(markCleanButton.Enabled, true, "OpportunityBoard should enable Mark Clean after local changes.");
   assertEqual(accountRepeater.Children[1].Text, "Atlas Bio - Qualified", "OpportunityBoard repeater should stay in sync after collection updates.");
+  assertEqual(
+    grid._headerNode.style.gridTemplateColumns.indexOf("minmax(220px, 420px)") >= 0,
+    true,
+    "OpportunityBoard should demonstrate a bounded flexible grid column for wider datasets."
+  );
+
+  dispatchTextInput(filterInput, "summit");
+  loaded.app.Runtime.flush();
+  assertEqual(grid.FilterText, "summit", "OpportunityBoard should bind the filter input into the DataGrid filter text.");
+  assertEqual(grid._rowNodes.length, 1, "OpportunityBoard filter should narrow visible grid rows.");
 }
 
 var tests = [
@@ -2563,6 +2716,8 @@ var tests = [
   { name: "collection tracks updates selection dirty state and summaries", fn: testCollectionTracksUpdatesSelectionDirtyStateAndSummaries },
   { name: "data grid renders selection commands and collection refresh", fn: testDataGridRendersSelectionCommandsAndCollectionRefresh },
   { name: "data grid supports resizable pixel-width columns", fn: testDataGridSupportsResizablePixelWidthColumns },
+  { name: "data grid supports bounded flexible columns", fn: testDataGridSupportsBoundedFlexibleColumns },
+  { name: "data grid supports sorting filtering and overflow modes", fn: testDataGridSupportsSortingFilteringAndOverflowModes },
   { name: "opportunity board uses collection and data grid flow", fn: testOpportunityBoardUsesCollectionAndDataGridFlow }
 ];
 
