@@ -1,4 +1,4 @@
-# JOG
+# JavaScript Object GUI ("JOG")
 
 JOG is a JavaScript-first browser UI framework aimed at developers who want a desktop-style programming model for front ends.
 
