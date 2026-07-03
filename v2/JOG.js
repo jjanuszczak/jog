@@ -1041,6 +1041,32 @@
     };
   };
 
+  Store.prototype.Derive = function(key, dependencyKeys, compute) {
+    var store = this;
+    var keys = ensureArray(dependencyKeys).slice();
+    var unsubscribes = [];
+
+    invariant(!!key, "Store.Derive requires a target key.");
+    invariant(keys.length > 0, "Store.Derive requires at least one dependency key.");
+    invariant(typeof compute === "function", "Store.Derive requires a compute function.");
+
+    function update() {
+      store.Set(key, compute(store));
+    }
+
+    keys.forEach(function(dependencyKey) {
+      unsubscribes.push(store.Subscribe(dependencyKey, update));
+    });
+
+    update();
+
+    return function() {
+      unsubscribes.forEach(function(unsubscribe) {
+        unsubscribe();
+      });
+    };
+  };
+
   Store.prototype._emit = function(key, value) {
     var listeners = ensureArray(this._listeners[key]).slice();
     listeners.forEach(function(listener) {
@@ -1421,6 +1447,136 @@
         listeners.splice(index, 1);
       }
     };
+  };
+
+  Collection.prototype.BindStore = function(store, key, eventKeys, compute) {
+    var collection = this;
+    var keys = ensureArray(eventKeys).slice();
+    var unsubscribes = [];
+
+    invariant(!!store && typeof store.Set === "function", "Collection.BindStore requires a target store.");
+    invariant(!!key, "Collection.BindStore requires a target store key.");
+    invariant(keys.length > 0, "Collection.BindStore requires at least one collection event key.");
+    invariant(typeof compute === "function", "Collection.BindStore requires a compute function.");
+
+    function update() {
+      store.Set(key, compute(collection, store));
+    }
+
+    keys.forEach(function(eventKey) {
+      unsubscribes.push(collection.Subscribe(eventKey, update));
+    });
+
+    update();
+
+    return function() {
+      unsubscribes.forEach(function(unsubscribe) {
+        unsubscribe();
+      });
+    };
+  };
+
+  function FormState(store, options) {
+    var config = options || {};
+    var summaryFormatter = config.summaryFormatter;
+
+    invariant(!!store && typeof store.Get === "function" && typeof store.Set === "function", "FormState requires a store.");
+
+    this._store = store;
+    this._summaryKey = config.summaryKey ? String(config.summaryKey) : "";
+    this._validKey = config.validKey ? String(config.validKey) : "";
+    this._watchUnsubscribes = [];
+    this._summaryFormatter = typeof summaryFormatter === "function"
+      ? summaryFormatter
+      : function(messages) {
+          return messages.length ? "Please fix: " + messages.join(" | ") : "";
+        };
+    this._validations = ensureArray(config.validations).map(function(validation) {
+      invariant(!!validation && !!validation.errorKey, "FormState validations require an errorKey.");
+      invariant(typeof validation.validate === "function", "FormState validations require a validate function.");
+      return {
+        errorKey: String(validation.errorKey),
+        validate: validation.validate
+      };
+    });
+  }
+
+  FormState.prototype._setSummary = function(messages) {
+    if (!this._summaryKey) {
+      return;
+    }
+    this._store.Set(this._summaryKey, this._summaryFormatter(messages, this._store));
+  };
+
+  FormState.prototype._setValid = function(isValid) {
+    if (!this._validKey) {
+      return;
+    }
+    this._store.Set(this._validKey, !!isValid);
+  };
+
+  FormState.prototype.Validate = function() {
+    var formState = this;
+    var messages = [];
+
+    this._validations.forEach(function(validation) {
+      var message = validation.validate(formState._store);
+      var normalized = message == null ? "" : String(message);
+
+      formState._store.Set(validation.errorKey, normalized);
+      if (normalized) {
+        messages.push(normalized);
+      }
+    });
+
+    this._setSummary(messages);
+    this._setValid(messages.length === 0);
+    return messages.length === 0;
+  };
+
+  FormState.prototype.ClearErrors = function() {
+    var formState = this;
+
+    this._validations.forEach(function(validation) {
+      formState._store.Set(validation.errorKey, "");
+    });
+    this._setSummary([]);
+    this._setValid(true);
+  };
+
+  FormState.prototype.Watch = function(keys, options) {
+    var formState = this;
+    var dependencyKeys = ensureArray(keys).slice();
+    var config = options || {};
+    var mode = config.mode === "always" ? "always" : "errors";
+
+    this.StopWatching();
+    this._watchUnsubscribes = dependencyKeys.map(function(key) {
+      return formState._store.Subscribe(key, function() {
+        var hasErrors;
+        if (mode === "always") {
+          formState.Validate();
+          return;
+        }
+        hasErrors = formState._validations.some(function(validation) {
+          return !!formState._store.Get(validation.errorKey);
+        });
+        if (hasErrors) {
+          formState.Validate();
+        }
+      });
+    });
+
+    return function() {
+      formState.StopWatching();
+    };
+  };
+
+  FormState.prototype.StopWatching = function() {
+    this._watchUnsubscribes.forEach(function(unsubscribe) {
+      unsubscribe();
+    });
+    this._watchUnsubscribes = [];
   };
 
   function Runtime(application) {
@@ -2171,6 +2327,16 @@
     var control = this;
     var listener = function(value) {
       control.Visible = transform ? !!transform(value) : !!value;
+    };
+    var unsubscribe = store.Subscribe(key, listener);
+    this._bindings.push({ unsubscribe: unsubscribe });
+    listener(store.Get(key));
+  };
+
+  Component.prototype.BindEnabled = function(store, key, transform) {
+    var control = this;
+    var listener = function(value) {
+      control.Enabled = transform ? !!transform(value) : !!value;
     };
     var unsubscribe = store.Subscribe(key, listener);
     this._bindings.push({ unsubscribe: unsubscribe });
@@ -3002,6 +3168,92 @@
   Object.defineProperty(StackPanel.prototype, "Responsive", {
     get: function() { return this._state.responsive; },
     set: function(value) { this._setState("responsive", cloneResponsiveConfig(value, normalizeResponsiveStackBreakpoint)); }
+  });
+
+  function Repeater() {
+    StackPanel.call(this);
+    this._typeName = "Repeater";
+    this._state.emptyText = "";
+    this._collection = null;
+    this._itemRenderer = null;
+    this._collectionUnsubscribe = null;
+  }
+
+  Repeater.prototype = Object.create(StackPanel.prototype);
+  Repeater.prototype.constructor = Repeater;
+
+  Repeater.prototype._createDomNode = function(doc) {
+    var node = StackPanel.prototype._createDomNode.call(this, doc);
+    node.classList.add("jog-repeater");
+    return node;
+  };
+
+  Repeater.prototype._clearRepeatedChildren = function() {
+    while (this._children.length) {
+      Container.prototype.Remove.call(this, this._children[0]);
+    }
+  };
+
+  Repeater.prototype._renderCollectionRows = function() {
+    var repeater = this;
+    var rows;
+
+    this._clearRepeatedChildren();
+    if (!this._collection || typeof this._itemRenderer !== "function") {
+      return;
+    }
+
+    rows = this._collection.GetRows();
+    if (!rows.length && this._state.emptyText) {
+      var emptyLabel = new Label();
+      emptyLabel.Text = this._state.emptyText;
+      Container.prototype.Add.call(this, emptyLabel);
+      return;
+    }
+
+    rows.forEach(function(row, index) {
+      var child = repeater._itemRenderer(row, index, repeater._collection);
+
+      invariant(!!child && typeof child._renderIfNeeded === "function", "Repeater renderer must return a JOG control.");
+      Container.prototype.Add.call(repeater, child);
+    });
+  };
+
+  Repeater.prototype.BindCollection = function(collection, renderer) {
+    var repeater = this;
+
+    invariant(!!collection && typeof collection.Subscribe === "function" && typeof collection.GetRows === "function", "Repeater.BindCollection requires a collection.");
+    invariant(typeof renderer === "function", "Repeater.BindCollection requires a renderer function.");
+
+    if (this._collectionUnsubscribe) {
+      this._collectionUnsubscribe();
+      this._collectionUnsubscribe = null;
+    }
+
+    this._collection = collection;
+    this._itemRenderer = renderer;
+    this._collectionUnsubscribe = collection.Subscribe("change", function() {
+      repeater._renderCollectionRows();
+    });
+    this._bindings.push({
+      unsubscribe: function() {
+        if (repeater._collectionUnsubscribe) {
+          repeater._collectionUnsubscribe();
+          repeater._collectionUnsubscribe = null;
+        }
+      }
+    });
+    this._renderCollectionRows();
+  };
+
+  Object.defineProperty(Repeater.prototype, "EmptyText", {
+    get: function() { return this._state.emptyText; },
+    set: function(value) {
+      this._setState("emptyText", value == null ? "" : String(value));
+      if (this._collection) {
+        this._renderCollectionRows();
+      }
+    }
   });
 
   function MenuBar() {
@@ -4804,6 +5056,7 @@
   JOG.WorkspaceShell = WorkspaceShell;
   JOG.SplitPanel = SplitPanel;
   JOG.StackPanel = StackPanel;
+  JOG.Repeater = Repeater;
   JOG.MenuBar = MenuBar;
   JOG.ToolBar = ToolBar;
   JOG.StatusBar = StatusBar;
@@ -4827,6 +5080,7 @@
   JOG.ListBox = ListBox;
   JOG.Store = Store;
   JOG.Collection = Collection;
+  JOG.FormState = FormState;
   JOG.EventArgs = EventArgs;
 
   global.JOG = JOG;

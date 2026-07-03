@@ -1,64 +1,44 @@
 (function(global) {
   "use strict";
 
-  function buildSummary(store) {
-    var summary = [
-      "Name: " + store.Get("customerName"),
-      "Tier: " + store.Get("customerTier"),
-      "Region: " + store.Get("customerRegion"),
-      "Owner: " + store.Get("customerOwner"),
-      "Active: " + (store.Get("customerActive") ? "Yes" : "No"),
-      "Notes: " + store.Get("customerNotes")
-    ].join(" | ");
-    store.Set("summary", summary);
-  }
-
-  function setFieldError(store, key, message) {
-    store.Set(key, message);
-  }
-
-  function validateForm(store) {
-    var hasErrors = false;
-    var name = (store.Get("customerName") || "").trim();
-    var region = (store.Get("customerRegion") || "").trim();
-    var notes = (store.Get("customerNotes") || "").trim();
-
-    if (name.length < 3) {
-      setFieldError(store, "customerNameError", "Enter a customer name with at least 3 characters.");
-      hasErrors = true;
-    } else {
-      setFieldError(store, "customerNameError", "");
-    }
-
-    if (notes.length < 12) {
-      setFieldError(store, "customerNotesError", "Enter notes with at least 12 characters.");
-      hasErrors = true;
-    } else {
-      setFieldError(store, "customerNotesError", "");
-    }
-
-    if (!region) {
-      setFieldError(store, "customerRegionError", "Select the customer region before saving this intake.");
-      hasErrors = true;
-    } else {
-      setFieldError(store, "customerRegionError", "");
-    }
-
-    if (!store.Get("customerActive")) {
-      setFieldError(store, "customerActiveError", "Confirm the customer is active before saving this intake.");
-      hasErrors = true;
-    } else {
-      setFieldError(store, "customerActiveError", "");
-    }
-
-    return !hasErrors;
-  }
-
-  function clearValidation(store) {
-    setFieldError(store, "customerNameError", "");
-    setFieldError(store, "customerRegionError", "");
-    setFieldError(store, "customerActiveError", "");
-    setFieldError(store, "customerNotesError", "");
+  function createCustomerFormState(store) {
+    return new JOG.FormState(store, {
+      summaryKey: "formValidationSummary",
+      validations: [
+        {
+          errorKey: "customerNameError",
+          validate: function(currentStore) {
+            return (currentStore.Get("customerName") || "").trim().length < 3
+              ? "Enter a customer name with at least 3 characters."
+              : "";
+          }
+        },
+        {
+          errorKey: "customerRegionError",
+          validate: function(currentStore) {
+            return (currentStore.Get("customerRegion") || "").trim()
+              ? ""
+              : "Select the customer region before saving this intake.";
+          }
+        },
+        {
+          errorKey: "customerActiveError",
+          validate: function(currentStore) {
+            return currentStore.Get("customerActive")
+              ? ""
+              : "Confirm the customer is active before saving this intake.";
+          }
+        },
+        {
+          errorKey: "customerNotesError",
+          validate: function(currentStore) {
+            return (currentStore.Get("customerNotes") || "").trim().length < 12
+              ? "Enter notes with at least 12 characters."
+              : "";
+          }
+        }
+      ]
+    });
   }
 
   function CustomerFormPage() {
@@ -75,6 +55,8 @@
       customerActive: true,
       customerNotes: "Interested in a pilot rollout during Q4.",
       summary: "",
+      summarySuffix: "",
+      formValidationSummary: "",
       saveStatus: "Ready to save.",
       customerNameError: "",
       customerRegionError: "",
@@ -82,7 +64,29 @@
       customerNotesError: ""
     });
 
-    buildSummary(store);
+    store.Derive("summary", [
+      "customerName",
+      "customerTier",
+      "customerRegion",
+      "customerOwner",
+      "customerActive",
+      "customerNotes",
+      "summarySuffix"
+    ], function(currentStore) {
+      var summary = [
+        "Name: " + currentStore.Get("customerName"),
+        "Tier: " + currentStore.Get("customerTier"),
+        "Region: " + currentStore.Get("customerRegion"),
+        "Owner: " + currentStore.Get("customerOwner"),
+        "Active: " + (currentStore.Get("customerActive") ? "Yes" : "No"),
+        "Notes: " + currentStore.Get("customerNotes")
+      ].join(" | ");
+      var suffix = currentStore.Get("summarySuffix");
+
+      return suffix ? summary + " | " + suffix : summary;
+    });
+    var formState = createCustomerFormState(store);
+    formState.Watch(["customerName", "customerRegion", "customerActive", "customerNotes"]);
 
     var shell = new JOG.SectionPanel();
     shell.Name = "formShell";
@@ -129,12 +133,7 @@
 
     var validationSection = new JOG.ValidationSummary();
     validationSection.Name = "validationSection";
-    validationSection.BindErrors(store, [
-      "customerNameError",
-      "customerRegionError",
-      "customerActiveError",
-      "customerNotesError"
-    ]);
+    validationSection.BindSummary(store, "formValidationSummary");
 
     var nameLabel = new JOG.Label();
     nameLabel.Text = "Customer Name";
@@ -297,12 +296,11 @@
     var saveButton = new JOG.Button();
     saveButton.Text = "Save Form";
     saveButton.OnClick(function() {
-      if (!validateForm(store)) {
+      if (!formState.Validate()) {
         store.Set("saveStatus", "Validation failed. Fix the highlighted fields.");
         return;
       }
-      buildSummary(store);
-      store.Set("summary", store.Get("summary") + " | Saved");
+      store.Set("summarySuffix", "Saved");
       store.Set("saveStatus", "Saved successfully.");
     });
 
@@ -315,8 +313,8 @@
       store.Set("customerOwner", "maya");
       store.Set("customerActive", true);
       store.Set("customerNotes", "Interested in a pilot rollout during Q4.");
-      clearValidation(store);
-      buildSummary(store);
+      formState.ClearErrors();
+      store.Set("summarySuffix", "");
       store.Set("saveStatus", "Form reset.");
     });
 
@@ -337,26 +335,11 @@
       return "Status: " + value;
     });
 
-    ["customerName", "customerRegion", "customerActive", "customerNotes"].forEach(function(key) {
-      store.Subscribe(key, function() {
-        if (key === "customerName" && store.Get("customerNameError")) {
-          validateForm(store);
-        }
-        if (key === "customerRegion" && store.Get("customerRegionError")) {
-          validateForm(store);
-        }
-        if (key === "customerActive" && store.Get("customerActiveError")) {
-          validateForm(store);
-        }
-        if (key === "customerNotes" && store.Get("customerNotesError")) {
-          validateForm(store);
-        }
-      });
-    });
-
     ["customerName", "customerTier", "customerRegion", "customerOwner", "customerActive", "customerNotes"].forEach(function(key) {
       store.Subscribe(key, function() {
-        buildSummary(store);
+        if (store.Get("summarySuffix")) {
+          store.Set("summarySuffix", "");
+        }
       });
     });
 

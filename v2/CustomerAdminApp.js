@@ -11,46 +11,41 @@
     store.Set("sidebarSelection", "Selected: " + name);
   }
 
-  function setSelectedFieldError(store, key, message) {
-    store.Set(key, message);
-  }
+  function createSelectedCustomerFormState(store) {
+    return new JOG.FormState(store, {
+      summaryKey: "selectedValidationSummary",
+      validations: [
+        {
+          errorKey: "selectedNameError",
+          validate: function(currentStore) {
+            return (currentStore.Get("selectedName") || "").trim().length < 3
+              ? "Enter a customer name with at least 3 characters."
+              : "";
+          }
+        },
+        {
+          errorKey: "selectedStatusError",
+          validate: function(currentStore) {
+            var status = (currentStore.Get("selectedStatus") || "").trim();
+            var allowedStatuses = ["active", "pending", "inactive"];
 
-  function validateSelectedCustomer(store) {
-    var hasErrors = false;
-    var name = (store.Get("selectedName") || "").trim();
-    var status = (store.Get("selectedStatus") || "").trim();
-    var allowedStatuses = ["active", "pending", "inactive"];
-
-    if (name.length < 3) {
-      setSelectedFieldError(store, "selectedNameError", "Enter a customer name with at least 3 characters.");
-      hasErrors = true;
-    } else {
-      setSelectedFieldError(store, "selectedNameError", "");
-    }
-
-    if (!status) {
-      setSelectedFieldError(store, "selectedStatusError", "Enter a customer status.");
-      hasErrors = true;
-    } else if (allowedStatuses.indexOf(status.toLowerCase()) < 0) {
-      setSelectedFieldError(store, "selectedStatusError", "Status must be Active, Pending, or Inactive.");
-      hasErrors = true;
-    } else {
-      setSelectedFieldError(store, "selectedStatusError", "");
-    }
-
-    return !hasErrors;
-  }
-
-  function clearSelectedValidation(store) {
-    setSelectedFieldError(store, "selectedNameError", "");
-    setSelectedFieldError(store, "selectedStatusError", "");
+            if (!status) {
+              return "Enter a customer status.";
+            }
+            if (allowedStatuses.indexOf(status.toLowerCase()) < 0) {
+              return "Status must be Active, Pending, or Inactive.";
+            }
+            return "";
+          }
+        }
+      ]
+    });
   }
 
   function persistSelectedCustomer(store) {
     var customerKey = store.Get("selectedCustomerKey");
     var name = store.Get("selectedName");
     var status = store.Get("selectedStatus");
-    var summary = name + " - " + status;
 
     if (!customerKey) {
       return;
@@ -58,12 +53,11 @@
 
     store.Set(customerKey + "Name", name);
     store.Set(customerKey + "Status", status);
-    store.Set(customerKey + "Summary", summary);
-    store.Set("selectedSummary", summary);
+    store.Set("selectedSummary", name + " - " + status);
     store.Set("sidebarSelection", "Selected: " + name);
   }
 
-  function EditCustomerDialog(store) {
+  function EditCustomerDialog(store, formState) {
     JOG.Dialog.call(this);
 
     this.Name = "editCustomerDialog";
@@ -83,10 +77,7 @@
 
     var validationSection = new JOG.ValidationSummary();
     validationSection.Name = "dialogValidationSection";
-    validationSection.BindErrors(store, [
-      "selectedNameError",
-      "selectedStatusError"
-    ]);
+    validationSection.BindSummary(store, "selectedValidationSummary");
 
     var nameLabel = new JOG.Label();
     nameLabel.Text = "Customer Name";
@@ -125,7 +116,7 @@
     var saveButton = new JOG.Button();
     saveButton.Text = "Save Customer";
     saveButton.OnClick(function() {
-      if (!validateSelectedCustomer(store)) {
+      if (!formState.Validate()) {
         store.Set("message", "Validation failed. Fix the selected customer fields.");
         return;
       }
@@ -169,19 +160,29 @@
     var store = new JOG.Store({
       customerOneName: "Acme Trading",
       customerOneStatus: "Active",
-      customerOneSummary: "Acme Trading - Active",
+      customerOneSummary: "",
       customerTwoName: "Northwind Foods",
       customerTwoStatus: "Pending",
-      customerTwoSummary: "Northwind Foods - Pending",
+      customerTwoSummary: "",
       selectedCustomerKey: "customerOne",
       selectedName: "Acme Trading",
       selectedStatus: "Active",
       selectedSummary: "Acme Trading - Active",
       sidebarSelection: "Selected: Acme Trading",
       message: "Ready",
+      selectedValidationSummary: "",
       selectedNameError: "",
       selectedStatusError: ""
     });
+
+    store.Derive("customerOneSummary", ["customerOneName", "customerOneStatus"], function(currentStore) {
+      return currentStore.Get("customerOneName") + " - " + currentStore.Get("customerOneStatus");
+    });
+    store.Derive("customerTwoSummary", ["customerTwoName", "customerTwoStatus"], function(currentStore) {
+      return currentStore.Get("customerTwoName") + " - " + currentStore.Get("customerTwoStatus");
+    });
+    var selectedFormState = createSelectedCustomerFormState(store);
+    selectedFormState.Watch(["selectedName", "selectedStatus"]);
 
     var shell = new JOG.WorkspaceShell();
     shell.Name = "customerShell";
@@ -229,10 +230,7 @@
     });
 
     var customerOneSummary = new JOG.Label();
-    customerOneSummary.Text = store.Get("customerOneSummary");
-    store.Subscribe("customerOneSummary", function(value) {
-      customerOneSummary.Text = value;
-    });
+    customerOneSummary.BindText(store, "customerOneSummary");
 
     customerOneButton.OnClick(function() {
       setSelectedCustomer(store, "customerOne");
@@ -245,10 +243,7 @@
     });
 
     var customerTwoSummary = new JOG.Label();
-    customerTwoSummary.Text = store.Get("customerTwoSummary");
-    store.Subscribe("customerTwoSummary", function(value) {
-      customerTwoSummary.Text = value;
-    });
+    customerTwoSummary.BindText(store, "customerTwoSummary");
 
     customerTwoButton.OnClick(function() {
       setSelectedCustomer(store, "customerTwo");
@@ -272,21 +267,14 @@
     detailStack.Gap = 12;
 
     var selectedSummary = new JOG.Label();
-    selectedSummary.Text = store.Get("selectedSummary");
-    store.Subscribe("selectedSummary", function(value) {
-      selectedSummary.Text = value;
-    });
+    selectedSummary.BindText(store, "selectedSummary");
 
     var selectedMarker = new JOG.Label();
-    selectedMarker.Text = store.Get("sidebarSelection");
-    store.Subscribe("sidebarSelection", function(value) {
-      selectedMarker.Text = value;
-    });
+    selectedMarker.BindText(store, "sidebarSelection");
 
     var message = new JOG.Label();
-    message.Text = "Status: " + store.Get("message");
-    store.Subscribe("message", function(value) {
-      message.Text = "Status: " + value;
+    message.BindText(store, "message", function(value) {
+      return "Status: " + value;
     });
 
     var editButton = new JOG.Button();
@@ -311,10 +299,7 @@
 
     var inlineValidationSection = new JOG.ValidationSummary();
     inlineValidationSection.Name = "inlineValidationSection";
-    inlineValidationSection.BindErrors(store, [
-      "selectedNameError",
-      "selectedStatusError"
-    ]);
+    inlineValidationSection.BindSummary(store, "selectedValidationSummary");
 
     var inlineNameError = new JOG.ValidationMessage();
     inlineNameError.Name = "inlineSelectedNameError";
@@ -349,11 +334,11 @@
     detailStack.Add(message);
     detail.Add(detailStack);
 
-    var editDialog = new EditCustomerDialog(store);
+    var editDialog = new EditCustomerDialog(store, selectedFormState);
     editDialog.Hide();
 
     applyInline.OnClick(function() {
-      if (!validateSelectedCustomer(store)) {
+      if (!selectedFormState.Validate()) {
         store.Set("message", "Validation failed. Fix the selected customer fields.");
         return;
       }
@@ -362,19 +347,8 @@
     });
 
     editButton.OnClick(function() {
-      clearSelectedValidation(store);
+      selectedFormState.ClearErrors();
       editDialog.ShowModal();
-    });
-
-    ["selectedName", "selectedStatus"].forEach(function(key) {
-      store.Subscribe(key, function() {
-        if (key === "selectedName" && store.Get("selectedNameError")) {
-          validateSelectedCustomer(store);
-        }
-        if (key === "selectedStatus" && store.Get("selectedStatusError")) {
-          validateSelectedCustomer(store);
-        }
-      });
     });
 
     workspace.Add(sidebar);
