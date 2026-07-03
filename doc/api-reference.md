@@ -359,6 +359,7 @@ Notes:
 - `Fill` stretches ordinary flow-layout controls with flex and `100%` sizing when appropriate
 - dock-managed children inside `DockPanel` still honor `Fill` for stretch intent, but do not keep raw `100%` width or height overrides because dock layout owns those dimensions
 - `Gap` is a generic spacing property, but `DockPanel` now uses it specifically for spacing between docked regions
+- `WorkspaceShell` also uses `Dock` and `Fill` through the same dock-managed layout path as `DockPanel`
 - `Dock` accepts `none`, `top`, `bottom`, `left`, `right`, `fill`
 - `ResponsiveLayout` accepts breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
 - `ResponsiveLayout` breakpoint values can override `width`, `height`, `minWidth`, `minHeight`, `maxWidth`, `maxHeight`, `left`, `top`, `padding`, `margin`, `gap`, and `dock`
@@ -449,6 +450,25 @@ Notes:
 
 - still the main shell-chrome container for top, bottom, left, right, and fill regions
 - a docked child `Gap` applies spacing after that region and overrides the panel-level gap for that one child
+
+### `JOG.WorkspaceShell`
+
+Extends `JOG.DockPanel`.
+
+Properties:
+
+- `Header`
+- `Sidebar`
+- `Content`
+
+Notes:
+
+- provides explicit shell slots for header plus sidebar plus content composition
+- defaults `Header` children to `Dock = "top"` when no explicit dock is already set
+- defaults `Sidebar` children to `Dock = "left"` when no explicit dock is already set
+- defaults `Content` children to `Dock = "fill"` when no explicit dock is already set
+- keeps slotted children ordered as header, sidebar, then content even if assigned in a different sequence
+- slotted children can still use inherited `ResponsiveLayout`, so a sidebar can collapse to a top region on smaller widths
 
 ### `JOG.SplitPanel`
 

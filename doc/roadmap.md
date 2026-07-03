@@ -32,6 +32,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - narrow `Fill` layout flag for stretching workspace content inside shell layouts
 - `Fill` no longer overrides dock-managed child width and height with raw `100%` sizing, which keeps page shells and split workspaces inside their containers
 - `DockPanel` now supports container and docked-child `Gap` spacing so shells can reserve chrome separation without manual margin glue
+- `WorkspaceShell` now provides explicit header, sidebar, and content slots for common page-shell composition
 - container child-structure changes now also dirty parent layout so docked shells reflow after tab and workspace mutations
 - control-level invalid state and error text
 - application diagnostics with debug logging and tree dump
@@ -53,6 +54,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 
 - `Panel`
 - `DockPanel`
+- `WorkspaceShell`
 - `SplitPanel`
 - `StackPanel`
 - `SectionPanel`
@@ -123,6 +125,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - customer admin example
 - customer admin now demonstrates a `SplitPanel` left-nav-plus-content workspace
 - customer admin now uses `PageHeader` instead of a manual fixed-height title panel
+- customer admin now uses `WorkspaceShell` instead of wiring the page-shell header and fill region manually
 - customer admin shell no longer overflows on the right edge
 - customer admin shell now uses dock gap spacing instead of manual header margin coordination
 - customer admin edit dialog now starts hidden correctly and uses a larger scrollable window body
@@ -134,6 +137,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - opportunity board sample with CRM-style add, edit, and delete flows
 - opportunity board migrated to `Collection` plus `DataGrid`
 - opportunity board now uses `PageHeader` instead of a manual fixed-height title panel
+- opportunity board now uses `WorkspaceShell` instead of wiring the page-shell header, sidebar, and fill region manually
 - opportunity board now demonstrates first-pass resizable `DataGrid` columns
 - opportunity editor dialog with breakpoint-aware responsive grid layout
 - opportunity board shell with responsive dock and stack behavior
@@ -144,7 +148,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 ### Tests
 
 - Node test runner at `test/run-v2-tests.js`
-- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, dock-gap shell spacing, split, stack, section, and page-header behavior, browser text file helper flows, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
+- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, dock-gap shell spacing, workspace-shell slot behavior, split, stack, section, and page-header behavior, browser text file helper flows, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
 
 ## Partial
 
@@ -163,10 +167,12 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `StackPanel` now has breakpoint-based orientation and spacing overrides
 - `DockPanel` now supports responsive shell and child layout changes through inherited `ResponsiveLayout`
 - `DockPanel` now supports gap-driven shell spacing at both the container and docked-child level
+- `WorkspaceShell` now covers the common header plus sidebar plus content shell pattern without manual child-order coordination
 - `SplitPanel` now supports first-pane and second-pane sizing plus breakpoint-based orientation changes
 - `SectionPanel` now supports a dedicated responsive helper surface for title and body-padding changes
-- shell layout is substantially more dependable than it was before this hardening pass, but app code still owns higher-level workspace composition decisions
-- the framework still lacks deeper multi-pane workspace management beyond `DockPanel` plus `SplitPanel`
+- shell layout is substantially more dependable than it was before this hardening pass, but app code still owns deeper multi-pane workspace composition decisions
+- the framework still lacks deeper workspace management beyond `WorkspaceShell`, `DockPanel`, and `SplitPanel`
+- `WorkspaceShell` still lacks convenience helpers for common sidebar sizing and shell-region sizing patterns, so apps still set widths and responsive collapse behavior directly on child controls
 
 ### Shell Controls
 
@@ -238,8 +244,9 @@ That means the next phase is not broad control expansion for its own sake. The n
 ### 1. Shell And Layout Hardening
 
 - keep making shell layout boring and dependable across more than the current examples
-- reduce the remaining multi-pane sizing and workspace-composition glue in app code
-- add stronger desktop-style shell composition primitives such as split-workspace and left-nav-plus-content patterns
+- reduce the remaining multi-pane sizing and deeper workspace-composition glue in app code
+- keep tightening the higher-level shell primitives now that header plus sidebar plus content composition is runtime-managed
+- evaluate whether `WorkspaceShell` should grow narrow convenience helpers for sidebar sizing, responsive sidebar collapse, or other repeated shell-region sizing patterns
 - keep hardening container interactions so tab, split, and dialog-heavy shells stay stable without manual coordination
 
 ### 2. Richer Binding And App-State Helpers

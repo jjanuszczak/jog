@@ -1965,7 +1965,13 @@
   };
 
   Component.prototype._isDockManagedChild = function(resolvedState) {
-    return !!(this._parent && this._parent._typeName === "DockPanel" && resolvedState && resolvedState.dock && resolvedState.dock !== "none");
+    return !!(
+      this._parent &&
+      (this._parent._typeName === "DockPanel" || this._parent._typeName === "WorkspaceShell") &&
+      resolvedState &&
+      resolvedState.dock &&
+      resolvedState.dock !== "none"
+    );
   };
 
   Component.prototype._createDomNode = function(doc) {
@@ -2687,6 +2693,144 @@
   DockPanel.prototype._childUsesFlowLayout = function() {
     return false;
   };
+
+  function WorkspaceShell() {
+    DockPanel.call(this);
+    this._typeName = "WorkspaceShell";
+    this._headerChild = null;
+    this._sidebarChild = null;
+    this._contentChild = null;
+  }
+
+  WorkspaceShell.prototype = Object.create(DockPanel.prototype);
+  WorkspaceShell.prototype.constructor = WorkspaceShell;
+
+  WorkspaceShell.prototype._createDomNode = function(doc) {
+    var node = DockPanel.prototype._createDomNode.call(this, doc);
+    node.classList.add("jog-workspace-shell");
+    return node;
+  };
+
+  WorkspaceShell.prototype._syncWorkspaceChildren = function() {
+    var slotted = [this._headerChild, this._sidebarChild, this._contentChild].filter(function(child) {
+      return !!child;
+    });
+    var ordered = slotted.slice();
+
+    this._children.forEach(function(child) {
+      if (ordered.indexOf(child) < 0) {
+        ordered.push(child);
+      }
+    });
+
+    this._children = ordered;
+    this._state.children = this._children.slice();
+
+    if (this._domNode) {
+      this._children.forEach(function(child) {
+        if (child && child._domNode && child._domNode.parentNode === child._parent._domNode) {
+          child._parent._domNode.appendChild(child._domNode);
+        }
+      });
+    }
+
+    this._markDirty("children");
+    if (this._parent) {
+      this._parent._markDirty("child-layout");
+    }
+  };
+
+  WorkspaceShell.prototype._setShellRoleChild = function(slotName, child, defaultDock) {
+    var current = this[slotName];
+    var duplicate;
+
+    if (current === child) {
+      if (child && (!child.Dock || child.Dock === "none")) {
+        child.Dock = defaultDock;
+      }
+      this._syncWorkspaceChildren();
+      return;
+    }
+
+    if (child) {
+      invariant(child !== this, "A shell cannot add itself.");
+      invariant(!child.Parent || child.Parent === this, "Child already belongs to another container.");
+      if (child.Name) {
+        duplicate = this._children.some(function(existing) {
+          return existing !== current && existing !== child && existing.Name && existing.Name === child.Name;
+        });
+        invariant(!duplicate, "Duplicate child name in container: " + child.Name);
+      }
+    }
+
+    if (current) {
+      var currentIndex = this._children.indexOf(current);
+      if (currentIndex >= 0) {
+        this._children.splice(currentIndex, 1);
+        this._state.children = this._children.slice();
+      }
+      current._setParent(null);
+      current.Dispose();
+    }
+
+    this[slotName] = child || null;
+
+    if (child) {
+      if ((!child.Dock || child.Dock === "none") && (!child._state.dock || child._state.dock === "none")) {
+        child.Dock = defaultDock;
+      }
+      if (this._children.indexOf(child) < 0) {
+        child._setParent(this);
+        if (this._application) {
+          child._attachToApplication(this._application);
+        }
+        this._children.push(child);
+        child._markDirty("parent");
+      }
+    }
+
+    this._syncWorkspaceChildren();
+  };
+
+  WorkspaceShell.prototype.Remove = function(child) {
+    if (child === this._headerChild) {
+      this.Header = null;
+      return;
+    }
+    if (child === this._sidebarChild) {
+      this.Sidebar = null;
+      return;
+    }
+    if (child === this._contentChild) {
+      this.Content = null;
+      return;
+    }
+    DockPanel.prototype.Remove.call(this, child);
+  };
+
+  WorkspaceShell.prototype.Clear = function() {
+    this.Header = null;
+    this.Sidebar = null;
+    this.Content = null;
+    while (this._children.length) {
+      DockPanel.prototype.Remove.call(this, this._children[0]);
+    }
+  };
+
+  Object.defineProperty(WorkspaceShell.prototype, "Header", {
+    get: function() { return this._headerChild; },
+    set: function(value) { this._setShellRoleChild("_headerChild", value, "top"); }
+  });
+
+  Object.defineProperty(WorkspaceShell.prototype, "Sidebar", {
+    get: function() { return this._sidebarChild; },
+    set: function(value) { this._setShellRoleChild("_sidebarChild", value, "left"); }
+  });
+
+  Object.defineProperty(WorkspaceShell.prototype, "Content", {
+    get: function() { return this._contentChild; },
+    set: function(value) { this._setShellRoleChild("_contentChild", value, "fill"); }
+  });
 
   function SplitPanel() {
     Container.call(this, "SplitPanel");
@@ -4657,6 +4801,7 @@
   JOG.Page = Page;
   JOG.Panel = Panel;
   JOG.DockPanel = DockPanel;
+  JOG.WorkspaceShell = WorkspaceShell;
   JOG.SplitPanel = SplitPanel;
   JOG.StackPanel = StackPanel;
   JOG.MenuBar = MenuBar;
