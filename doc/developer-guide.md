@@ -233,6 +233,7 @@ This is the core architectural shift from V1. It separates control state from di
 
 The runtime now also exposes a narrow `Fill` flag for controls and containers that need to stretch inside shell layouts. This is not a general flexbox abstraction. It exists so shells and tab workspaces can reduce manual width and height math.
 When a control is already dock-managed inside a `DockPanel`, `Fill` now avoids forcing raw `100%` width and height so dock geometry remains authoritative.
+`DockPanel` now also honors `Gap` as shell spacing between docked regions. A docked child can override that spacing with its own `Gap` when one region needs a different separation than the rest of the shell.
 
 ## Data Controls
 
@@ -457,7 +458,7 @@ Children can set:
 - `Dock = "right"`
 - `Dock = "fill"`
 
-The container also respects container `Padding` and child `Margin`.
+The container also respects container `Padding`, container `Gap`, child `Margin`, and docked-child `Gap` overrides.
 
 Responsive dock behavior can now be driven through inherited `ResponsiveLayout` on the container and its children. This is the current way to collapse a left sidebar into a top region on smaller widths.
 

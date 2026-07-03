@@ -690,17 +690,18 @@ function testResponsiveDockAndStackLayoutsApplyOnMountAndResize() {
   shell.Width = 900;
   shell.Height = 600;
   shell.Padding = 24;
+  shell.Gap = 14;
   shell.ResponsiveLayout = {
-    base: { padding: 12 },
-    md: { padding: 24 }
+    base: { padding: 12, gap: 10 },
+    md: { padding: 24, gap: 14 }
   };
 
   sidebar.Title = "Sidebar";
   sidebar.Dock = "left";
   sidebar.Width = 220;
   sidebar.ResponsiveLayout = {
-    base: { dock: "top", width: null, height: 120, margin: { bottom: 10 } },
-    md: { dock: "left", width: 220, height: null, margin: { top: 0, right: 20, bottom: 0, left: 0 } }
+    base: { dock: "top", width: null, height: 120, gap: 10 },
+    md: { dock: "left", width: 220, height: null, gap: 20 }
   };
 
   content.Title = "Content";
@@ -723,6 +724,7 @@ function testResponsiveDockAndStackLayoutsApplyOnMountAndResize() {
 
   assertEqual(sidebar._domNode.style.top, "12px", "Responsive dock child should dock to the top on narrow mount.");
   assertEqual(sidebar._domNode.style.height, "120px", "Responsive dock child should use mobile height on narrow mount.");
+  assertEqual(content._domNode.style.top, "142px", "DockPanel should place fill content after responsive mobile dock gap.");
   assertEqual(actionRow._domNode.className.indexOf("vertical") >= 0, true, "Responsive StackPanel should switch to vertical on narrow mount.");
   assertEqual(actionRow._domNode.style.gap, "12px", "Responsive StackPanel should use its mobile gap on narrow mount.");
 
@@ -731,8 +733,70 @@ function testResponsiveDockAndStackLayoutsApplyOnMountAndResize() {
 
   assertEqual(sidebar._domNode.style.left, "24px", "Responsive dock child should dock left on wider resize.");
   assertEqual(sidebar._domNode.style.width, "220px", "Responsive dock child should restore desktop width on wider resize.");
+  assertEqual(content._domNode.style.left, "264px", "DockPanel should place fill content after responsive desktop dock gap.");
   assertEqual(actionRow._domNode.className.indexOf("horizontal") >= 0, true, "Responsive StackPanel should return to horizontal on wider resize.");
   assertEqual(actionRow._domNode.style.gap, "8px", "Responsive StackPanel should restore desktop gap on wider resize.");
+}
+
+function testDockPanelGapSupportsShellSpacingOnMountAndResize() {
+  var sandbox = createJOGSandbox({ innerWidth: 540 });
+  var JOG = sandbox.JOG;
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var shell = new JOG.DockPanel();
+  var header = new JOG.PageHeader();
+  var sidebar = new JOG.SectionPanel();
+  var content = new JOG.SectionPanel();
+
+  shell.Width = 960;
+  shell.Height = 640;
+  shell.Padding = 20;
+  shell.Gap = 12;
+  shell.ResponsiveLayout = {
+    base: { padding: 12, gap: 8 },
+    md: { padding: 20, gap: 12 }
+  };
+
+  header.Dock = "top";
+  header.Height = 90;
+  header.Gap = 10;
+  header.TitleText = "Shell";
+  header.SubtitleText = "Gap test";
+
+  sidebar.Dock = "left";
+  sidebar.Width = 220;
+  sidebar.Gap = 24;
+  sidebar.ResponsiveLayout = {
+    base: {
+      dock: "top",
+      width: null,
+      height: 120,
+      gap: 16
+    },
+    md: {
+      dock: "left",
+      width: 220,
+      height: null,
+      gap: 24
+    }
+  };
+
+  content.Dock = "fill";
+
+  shell.Add(header);
+  shell.Add(sidebar);
+  shell.Add(content);
+  page.Add(shell);
+  app.Run(page);
+
+  assertEqual(content._domNode.style.top, "248px", "DockPanel should stack top-docked regions using child gap overrides on narrow mount.");
+  assertEqual(content._domNode.style.left, "12px", "DockPanel should keep fill content aligned to shell padding until a left dock is active.");
+
+  dispatchWindowResize(sandbox, 980);
+  app.Runtime.flush();
+
+  assertEqual(content._domNode.style.top, "120px", "DockPanel should preserve header gap after responsive resize.");
+  assertEqual(content._domNode.style.left, "264px", "DockPanel should preserve left-dock gap after responsive resize.");
 }
 
 function testSectionPanelResponsiveTitleAndPadding() {
@@ -2193,6 +2257,7 @@ var tests = [
   { name: "Grid supports named areas and auto rows", fn: testGridSupportsNamedAreasAndAutoRows },
   { name: "Grid responsive breakpoints apply on mount and resize", fn: testGridResponsiveBreakpointsApplyOnMountAndResize },
   { name: "responsive dock and stack layouts apply on mount and resize", fn: testResponsiveDockAndStackLayoutsApplyOnMountAndResize },
+  { name: "dock panel gap supports shell spacing on mount and resize", fn: testDockPanelGapSupportsShellSpacingOnMountAndResize },
   { name: "section panel responsive title and padding", fn: testSectionPanelResponsiveTitleAndPadding },
   { name: "split panel responsive orientation and sizing", fn: testSplitPanelResponsiveOrientationAndSizing },
   { name: "fill property supports tab workspace editors", fn: testFillPropertySupportsTabWorkspaceEditors },

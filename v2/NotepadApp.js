@@ -270,6 +270,7 @@
     appShell.Name = "notepadShell";
     appShell.Fill = true;
     appShell.Padding = 12;
+    appShell.Gap = 10;
     appShell.MinHeight = 0;
     appShell.MinWidth = 0;
 
@@ -277,7 +278,6 @@
     menuBar.Name = "notepadMenu";
     menuBar.Dock = "top";
     menuBar.Height = 48;
-    menuBar.Margin = { bottom: 10 };
     menuBar.Items = [
       { key: "new", text: "New" },
       { key: "open", text: "Open" },
@@ -311,7 +311,6 @@
     statusBar.Name = "notepadStatus";
     statusBar.Dock = "bottom";
     statusBar.Height = 38;
-    statusBar.Margin = { top: 10 };
 
     fileStatus = new JOG.Label();
     caretStatus = new JOG.Label();
