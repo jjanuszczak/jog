@@ -455,6 +455,7 @@
       selectionStatusMessage: "Ready.",
       actionStatusMessage: "",
       statusMessage: "Ready.",
+      boardFilterText: "",
       hasSelection: false,
       hasDirtyRows: false
     });
@@ -470,9 +471,22 @@
 
     var shell = new JOG.WorkspaceShell();
     shell.Name = "opportunityBoardShell";
-    shell.Width = 1180;
-    shell.Height = 760;
+    shell.Fill = true;
     shell.Padding = 18;
+    shell.SidebarLayout = {
+      base: {
+        dock: "top",
+        width: null,
+        height: 284,
+        gap: 18
+      },
+      md: {
+        dock: "left",
+        width: 270,
+        height: null,
+        gap: 24
+      }
+    };
     shell.ResponsiveLayout = {
       base: { padding: 12 },
       md: { padding: 18 }
@@ -487,24 +501,9 @@
     var sidebar = new JOG.SectionPanel();
     sidebar.Name = "opportunitySidebar";
     sidebar.Title = "Pipeline Snapshot";
-    sidebar.Width = 270;
     sidebar.Padding = 12;
     sidebar.Gap = 24;
     sidebar.ThemePreset = "primary";
-    sidebar.ResponsiveLayout = {
-      base: {
-        dock: "top",
-        width: null,
-        height: 284,
-        gap: 18
-      },
-      md: {
-        dock: "left",
-        width: 270,
-        height: null,
-        gap: 24
-      }
-    };
     sidebar.Responsive = {
       base: {
         title: "Pipeline",
@@ -613,23 +612,78 @@
       return "Status: " + value;
     });
 
+    var filterInput = new JOG.TextBox();
+    filterInput.Name = "opportunityFilterInput";
+    filterInput.Width = 260;
+    filterInput.Placeholder = "Filter deals";
+    filterInput.BindText(editorStore, "boardFilterText");
+
+    var clearFilterButton = new JOG.Button();
+    clearFilterButton.Text = "Clear Filter";
+    clearFilterButton.ThemePreset = "quiet";
+    clearFilterButton.BindEnabled(editorStore, "boardFilterText", function(value) {
+      return !!String(value || "").trim();
+    });
+
     actionRow.Add(addButton);
     actionRow.Add(clearSelectionButton);
     actionRow.Add(markCleanButton);
+    actionRow.Add(filterInput);
+    actionRow.Add(clearFilterButton);
     actionRow.Add(statusLabel);
 
     var boardGrid = new JOG.DataGrid();
     boardGrid.Name = "opportunityDataGrid";
     boardGrid.Collection = opportunityCollection;
+    boardGrid.FilterColumns = ["account", "product", "owner", "nextStep", "stage"];
     boardGrid.ResizableColumns = true;
     boardGrid.EmptyText = "No opportunities yet. Use Add Opportunity to create the first record.";
     boardGrid.Columns = [
-      { key: "account", title: "Account", width: "180px" },
-      { key: "stage", title: "Stage", width: "120px", formatter: function(value) { return getStageLabel(value); } },
-      { key: "value", title: "Value", width: "120px", align: "right", formatter: function(value) { return formatCurrency(value); } },
-      { key: "product", title: "Product", width: "160px" },
-      { key: "owner", title: "Owner", width: "150px", formatter: function(value) { return getOwnerLabel(value); } },
-      { key: "nextStep", title: "Next Step", width: "280px" }
+      { key: "account", title: "Account", width: "180px", minWidth: 160, editable: true },
+      {
+        key: "stage",
+        title: "Stage",
+        width: "120px",
+        minWidth: 110,
+        formatter: function(value) { return getStageLabel(value); },
+        editable: true,
+        editor: "select",
+        options: [
+          { value: "prospect", text: "Prospect" },
+          { value: "qualified", text: "Qualified" },
+          { value: "proposal", text: "Proposal" },
+          { value: "negotiation", text: "Negotiation" },
+          { value: "closedwon", text: "Closed Won" }
+        ]
+      },
+      {
+        key: "value",
+        title: "Value",
+        width: "120px",
+        minWidth: 110,
+        align: "right",
+        formatter: function(value) { return formatCurrency(value); },
+        sortValue: function(value) { return Number(value) || 0; },
+        editable: true,
+        parseValue: function(value) { return parseCurrency(value); }
+      },
+      { key: "product", title: "Product", width: "160px", minWidth: 140, editable: true },
+      {
+        key: "owner",
+        title: "Owner",
+        width: "150px",
+        minWidth: 140,
+        formatter: function(value) { return getOwnerLabel(value); },
+        editable: true,
+        editor: "select",
+        options: [
+          { value: "maya", text: "Maya Santos" },
+          { value: "daniel", text: "Daniel Ng" },
+          { value: "farah", text: "Farah Rahman" },
+          { value: "john", text: "John Januszczak" }
+        ]
+      },
+      { key: "nextStep", title: "Next Step", minWidth: 220, maxWidth: 420, overflow: "wrap", editable: true, editor: "textarea" }
     ];
     boardGrid.RowCommands = [
       { key: "edit", text: "Edit", themePreset: "primary" },
@@ -723,6 +777,15 @@
       editorStore.Set("actionStatusMessage", "Marked the current board snapshot as clean.");
     });
 
+    clearFilterButton.OnClick(function() {
+      editorStore.Set("boardFilterText", "");
+    });
+
+    editorStore.Subscribe("boardFilterText", function(value) {
+      boardGrid.FilterText = value;
+    });
+    boardGrid.FilterText = editorStore.Get("boardFilterText");
+
     boardGrid.OnSelectionChange(function(args) {
       var row = args.Row;
 
@@ -748,6 +811,16 @@
         opportunityCollection.Remove(row.id);
         editorStore.Set("actionStatusMessage", "Deleted " + row.account + ".");
       }
+    });
+    boardGrid.OnSortChange(function(args) {
+      if (!args.SortDirection) {
+        editorStore.Set("actionStatusMessage", "Cleared board sorting.");
+        return;
+      }
+      editorStore.Set("actionStatusMessage", "Sorted by " + args.Column.title + " (" + args.SortDirection + ").");
+    });
+    boardGrid.OnCellEditCommit(function(args) {
+      editorStore.Set("actionStatusMessage", "Updated " + args.Column.title + " for " + args.Row.account + ".");
     });
 
     shell.Header = topBar;

@@ -33,6 +33,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `Fill` no longer overrides dock-managed child width and height with raw `100%` sizing, which keeps page shells and split workspaces inside their containers
 - `DockPanel` now supports container and docked-child `Gap` spacing so shells can reserve chrome separation without manual margin glue
 - `WorkspaceShell` now provides explicit header, sidebar, and content slots for common page-shell composition
+- `WorkspaceShell` now also exposes `SidebarLayout` for shell-owned responsive sidebar sizing and collapse rules
 - container child-structure changes now also dirty parent layout so docked shells reflow after tab and workspace mutations
 - control-level invalid state and error text
 - application diagnostics with debug logging and tree dump
@@ -70,6 +71,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `PageHeader`
 - `TabControl`
 - `DataGrid`
+- `DataGrid` view-level sorting and filtering
 - `Label`
 - `ValidationMessage`
 - `ValidationSummary`
@@ -149,7 +151,10 @@ That means the next phase is not broad control expansion for its own sake. The n
 - opportunity board now uses `Repeater` for collection-backed sidebar account rows
 - opportunity board now uses `PageHeader` instead of a manual fixed-height title panel
 - opportunity board now uses `WorkspaceShell` instead of wiring the page-shell header, sidebar, and fill region manually
+- opportunity board now uses shell-owned sidebar layout wiring instead of placing responsive sidebar sizing on the sidebar control itself
 - opportunity board now demonstrates first-pass resizable `DataGrid` columns
+- opportunity board now demonstrates `DataGrid` filtering and sortable headers
+- opportunity board now demonstrates a bounded flexible `DataGrid` notes column for wider datasets
 - opportunity editor dialog with breakpoint-aware responsive grid layout
 - opportunity board shell with responsive dock and stack behavior
 - opportunity board shell now uses dock gap spacing instead of manual header and sidebar margin coordination
@@ -184,6 +189,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - shell layout is substantially more dependable than it was before this hardening pass, but app code still owns deeper multi-pane workspace composition decisions
 - the framework still lacks deeper workspace management beyond `WorkspaceShell`, `DockPanel`, and `SplitPanel`
 - `WorkspaceShell` still lacks convenience helpers for common sidebar sizing and shell-region sizing patterns, so apps still set widths and responsive collapse behavior directly on child controls
+- `WorkspaceShell.SidebarLayout` now covers the repeated sidebar dock, size, and gap pattern, but deeper multi-pane workspace composition still belongs to app code
 
 ### Shell Controls
 
@@ -241,7 +247,12 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `Repeater.BindCollection()` now covers first-pass collection-backed repeated UI
 - `Collection.BindStore()` now covers explicit collection-to-store derived page state
 - `DataGrid` now covers columns, rows, single selection, basic formatting, dirty-row styling, row commands, and first-pass mouse resizing for pixel-width columns
-- app code still owns sorting, filtering, inline editing flows, persistence, and keyboard-heavy interaction behavior
+- `DataGrid` now also covers view-level sorting, filter text, filter predicates, and per-column overflow modes
+- `DataGrid` now also covers first-pass inline editing for text, textarea, and select cells, including committing the current edit when the user moves directly into another editable cell
+- `DataGrid` column resizing now honors per-column minimum and maximum pixel widths
+- `DataGrid` now also honors `minWidth` plus `maxWidth` on flexible columns so wider boards can keep one bounded narrative column without fixing every track in pixels
+- app code still owns persistence and keyboard-heavy interaction behavior
+- sorting and filtering now stay view-local to the grid and do not mutate the bound collection
 - collection-to-control binding is still explicit, but the new helpers now cover a large share of repeated summary, selection, command-state, validation-summary, and simple repeated-row glue
 - resized column widths currently persist only in memory for the lifetime of the grid instance
 - the initial data-grid sprint goal is met at a credible first-pass level, but not yet at a production-depth level
@@ -260,16 +271,12 @@ That means the next phase is not broad control expansion for its own sake. The n
 - keep making shell layout boring and dependable across more than the current examples
 - reduce the remaining multi-pane sizing and deeper workspace-composition glue in app code
 - keep tightening the higher-level shell primitives now that header plus sidebar plus content composition is runtime-managed
-- evaluate whether `WorkspaceShell` should grow narrow convenience helpers for sidebar sizing, responsive sidebar collapse, or other repeated shell-region sizing patterns
 - keep hardening container interactions so tab, split, and dialog-heavy shells stay stable without manual coordination
 
 ### 2. DataGrid Depth And Behavior Hardening
 
-- add sorting and filtering without breaking the explicit collection model
-- add inline editing patterns only after the row-command and dialog flows are stable
 - harden column sizing and layout behavior for wider datasets
 - keep resized column widths in memory only for now, then later decide whether apps need hooks for saved views or per-user persistence
-- expose finer per-column overflow and sizing behavior once more than the OpportunityBoard example needs it
 - keep `TreeView` behind deeper `DataGrid` maturity unless a concrete app need pulls it forward
 
 ### 3. Third-Party Control Extensibility
@@ -284,9 +291,6 @@ That means the next phase is not broad control expansion for its own sake. The n
 
 ## Remaining From Initial Data Scope
 
-- sorting is still deferred
-- filtering is still deferred
-- inline editing inside `DataGrid` is still deferred
 - persistence of collection mutations remains app-owned
 - keyboard-first and accessibility-grade grid behavior remains unfinished
 

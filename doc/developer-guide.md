@@ -239,7 +239,7 @@ This is the core architectural shift from V1. It separates control state from di
 
 The runtime now also exposes a narrow `Fill` flag for controls and containers that need to stretch inside shell layouts. This is not a general flexbox abstraction. It exists so shells and tab workspaces can reduce manual width and height math.
 When a control is already dock-managed inside a `DockPanel`, `Fill` now avoids forcing raw `100%` width and height so dock geometry remains authoritative.
-`DockPanel` now also honors `Gap` as shell spacing between docked regions. A docked child can override that spacing with its own `Gap` when one region needs a different separation than the rest of the shell. `WorkspaceShell` builds on that dock behavior with explicit `Header`, `Sidebar`, and `Content` slots for the most common app-shell composition.
+`DockPanel` now also honors `Gap` as shell spacing between docked regions. A docked child can override that spacing with its own `Gap` when one region needs a different separation than the rest of the shell. `WorkspaceShell` builds on that dock behavior with explicit `Header`, `Sidebar`, and `Content` slots for the most common app-shell composition, and now also exposes a shell-owned `SidebarLayout` helper for repeated responsive sidebar sizing and collapse patterns.
 
 ## Data Controls
 
@@ -253,9 +253,15 @@ JOG now has a first-pass data-centric layer aimed at CRUD and internal-tool scre
 - dirty tracking for updated rows and deleted baseline rows
 - derived summaries through named summary functions
 
-`JOG.DataGrid` is the first control built on top of that model. The implemented surface today is intentionally narrow:
+`JOG.DataGrid` is the first control built on top of that model. The implemented surface today is still intentionally narrow, but it now covers first-pass view-level sorting, filtering, and inline editing:
 
 - explicit column definitions with `key`, `title`, `width`, `align`, and optional `formatter`
+- optional sortable headers, `sortValue`, and view-level `SortKey` plus `SortDirection`
+- explicit filter text plus optional `FilterColumns` and `FilterPredicate`
+- per-column overflow modes for truncate, wrap, or clip
+- first-pass inline editing for text, textarea, and select cells, including committing the current edit when the user moves directly to another editable cell
+- bounded pixel-width resizing through per-column `minWidth` and `maxWidth`
+- bounded flexible columns through `minWidth` plus `maxWidth` without forcing a fixed pixel width
 - rows provided by a bound `JOG.Collection`
 - single-row selection
 - row command buttons through `RowCommands`
@@ -265,9 +271,6 @@ JOG now has a first-pass data-centric layer aimed at CRUD and internal-tool scre
 
 What it does not do yet:
 
-- sorting
-- filtering
-- inline editing
 - column reordering
 - virtualization
 - touch resizing
@@ -477,6 +480,7 @@ Use it for app shells, sidebars, top bars, and detail regions.
 - `Header` defaults to `Dock = "top"`
 - `Sidebar` defaults to `Dock = "left"`
 - `Content` defaults to `Dock = "fill"`
+- `SidebarLayout` can own the repeated responsive dock, width, height, and gap pattern for the sidebar slot
 - keeps those slotted children ordered correctly even if you assign them in a different sequence
 - still honors `Padding`, `Gap`, and child `ResponsiveLayout` so sidebars can collapse to top regions on narrow widths
 
