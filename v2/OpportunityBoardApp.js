@@ -23,62 +23,52 @@
     return isNaN(amount) ? 0 : amount;
   }
 
-  function setFieldError(store, key, message) {
-    store.Set(key, message);
-  }
-
-  function clearValidation(store) {
-    setFieldError(store, "accountError", "");
-    setFieldError(store, "stageError", "");
-    setFieldError(store, "valueError", "");
-    setFieldError(store, "productError", "");
-    setFieldError(store, "ownerError", "");
-  }
-
-  function validateOpportunity(store) {
-    var hasErrors = false;
-    var account = (store.Get("account") || "").trim();
-    var stage = (store.Get("stage") || "").trim();
-    var value = parseCurrency(store.Get("value"));
-    var product = (store.Get("product") || "").trim();
-    var owner = (store.Get("owner") || "").trim();
-
-    if (account.length < 3) {
-      setFieldError(store, "accountError", "Enter an account name with at least 3 characters.");
-      hasErrors = true;
-    } else {
-      setFieldError(store, "accountError", "");
-    }
-
-    if (!stage) {
-      setFieldError(store, "stageError", "Select a pipeline stage.");
-      hasErrors = true;
-    } else {
-      setFieldError(store, "stageError", "");
-    }
-
-    if (value <= 0) {
-      setFieldError(store, "valueError", "Enter a positive opportunity value.");
-      hasErrors = true;
-    } else {
-      setFieldError(store, "valueError", "");
-    }
-
-    if (product.length < 2) {
-      setFieldError(store, "productError", "Enter the product or package being sold.");
-      hasErrors = true;
-    } else {
-      setFieldError(store, "productError", "");
-    }
-
-    if (!owner) {
-      setFieldError(store, "ownerError", "Select an owner for this opportunity.");
-      hasErrors = true;
-    } else {
-      setFieldError(store, "ownerError", "");
-    }
-
-    return !hasErrors;
+  function createOpportunityFormState(store) {
+    return new JOG.FormState(store, {
+      summaryKey: "opportunityValidationSummaryText",
+      validations: [
+        {
+          errorKey: "accountError",
+          validate: function(currentStore) {
+            return (currentStore.Get("account") || "").trim().length < 3
+              ? "Enter an account name with at least 3 characters."
+              : "";
+          }
+        },
+        {
+          errorKey: "stageError",
+          validate: function(currentStore) {
+            return (currentStore.Get("stage") || "").trim()
+              ? ""
+              : "Select a pipeline stage.";
+          }
+        },
+        {
+          errorKey: "valueError",
+          validate: function(currentStore) {
+            return parseCurrency(currentStore.Get("value")) > 0
+              ? ""
+              : "Enter a positive opportunity value.";
+          }
+        },
+        {
+          errorKey: "productError",
+          validate: function(currentStore) {
+            return (currentStore.Get("product") || "").trim().length >= 2
+              ? ""
+              : "Enter the product or package being sold.";
+          }
+        },
+        {
+          errorKey: "ownerError",
+          validate: function(currentStore) {
+            return (currentStore.Get("owner") || "").trim()
+              ? ""
+              : "Select an owner for this opportunity.";
+          }
+        }
+      ]
+    });
   }
 
   function createEmptyOpportunity(nextId) {
@@ -105,7 +95,7 @@
     };
   }
 
-  function loadOpportunityIntoStore(store, record, mode) {
+  function loadOpportunityIntoStore(store, formState, record, mode) {
     store.Set("editingId", record.id);
     store.Set("editorMode", mode);
     store.Set("editorTitle", mode === "add" ? "Add Opportunity" : "Edit Opportunity");
@@ -115,7 +105,7 @@
     store.Set("product", record.product);
     store.Set("owner", record.owner);
     store.Set("nextStep", record.nextStep || "");
-    clearValidation(store);
+    formState.ClearErrors();
   }
 
   var STAGE_WEIGHTS = {
@@ -203,7 +193,7 @@
     return card;
   }
 
-  function OpportunityEditorDialog(store, onSave) {
+  function OpportunityEditorDialog(store, formState, onSave) {
     JOG.Dialog.call(this);
 
     this.Name = "opportunityEditorDialog";
@@ -228,13 +218,7 @@
 
     var validation = new JOG.ValidationSummary();
     validation.Name = "opportunityValidationSummary";
-    validation.BindErrors(store, [
-      "accountError",
-      "stageError",
-      "valueError",
-      "productError",
-      "ownerError"
-    ]);
+    validation.BindSummary(store, "opportunityValidationSummaryText");
 
     var formGrid = new JOG.Grid();
     formGrid.Name = "opportunityEditorGrid";
@@ -378,7 +362,7 @@
     saveButton.Text = "Save Opportunity";
     saveButton.ThemePreset = "primary";
     saveButton.OnClick(function() {
-      if (!validateOpportunity(store)) {
+      if (!formState.Validate()) {
         return;
       }
       onSave();
@@ -461,13 +445,24 @@
       valueError: "",
       productError: "",
       ownerError: "",
+      opportunityValidationSummaryText: "",
       totalOpenText: "0",
       pipelineValueText: "$0",
       weightedValueText: "$0",
       lateStageText: "0",
       dirtyRowsText: "0",
       headlineText: "",
-      statusMessage: "Ready."
+      selectionStatusMessage: "Ready.",
+      actionStatusMessage: "",
+      statusMessage: "Ready.",
+      hasSelection: false,
+      hasDirtyRows: false
+    });
+    var opportunityFormState = createOpportunityFormState(editorStore);
+    opportunityFormState.Watch(["account", "stage", "value", "product", "owner"]);
+
+    editorStore.Derive("statusMessage", ["selectionStatusMessage", "actionStatusMessage"], function(currentStore) {
+      return currentStore.Get("actionStatusMessage") || currentStore.Get("selectionStatusMessage") || "Ready.";
     });
 
     this.Title = "JOG V2 Opportunity Board";
@@ -539,6 +534,26 @@
     var weightedCard = createMetricCard("Weighted Value", editorStore, "weightedValueText");
     var lateStageCard = createMetricCard("Late Stage Deals", editorStore, "lateStageText");
     var dirtyCard = createMetricCard("Dirty Rows", editorStore, "dirtyRowsText");
+    var accountListTitle = new JOG.Label();
+    accountListTitle.Text = "Pipeline Accounts";
+
+    var accountRepeater = new JOG.Repeater();
+    accountRepeater.Name = "opportunityAccountRepeater";
+    accountRepeater.Orientation = "vertical";
+    accountRepeater.Gap = 8;
+    accountRepeater.EmptyText = "No opportunities in the board.";
+    accountRepeater.BindCollection(opportunityCollection, function(row, index, collection) {
+      var button = new JOG.Button();
+
+      button.Name = "opportunityAccountLink" + String(index + 1);
+      button.Text = row.account + " - " + getStageLabel(row.stage);
+      button.ThemePreset = collection.IsSelected(row.id) ? "primary" : "quiet";
+      button.OnClick(function() {
+        collection.Select(row.id);
+        editorStore.Set("actionStatusMessage", "");
+      });
+      return button;
+    });
 
     sidebarStack.Add(headline);
     sidebarStack.Add(totalCard);
@@ -546,6 +561,8 @@
     sidebarStack.Add(weightedCard);
     sidebarStack.Add(lateStageCard);
     sidebarStack.Add(dirtyCard);
+    sidebarStack.Add(accountListTitle);
+    sidebarStack.Add(accountRepeater);
     sidebar.Add(sidebarStack);
 
     var boardSection = new JOG.SectionPanel();
@@ -584,10 +601,12 @@
     var clearSelectionButton = new JOG.Button();
     clearSelectionButton.Text = "Clear Selection";
     clearSelectionButton.ThemePreset = "quiet";
+    clearSelectionButton.BindEnabled(editorStore, "hasSelection");
 
     var markCleanButton = new JOG.Button();
     markCleanButton.Text = "Mark Clean";
     markCleanButton.ThemePreset = "quiet";
+    markCleanButton.BindEnabled(editorStore, "hasDirtyRows");
 
     var statusLabel = new JOG.Label();
     statusLabel.BindText(editorStore, "statusMessage", function(value) {
@@ -621,28 +640,41 @@
     boardLayout.Add(boardGrid);
     boardSection.Add(boardLayout);
 
-    function syncBoardState() {
-      editorStore.Set("totalOpenText", String(opportunityCollection.GetSummary("totalOpen") || 0));
-      editorStore.Set("pipelineValueText", formatCurrency(opportunityCollection.GetSummary("pipelineValue") || 0));
-      editorStore.Set("weightedValueText", formatCurrency(opportunityCollection.GetSummary("weightedValue") || 0));
-      editorStore.Set("lateStageText", String(opportunityCollection.GetSummary("lateStageCount") || 0));
-      editorStore.Set("dirtyRowsText", String(opportunityCollection.GetSummary("dirtyCount") || 0));
-      editorStore.Set("headlineText", describeHeadline(opportunityCollection));
-    }
-
-    function syncSelectionStatus() {
-      var selected = opportunityCollection.GetSelectedRows()[0];
+    opportunityCollection.BindStore(editorStore, "totalOpenText", ["summary"], function(collection) {
+      return String(collection.GetSummary("totalOpen") || 0);
+    });
+    opportunityCollection.BindStore(editorStore, "pipelineValueText", ["summary"], function(collection) {
+      return formatCurrency(collection.GetSummary("pipelineValue") || 0);
+    });
+    opportunityCollection.BindStore(editorStore, "weightedValueText", ["summary"], function(collection) {
+      return formatCurrency(collection.GetSummary("weightedValue") || 0);
+    });
+    opportunityCollection.BindStore(editorStore, "lateStageText", ["summary"], function(collection) {
+      return String(collection.GetSummary("lateStageCount") || 0);
+    });
+    opportunityCollection.BindStore(editorStore, "dirtyRowsText", ["summary"], function(collection) {
+      return String(collection.GetSummary("dirtyCount") || 0);
+    });
+    opportunityCollection.BindStore(editorStore, "headlineText", ["summary"], function(collection) {
+      return describeHeadline(collection);
+    });
+    opportunityCollection.BindStore(editorStore, "hasSelection", ["selection"], function(collection) {
+      return collection.GetSelectedRows().length > 0;
+    });
+    opportunityCollection.BindStore(editorStore, "hasDirtyRows", ["dirty"], function(collection) {
+      return collection.HasDirtyRows();
+    });
+    opportunityCollection.BindStore(editorStore, "selectionStatusMessage", ["change"], function(collection) {
+      var selected = collection.GetSelectedRows()[0];
 
       if (!selected) {
-        editorStore.Set("statusMessage", opportunityCollection.HasDirtyRows() ? "No row selected. Pending local changes exist." : "Ready.");
-        return;
+        return collection.HasDirtyRows() ? "No row selected. Pending local changes exist." : "Ready.";
       }
 
-      editorStore.Set(
-        "statusMessage",
+      return (
         "Selected " + selected.account + " in " + getStageLabel(selected.stage) + " for " + formatCurrency(selected.value) + "."
       );
-    }
+    });
 
     function saveOpportunity() {
       var record = {
@@ -663,34 +695,32 @@
 
       opportunityCollection.Select(record.id);
       editorStore.Set(
-        "statusMessage",
+        "actionStatusMessage",
         (editorStore.Get("editorMode") === "add" ? "Added " : "Saved changes to ") + record.account + "."
       );
-      syncBoardState();
     }
 
-    var editorDialog = new OpportunityEditorDialog(editorStore, saveOpportunity);
+    var editorDialog = new OpportunityEditorDialog(editorStore, opportunityFormState, saveOpportunity);
     editorDialog.Hide();
     editorDialog.OnHide(function() {
-      clearValidation(editorStore);
+      opportunityFormState.ClearErrors();
     });
 
     addButton.OnClick(function() {
-      loadOpportunityIntoStore(editorStore, createEmptyOpportunity(nextOpportunityId), "add");
+      loadOpportunityIntoStore(editorStore, opportunityFormState, createEmptyOpportunity(nextOpportunityId), "add");
       nextOpportunityId += 1;
-      editorStore.Set("statusMessage", "Adding a new opportunity.");
+      editorStore.Set("actionStatusMessage", "Adding a new opportunity.");
       editorDialog.ShowModal();
     });
 
     clearSelectionButton.OnClick(function() {
       opportunityCollection.ClearSelection();
-      syncSelectionStatus();
+      editorStore.Set("actionStatusMessage", "");
     });
 
     markCleanButton.OnClick(function() {
       opportunityCollection.MarkClean();
-      editorStore.Set("statusMessage", "Marked the current board snapshot as clean.");
-      syncBoardState();
+      editorStore.Set("actionStatusMessage", "Marked the current board snapshot as clean.");
     });
 
     boardGrid.OnSelectionChange(function(args) {
@@ -699,10 +729,7 @@
       if (!row) {
         return;
       }
-      editorStore.Set(
-        "statusMessage",
-        "Selected " + row.account + " in " + getStageLabel(row.stage) + " for " + formatCurrency(row.value) + "."
-      );
+      editorStore.Set("actionStatusMessage", "");
     });
 
     boardGrid.OnRowCommand(function(args) {
@@ -712,24 +739,15 @@
         return;
       }
       if (args.Key === "edit") {
-        loadOpportunityIntoStore(editorStore, cloneOpportunity(row), "edit");
-        editorStore.Set("statusMessage", "Editing " + row.account + ".");
+        loadOpportunityIntoStore(editorStore, opportunityFormState, cloneOpportunity(row), "edit");
+        editorStore.Set("actionStatusMessage", "Editing " + row.account + ".");
         editorDialog.ShowModal();
         return;
       }
       if (args.Key === "delete") {
         opportunityCollection.Remove(row.id);
-        editorStore.Set("statusMessage", "Deleted " + row.account + ".");
-        syncBoardState();
-        syncSelectionStatus();
+        editorStore.Set("actionStatusMessage", "Deleted " + row.account + ".");
       }
-    });
-
-    opportunityCollection.Subscribe("change", function() {
-      syncBoardState();
-    });
-    opportunityCollection.Subscribe("selection", function() {
-      syncSelectionStatus();
     });
 
     shell.Header = topBar;
@@ -738,9 +756,6 @@
 
     this.Add(shell);
     this.Add(editorDialog);
-
-    syncBoardState();
-    syncSelectionStatus();
   }
 
   OpportunityBoardPage.prototype = Object.create(JOG.Page.prototype);

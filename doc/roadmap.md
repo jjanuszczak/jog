@@ -57,6 +57,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `WorkspaceShell`
 - `SplitPanel`
 - `StackPanel`
+- `Repeater`
 - `SectionPanel`
 - `SectionPanel` responsive title and body-padding overrides
 - `Grid`
@@ -84,6 +85,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 
 - `Store`
 - `Collection`
+- `FormState`
 - `Label.BindText`
 - `ValidationMessage.BindMessage`
 - `ValidationSummary.BindSummary`
@@ -95,9 +97,13 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `DropDownList.BindSelectedValue`
 - `ListBox.BindSelectedValue`
 - `BindVisible(store, key, transform)`
+- `BindEnabled(store, key, transform)`
 - `SetError(message)`
 - `ClearError()`
 - `BindError(store, key)`
+- `Store.Derive(key, dependencyKeys, compute)`
+- `Collection.BindStore(store, key, eventKeys, compute)`
+- `Repeater.BindCollection(collection, renderer)`
 - collection row identity, selection, dirty tracking, and derived summary definitions
 
 ### Windows and Dialogs
@@ -133,9 +139,14 @@ That means the next phase is not broad control expansion for its own sake. The n
 - form demo with breakpoint-aware responsive grid layout
 - form demo validation and inline error feedback
 - form demo validation summary with reusable binding helpers
+- form demo now uses derived store summary wiring instead of manual summary subscription glue
+- form demo now uses `FormState` for validation orchestration
 - form demo checkbox and radio-group invalid-state feedback
 - opportunity board sample with CRM-style add, edit, and delete flows
 - opportunity board migrated to `Collection` plus `DataGrid`
+- opportunity board now uses collection-to-store binding helpers for board metrics and command-state wiring
+- opportunity board now uses `FormState` for editor validation orchestration
+- opportunity board now uses `Repeater` for collection-backed sidebar account rows
 - opportunity board now uses `PageHeader` instead of a manual fixed-height title panel
 - opportunity board now uses `WorkspaceShell` instead of wiring the page-shell header, sidebar, and fill region manually
 - opportunity board now demonstrates first-pass resizable `DataGrid` columns
@@ -219,27 +230,30 @@ That means the next phase is not broad control expansion for its own sake. The n
 - first-class validation display controls now exist for inline messages and summary blocks
 - validation summaries can now derive their own message directly from multiple field error keys
 - radio-group invalid styling can now be applied at the row-container level
-- app code must still orchestrate when validation runs
+- `FormState` now covers the repeated pattern where app code wants store-driven field errors, one summary key, and revalidation watches without hand-written subscription glue
+- app code still owns the validation rules and explicit save timing
 
 ### State and Data
 
 - explicit store binding is working well for single-record forms
 - `Collection` now covers row identity, selection, update patterns, dirty tracking, deleted-row tracking, and derived summaries
+- `Store.Derive()` now covers explicit store-to-store derived keys
+- `Repeater.BindCollection()` now covers first-pass collection-backed repeated UI
+- `Collection.BindStore()` now covers explicit collection-to-store derived page state
 - `DataGrid` now covers columns, rows, single selection, basic formatting, dirty-row styling, row commands, and first-pass mouse resizing for pixel-width columns
 - app code still owns sorting, filtering, inline editing flows, persistence, and keyboard-heavy interaction behavior
-- collection-to-control binding is still split between `Collection` subscriptions and `Store` bindings rather than a broader derived-state layer
+- collection-to-control binding is still explicit, but the new helpers now cover a large share of repeated summary, selection, command-state, validation-summary, and simple repeated-row glue
 - resized column widths currently persist only in memory for the lifetime of the grid instance
 - the initial data-grid sprint goal is met at a credible first-pass level, but not yet at a production-depth level
 
 ## Next Priorities
 
 1. Shell and layout hardening
-2. Richer binding and app-state helpers
-3. DataGrid depth and behavior hardening
-4. Third-party control extensibility
-5. Accessibility and keyboard model
-6. Deeper shell-control behavior
-7. Browser-level interaction verification
+2. DataGrid depth and behavior hardening
+3. Third-party control extensibility
+4. Accessibility and keyboard model
+5. Deeper shell-control behavior
+6. Browser-level interaction verification
 
 ### 1. Shell And Layout Hardening
 
@@ -249,15 +263,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - evaluate whether `WorkspaceShell` should grow narrow convenience helpers for sidebar sizing, responsive sidebar collapse, or other repeated shell-region sizing patterns
 - keep hardening container interactions so tab, split, and dialog-heavy shells stay stable without manual coordination
 
-### 2. Richer Binding And App-State Helpers
-
-- add stronger support for collection updates and repeated UI structures
-- improve validation orchestration helpers
-- improve selection, dirty tracking, and derived-value patterns without turning JOG into a magic framework
-- if the next flagship example needs a stronger browser-native utility story, use the planned Browser Data and Settings Utility captured in `doc/browser-data-settings-utility-prd.md`
-- keep the model explicit and JavaScript-first
-
-### 3. DataGrid Depth And Behavior Hardening
+### 2. DataGrid Depth And Behavior Hardening
 
 - add sorting and filtering without breaking the explicit collection model
 - add inline editing patterns only after the row-command and dialog flows are stable
@@ -266,7 +272,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - expose finer per-column overflow and sizing behavior once more than the OpportunityBoard example needs it
 - keep `TreeView` behind deeper `DataGrid` maturity unless a concrete app need pulls it forward
 
-### 4. Third-Party Control Extensibility
+### 3. Third-Party Control Extensibility
 
 - implement a formal third-party control registration model instead of relying on runtime patching or private internals
 - define and document the supported extension contract for `Control`, `Container`, `Window`, and `Dialog`
@@ -284,7 +290,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - persistence of collection mutations remains app-owned
 - keyboard-first and accessibility-grade grid behavior remains unfinished
 
-### 5. Accessibility And Keyboard Model
+### 4. Accessibility And Keyboard Model
 
 - add modal focus trap
 - restore focus after dialog close
@@ -293,14 +299,14 @@ That means the next phase is not broad control expansion for its own sake. The n
 - review control labeling and semantics
 - treat accessibility as framework completeness, not deferred polish
 
-### 6. Deeper Shell-Control Behavior
+### 5. Deeper Shell-Control Behavior
 
 - add menu hierarchy and better command behavior where appropriate
 - add toolbar overflow and separators
 - add stronger status-bar conventions
 - add closable and reorderable tabs when the underlying shell behavior is stable
 
-### 7. Browser-Level Interaction Verification
+### 6. Browser-Level Interaction Verification
 
 - keep the zero-dependency Node suite for fast regression coverage
 - add lightweight real-browser verification for focus order, keyboard flows, modal correctness, and pointer interaction edge cases

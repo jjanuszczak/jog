@@ -413,6 +413,27 @@ function testStoreSubscribeAndUnsubscribe() {
   assertEqual(calls[0], "Northwind", "Store subscriber should receive changed value.");
 }
 
+function testStoreDeriveKeepsComputedKeysInSync() {
+  var JOG = loadJOG();
+  var store = new JOG.Store({
+    firstName: "Atlas",
+    status: "Active",
+    summary: ""
+  });
+  var unsubscribe = store.Derive("summary", ["firstName", "status"], function(currentStore) {
+    return currentStore.Get("firstName") + " - " + currentStore.Get("status");
+  });
+
+  assertEqual(store.Get("summary"), "Atlas - Active", "Store.Derive should compute the initial value.");
+
+  store.Set("status", "Pending");
+  assertEqual(store.Get("summary"), "Atlas - Pending", "Store.Derive should refresh when a dependency changes.");
+
+  unsubscribe();
+  store.Set("firstName", "Northwind");
+  assertEqual(store.Get("summary"), "Atlas - Pending", "Store.Derive should stop updating after unsubscribe.");
+}
+
 function testContainerRejectsDuplicateChildNames() {
   var JOG = loadJOG();
   var panel = new JOG.Panel();
@@ -484,6 +505,158 @@ function testBindVisibleTracksStoreAndDisposesCleanly() {
   store.Set("summary", "");
 
   assertEqual(section.Visible, true, "Disposed control should stop receiving visibility updates.");
+}
+
+function testBindEnabledTracksStoreAndDisposesCleanly() {
+  var JOG = loadJOG();
+  var store = new JOG.Store({ canSave: false });
+  var button = new JOG.Button();
+
+  button.BindEnabled(store, "canSave");
+  assertEqual(button.Enabled, false, "BindEnabled should disable controls for falsy values.");
+
+  store.Set("canSave", true);
+  assertEqual(button.Enabled, true, "BindEnabled should enable controls for truthy values.");
+
+  button.Dispose();
+  store.Set("canSave", false);
+  assertEqual(button.Enabled, true, "Disposed controls should stop receiving enabled-state updates.");
+}
+
+function testCollectionBindStoreKeepsDerivedStoreKeysInSync() {
+  var JOG = loadJOG();
+  var collection = new JOG.Collection({
+    rows: [
+      { id: "1", account: "Atlas", value: 100 },
+      { id: "2", account: "Northwind", value: 200 }
+    ],
+    summaryDefinitions: {
+      totalValue: function(rows) {
+        return rows.reduce(function(total, row) {
+          return total + row.value;
+        }, 0);
+      }
+    }
+  });
+  var store = new JOG.Store({ totalText: "", hasSelection: false });
+  var unsubscribeTotal = collection.BindStore(store, "totalText", ["summary"], function(currentCollection) {
+    return "$" + currentCollection.GetSummary("totalValue");
+  });
+  var unsubscribeSelection = collection.BindStore(store, "hasSelection", ["selection"], function(currentCollection) {
+    return currentCollection.GetSelectedRows().length > 0;
+  });
+
+  assertEqual(store.Get("totalText"), "$300", "Collection.BindStore should compute the initial store value.");
+  assertEqual(store.Get("hasSelection"), false, "Collection.BindStore should compute initial selection state.");
+
+  collection.Select("2");
+  assertEqual(store.Get("hasSelection"), true, "Collection.BindStore should refresh when the bound collection event fires.");
+
+  collection.Update("1", { value: 150 });
+  assertEqual(store.Get("totalText"), "$350", "Collection.BindStore should refresh derived summary state.");
+
+  unsubscribeTotal();
+  unsubscribeSelection();
+  collection.ClearSelection();
+  collection.Update("2", { value: 250 });
+  assertEqual(store.Get("hasSelection"), true, "Collection.BindStore should stop syncing after unsubscribe.");
+  assertEqual(store.Get("totalText"), "$350", "Collection.BindStore should stop updating derived values after unsubscribe.");
+}
+
+function testFormStateValidatesClearsAndWatchesStoreErrors() {
+  var JOG = loadJOG();
+  var store = new JOG.Store({
+    name: "",
+    stage: "",
+    nameError: "",
+    stageError: "",
+    summary: "",
+    isValid: false
+  });
+  var formState = new JOG.FormState(store, {
+    summaryKey: "summary",
+    validKey: "isValid",
+    validations: [
+      {
+        errorKey: "nameError",
+        validate: function(currentStore) {
+          return (currentStore.Get("name") || "").trim().length >= 3 ? "" : "Enter a longer name";
+        }
+      },
+      {
+        errorKey: "stageError",
+        validate: function(currentStore) {
+          return currentStore.Get("stage") ? "" : "Select a stage";
+        }
+      }
+    ]
+  });
+
+  assertEqual(formState.Validate(), false, "FormState should report invalid forms.");
+  assertEqual(store.Get("nameError"), "Enter a longer name", "FormState should set field errors during validation.");
+  assertEqual(store.Get("stageError"), "Select a stage", "FormState should set all configured field errors.");
+  assertEqual(store.Get("summary"), "Please fix: Enter a longer name | Select a stage", "FormState should build the configured summary key.");
+  assertEqual(store.Get("isValid"), false, "FormState should update the configured valid key.");
+
+  formState.Watch(["name", "stage"]);
+  store.Set("name", "Atlas");
+  store.Set("stage", "proposal");
+  assertEqual(store.Get("nameError"), "", "FormState.Watch should revalidate name when prior errors exist.");
+  assertEqual(store.Get("stageError"), "", "FormState.Watch should clear resolved errors.");
+  assertEqual(store.Get("summary"), "", "FormState.Watch should clear the summary when validation passes.");
+  assertEqual(store.Get("isValid"), true, "FormState.Watch should refresh the valid flag.");
+
+  store.Set("name", "");
+  assertEqual(store.Get("nameError"), "", "FormState.Watch should stay quiet until a later invalid run sets errors again.");
+
+  assertEqual(formState.Validate(), false, "FormState should allow explicit revalidation after watch updates.");
+  formState.ClearErrors();
+  assertEqual(store.Get("nameError"), "", "FormState.ClearErrors should clear field errors.");
+  assertEqual(store.Get("stageError"), "", "FormState.ClearErrors should clear every configured field error.");
+  assertEqual(store.Get("summary"), "", "FormState.ClearErrors should clear the summary key.");
+  assertEqual(store.Get("isValid"), true, "FormState.ClearErrors should mark the form valid.");
+}
+
+function testRepeaterRendersCollectionRowsAndRefreshesOnChange() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var collection = new JOG.Collection({
+    rows: [
+      { id: "1", account: "Atlas", stage: "qualified" },
+      { id: "2", account: "Northwind", stage: "proposal" }
+    ]
+  });
+  var repeater = new JOG.Repeater();
+
+  repeater.Name = "testRepeater";
+  repeater.EmptyText = "No rows.";
+  repeater.BindCollection(collection, function(row) {
+    var label = new JOG.Label();
+
+    label.Text = row.account + " - " + row.stage;
+    return label;
+  });
+
+  page.Add(repeater);
+  app.Run(page);
+
+  assertEqual(repeater.Children.length, 2, "Repeater should render one child per collection row.");
+  assertEqual(repeater.Children[0].Text, "Atlas - qualified", "Repeater should render the first collection row.");
+
+  collection.Update("2", { stage: "negotiation" });
+  app.Runtime.flush();
+  assertEqual(repeater.Children[1].Text, "Northwind - negotiation", "Repeater should refresh rendered children on collection change.");
+
+  collection.Remove("1");
+  app.Runtime.flush();
+  assertEqual(repeater.Children.length, 1, "Repeater should remove children for deleted rows.");
+  assertEqual(repeater.Children[0].Text, "Northwind - negotiation", "Repeater should keep remaining rows in sync.");
+
+  collection.Remove("2");
+  app.Runtime.flush();
+  assertEqual(repeater.Children.length, 1, "Repeater should render one empty-state child when the collection is empty.");
+  assertEqual(repeater.Children[0].Text, "No rows.", "Repeater should render the configured empty-state label.");
 }
 
 function testValidationMessageBindsTextAndVisibility() {
@@ -2279,11 +2452,20 @@ function testOpportunityBoardUsesCollectionAndDataGridFlow() {
   var shell = findControl(loaded.page, function(control) {
     return control.Name === "opportunityBoardShell";
   });
+  var clearSelectionButton = findControl(loaded.page, function(control) {
+    return control._typeName === "Button" && control.Text === "Clear Selection";
+  });
+  var markCleanButton = findControl(loaded.page, function(control) {
+    return control._typeName === "Button" && control.Text === "Mark Clean";
+  });
   var header = findControl(loaded.page, function(control) {
     return control.Name === "opportunityTopBar";
   });
   var grid = findControl(loaded.page, function(control) {
     return control.Name === "opportunityDataGrid";
+  });
+  var accountRepeater = findControl(loaded.page, function(control) {
+    return control.Name === "opportunityAccountRepeater";
   });
   var dialog = findControl(loaded.page, function(control) {
     return control.Name === "opportunityEditorDialog";
@@ -2295,26 +2477,42 @@ function testOpportunityBoardUsesCollectionAndDataGridFlow() {
   assertEqual(shell._typeName, "WorkspaceShell", "OpportunityBoard should use the shared workspace shell primitive.");
   assertEqual(header._typeName, "PageHeader", "OpportunityBoard should use the shared page header primitive.");
   assertEqual(header._domNode.style.height !== "0px", true, "OpportunityBoard header should size itself without a fixed height.");
+  assertEqual(clearSelectionButton.Enabled, false, "OpportunityBoard should disable Clear Selection until a row is selected.");
+  assertEqual(markCleanButton.Enabled, false, "OpportunityBoard should disable Mark Clean until local changes exist.");
   assert(!!grid, "OpportunityBoard should render a DataGrid.");
+  assertEqual(accountRepeater._typeName, "Repeater", "OpportunityBoard should use the repeater helper for sidebar account rows.");
+  assertEqual(accountRepeater.Children.length, 3, "OpportunityBoard repeater should render seeded opportunity rows.");
   assertEqual(grid.Collection.GetRows().length, 3, "OpportunityBoard should start with seeded collection rows.");
 
   dispatchNodeClick(grid._rowNodes[1]);
   loaded.app.Runtime.flush();
   assertEqual(grid.Collection.GetSelectedId(), "2", "OpportunityBoard grid selection should flow through the collection.");
   assertEqual(statusLabel.Text.indexOf("Atlas Bio") >= 0, true, "OpportunityBoard status should reflect the selected row.");
+  assertEqual(clearSelectionButton.Enabled, true, "OpportunityBoard should enable Clear Selection after a row is selected.");
   assertEqual(grid.ResizableColumns, true, "OpportunityBoard should enable resizable grid columns.");
+  assertEqual(accountRepeater.Children[1].ThemePreset, "primary", "OpportunityBoard repeater should highlight the selected row.");
 
   dispatchNodeClick(grid._commandNodes["2"].edit);
   loaded.app.Runtime.flush();
   assertEqual(dialog.Visible, true, "OpportunityBoard edit command should open the editor dialog.");
+
+  grid.Collection.Update("2", { value: 86000 });
+  loaded.app.Runtime.flush();
+  assertEqual(markCleanButton.Enabled, true, "OpportunityBoard should enable Mark Clean after local changes.");
+  assertEqual(accountRepeater.Children[1].Text, "Atlas Bio - Qualified", "OpportunityBoard repeater should stay in sync after collection updates.");
 }
 
 var tests = [
   { name: "store subscribe and unsubscribe", fn: testStoreSubscribeAndUnsubscribe },
+  { name: "store derive keeps computed keys in sync", fn: testStoreDeriveKeepsComputedKeysInSync },
   { name: "container rejects duplicate child names", fn: testContainerRejectsDuplicateChildNames },
   { name: "BindError tracks store and disposes cleanly", fn: testBindErrorTracksStoreAndDisposesCleanly },
   { name: "Label.BindText formats and disposes cleanly", fn: testLabelBindTextFormatsAndDisposesCleanly },
   { name: "BindVisible tracks store and disposes cleanly", fn: testBindVisibleTracksStoreAndDisposesCleanly },
+  { name: "BindEnabled tracks store and disposes cleanly", fn: testBindEnabledTracksStoreAndDisposesCleanly },
+  { name: "collection BindStore keeps derived store keys in sync", fn: testCollectionBindStoreKeepsDerivedStoreKeysInSync },
+  { name: "FormState validates clears and watches store errors", fn: testFormStateValidatesClearsAndWatchesStoreErrors },
+  { name: "Repeater renders collection rows and refreshes on change", fn: testRepeaterRendersCollectionRowsAndRefreshesOnChange },
   { name: "ValidationMessage binds text and visibility", fn: testValidationMessageBindsTextAndVisibility },
   { name: "ValidationSummary binds summary and visibility", fn: testValidationSummaryBindsSummaryAndVisibility },
   { name: "ValidationSummary can build summary from error keys", fn: testValidationSummaryCanBuildSummaryFromErrorKeys },

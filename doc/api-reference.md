@@ -354,6 +354,7 @@ Common methods:
 - `ClearError()`
 - `BindError(store, key)`
 - `BindVisible(store, key, transform)`
+- `BindEnabled(store, key, transform)`
 
 Notes:
 - `Fill` stretches ordinary flow-layout controls with flex and `100%` sizing when appropriate
@@ -372,6 +373,7 @@ Notes:
 - `ClearError()` clears both
 - `BindError(store, key)` binds control error state to a store key whose value is an error string or empty
 - `BindVisible(store, key, transform)` binds control visibility to a store key, with an optional mapper
+- `BindEnabled(store, key, transform)` binds control enabled state to a store key, with an optional mapper
 
 ### `JOG.Control`
 
@@ -508,6 +510,27 @@ Notes:
 - render implementation prefers `Gap` when both are set
 - `Responsive` uses breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
 - `Responsive` breakpoint values can override `orientation`, `spacing`, and `gap`
+
+### `JOG.Repeater`
+
+Extends `JOG.StackPanel`.
+
+Properties:
+
+- inherited stack-panel and component properties
+- `EmptyText`
+
+Methods:
+
+- `BindCollection(collection, renderer)`
+
+Notes:
+
+- renders one child control per collection row
+- `renderer(row, index, collection)` must return a JOG control
+- re-renders on collection `change` events
+- renders one fallback `Label` with `EmptyText` when the collection is empty
+- stays explicit, it does not add templates, keyed diffing, or virtualized rendering
 
 ### `JOG.SectionPanel`
 
@@ -867,11 +890,46 @@ Methods:
 - `Get(key)`
 - `Set(key, value)`
 - `Subscribe(key, listener)`
+- `Derive(key, dependencyKeys, compute)`
 
 Notes:
 
 - `Subscribe` returns an unsubscribe function
 - `Set` does nothing if the new value is strictly equal to the old value
+- `Derive` returns an unsubscribe function and keeps one store key in sync from other store keys through an explicit compute function
+
+### `JOG.FormState`
+
+Constructor:
+
+- `new JOG.FormState(store, options)`
+
+Options supported now:
+
+- `summaryKey`
+- `validKey`
+- `summaryFormatter`
+- `validations`
+
+Validation item shape:
+
+- `errorKey`
+- `validate(currentStore)`
+
+Methods:
+
+- `Validate()`
+- `ClearErrors()`
+- `Watch(keys, options)`
+- `StopWatching()`
+
+Notes:
+
+- `Validate()` writes each configured error key back into the store and returns `true` when no errors remain
+- `ClearErrors()` clears configured error keys and resets `summaryKey` and `validKey` when those options are present
+- `Watch(keys)` re-runs validation only when one of the watched keys changes and the form currently has errors
+- `Watch(keys, { mode: "always" })` validates on every watched key change
+- this helper is intentionally narrow and store-oriented, not a form-schema system
 
 ### `JOG.Collection`
 
@@ -904,6 +962,7 @@ Methods:
 - `GetSummary(key)`
 - `GetSummaries()`
 - `Subscribe(key, listener)`
+- `BindStore(store, key, eventKeys, compute)`
 
 Notes:
 
@@ -913,6 +972,7 @@ Notes:
 - dirty tracking covers changed current rows plus deleted baseline rows
 - `MarkClean()` without ids resets the current snapshot as the clean baseline
 - subscription keys are `rows`, `selection`, `dirty`, `summary`, and `change`
+- `BindStore(store, key, eventKeys, compute)` pushes explicit collection-derived values into a target store key and returns an unsubscribe function
 
 ### `JOG.EventArgs`
 

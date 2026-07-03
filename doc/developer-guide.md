@@ -26,11 +26,11 @@ Implemented public surface in `v2/JOG.js`:
 - browser helpers: `JOG.Browser.OpenTextFile()`, `JOG.Browser.SaveTextFile()`
 - application runtime: `Application`, `Page`
 - base types: `Component`, `Control`, `Container`
-- layout containers: `Panel`, `DockPanel`, `WorkspaceShell`, `SplitPanel`, `StackPanel`, `SectionPanel`, `Grid`
+- layout containers: `Panel`, `DockPanel`, `WorkspaceShell`, `SplitPanel`, `StackPanel`, `Repeater`, `SectionPanel`, `Grid`
 - shell controls: `MenuBar`, `ToolBar`, `StatusBar`, `PageHeader`, `TabControl`, `TabPage`
 - windows: `Window`, `Dialog`
 - controls: `DataGrid`, `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
-- state: `Store`, `Collection`
+- state: `Store`, `Collection`, `FormState`
 - event payload type: `EventArgs`
 - control-level validation state: `Invalid`, `ErrorText`, `SetError()`, `ClearError()`, `BindError()`, `ValidationMessage`, `ValidationSummary`
 - application diagnostics: `Debug`, `DumpTree()`, `LogTree()`
@@ -642,8 +642,10 @@ Available store methods:
 - `Get(key)`
 - `Set(key, value)`
 - `Subscribe(key, listener)`
+- `Derive(key, dependencyKeys, compute)`
 
 `Subscribe` returns an unsubscribe function. Control bindings register these unsubscribers and clean them up on `Dispose()`.
+`Derive` also returns an unsubscribe function. It keeps one store key in sync from other store keys through an explicit compute function.
 
 Current explicit binding helpers:
 
@@ -658,8 +660,14 @@ Current explicit binding helpers:
 - `DropDownList.BindSelectedValue(store, key)`
 - `ListBox.BindSelectedValue(store, key)`
 - `Component.BindVisible(store, key, transform)`
+- `Component.BindEnabled(store, key, transform)`
 
-Binding is explicit and per-control. There is no expression language, selector syntax, derived store, or automatic form model.
+Current explicit app-state helper:
+
+- `Store.Derive(key, dependencyKeys, compute)`
+- `FormState(store, options)`
+
+Binding is explicit and per-control. There is no expression language or selector syntax. `Store.Derive()` and `FormState` stay intentionally narrow. App code still decides which keys are derived, when validation runs, and what those keys mean.
 
 ## Collection Model
 
@@ -709,6 +717,7 @@ Available collection methods:
 - `GetSummary(key)`
 - `GetSummaries()`
 - `Subscribe(key, listener)`
+- `BindStore(store, key, eventKeys, compute)`
 
 Supported subscription keys today:
 
@@ -717,6 +726,10 @@ Supported subscription keys today:
 - `dirty`
 - `summary`
 - `change`
+
+`BindStore(store, key, eventKeys, compute)` is the narrow bridge from collection state into store-backed page state. It is useful when a page wants labels, button enabled state, or status text that depend on collection summaries, selection, or dirty state without hand-written subscription glue.
+
+For simple repeated collection-backed UI, use `JOG.Repeater` with `BindCollection(collection, renderer)`. The renderer stays explicit and returns normal JOG controls, while the repeater handles re-rendering when the collection changes.
 
 The collection API stays explicit. App code decides when records become clean again, usually after a persistence step or a deliberate local snapshot reset.
 
@@ -732,6 +745,7 @@ Available on components and controls:
 - `ClearError()`
 - `BindError(store, key)`
 - `BindVisible(store, key, transform)`
+- `BindEnabled(store, key, transform)`
 
 What this does today:
 
@@ -744,9 +758,9 @@ What this does today:
 
 What it does not do:
 
-- it does not provide a form validator DSL
+- it does not provide a validator DSL
 - it does not render inline error text automatically
-- it does not manage validation timing for you
+- it does not decide which validations your form needs
 
 The intended usage is explicit. App code decides when validation runs, stores error messages where useful, and can show inline error labels beside controls.
 
@@ -757,7 +771,30 @@ The recommended pattern now is:
 3. have validation code set or clear that store key
 4. render inline error labels only where you want them
 
-You can also keep a separate summary key in the store when you want a page-level validation summary block above the form. When your summary is just a composition of field-level error strings, `ValidationSummary.BindErrors(store, ["nameError", "statusError"])` removes that extra summary-store wiring while keeping validation timing in app code.
+`JOG.FormState` now covers the narrow repeated pattern where a form needs to validate a fixed set of store keys, write field errors back into the store, and optionally maintain one summary key plus one valid-state key.
+
+```js
+var formState = new JOG.FormState(store, {
+  summaryKey: "validationSummary",
+  validations: [
+    {
+      errorKey: "nameError",
+      validate: function(currentStore) {
+        return (currentStore.Get("name") || "").trim() ? "" : "Enter a name.";
+      }
+    }
+  ]
+});
+
+saveButton.OnClick(function() {
+  if (!formState.Validate()) {
+    return;
+  }
+  // persist record
+});
+```
+
+`FormState.Watch(keys)` re-runs validation only after errors exist, which keeps the model explicit without forcing eager validation on every keystroke. When your summary is just a composition of field-level error strings and you do not need a dedicated form helper, `ValidationSummary.BindErrors(store, ["nameError", "statusError"])` is still the smaller option.
 
 For radio-group validation, bind the error key to the `StackPanel` that owns the radio buttons. The built-in invalid styling now propagates from that row container to the radio captions.
 
