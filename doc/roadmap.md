@@ -63,6 +63,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `MenuBar`
 - `ToolBar`
 - `StatusBar`
+- `PageHeader`
 - `TabControl`
 - `DataGrid`
 - `Label`
@@ -119,6 +120,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - notepad now reports file-operation failures through a JOG dialog instead of browser `alert()` UI
 - customer admin example
 - customer admin now demonstrates a `SplitPanel` left-nav-plus-content workspace
+- customer admin now uses `PageHeader` instead of a manual fixed-height title panel
 - customer admin shell no longer overflows on the right edge
 - customer admin edit dialog now starts hidden correctly and uses a larger scrollable window body
 - form demo with grid layout
@@ -128,6 +130,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - form demo checkbox and radio-group invalid-state feedback
 - opportunity board sample with CRM-style add, edit, and delete flows
 - opportunity board migrated to `Collection` plus `DataGrid`
+- opportunity board now uses `PageHeader` instead of a manual fixed-height title panel
 - opportunity board now demonstrates first-pass resizable `DataGrid` columns
 - opportunity editor dialog with breakpoint-aware responsive grid layout
 - opportunity board shell with responsive dock and stack behavior
@@ -137,7 +140,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 ### Tests
 
 - Node test runner at `test/run-v2-tests.js`
-- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, split, stack, and section behavior, browser text file helper flows, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
+- baseline coverage for store, collection, container rules, diagnostics, error binding, lifecycle guards, responsive grid breakpoints, responsive dock, split, stack, section, and page-header behavior, browser text file helper flows, theme preset classes, richer window resize behavior, modal stacking, window lifecycle events, data-grid rendering, fill-based tab workspaces, shell relayout after tab mutations, dock-managed fill behavior, scrollable dialog content panes, and example-level integration flows including customer selection, dialog close branches, form reset behavior, and the opportunity board grid flow
 
 ## Partial
 
@@ -165,6 +168,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - `MenuBar` exists as a first minimal shell control with flat clickable items
 - `ToolBar` exists as a first minimal shell container for command controls
 - `StatusBar` exists as a first minimal shell container for status content
+- `PageHeader` exists as a narrow shell primitive for page title and subtitle chrome
 - `TabControl` exists as a first minimal tabbed container with explicit `TabPage` children
 - nested menus, accelerators, and keyboard navigation are not implemented yet
 - toolbar overflow, separators, richer status conventions, closable tabs, and drag reordering are not implemented yet

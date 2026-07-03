@@ -1925,6 +1925,38 @@ function testStatusBarUsesFlowLayoutForChildControls() {
   assert(label._domNode.parentNode === statusBar._domNode, "StatusBar should host child controls directly.");
 }
 
+function testPageHeaderUsesStackedTitleSubtitleLayout() {
+  var JOG = loadJOG();
+  var app = new JOG.Application();
+  var page = new JOG.Page();
+  var shell = new JOG.DockPanel();
+  var header = new JOG.PageHeader();
+  var content = new JOG.SectionPanel();
+
+  shell.Width = 920;
+  shell.Height = 640;
+  shell.Padding = 20;
+
+  header.Name = "testPageHeader";
+  header.Dock = "top";
+  header.Margin = { bottom: 18 };
+  header.TitleText = "Deals";
+  header.SubtitleText = "Pipeline summary and next actions.";
+
+  content.Name = "testPageHeaderContent";
+  content.Dock = "fill";
+
+  shell.Add(header);
+  shell.Add(content);
+  page.Add(shell);
+  app.Run(page);
+
+  assertEqual(header._titleNode.textContent, "Deals", "PageHeader should render its title text.");
+  assertEqual(header._subtitleNode.textContent, "Pipeline summary and next actions.", "PageHeader should render its subtitle text.");
+  assertEqual(header._domNode.style.height !== "0px", true, "PageHeader should size itself without a fixed explicit height.");
+  assertEqual(content._domNode.style.top !== "0px", true, "Docked content should sit below the PageHeader.");
+}
+
 function testTabControlSwitchesVisiblePage() {
   var JOG = loadJOG();
   var app = new JOG.Application();
@@ -2118,6 +2150,9 @@ function testDataGridSupportsResizablePixelWidthColumns() {
 
 function testOpportunityBoardUsesCollectionAndDataGridFlow() {
   var loaded = loadExampleApp("OpportunityBoardApp.js");
+  var header = findControl(loaded.page, function(control) {
+    return control.Name === "opportunityTopBar";
+  });
   var grid = findControl(loaded.page, function(control) {
     return control.Name === "opportunityDataGrid";
   });
@@ -2128,6 +2163,8 @@ function testOpportunityBoardUsesCollectionAndDataGridFlow() {
     return control._typeName === "Label" && control.Text.indexOf("Status:") === 0;
   });
 
+  assertEqual(header._typeName, "PageHeader", "OpportunityBoard should use the shared page header primitive.");
+  assertEqual(header._domNode.style.height !== "0px", true, "OpportunityBoard header should size itself without a fixed height.");
   assert(!!grid, "OpportunityBoard should render a DataGrid.");
   assertEqual(grid.Collection.GetRows().length, 3, "OpportunityBoard should start with seeded collection rows.");
 
@@ -2190,6 +2227,7 @@ var tests = [
   { name: "menu bar renders items and raises click events", fn: testMenuBarRendersItemsAndRaisesClickEvents },
   { name: "tool bar uses flow layout for child controls", fn: testToolBarUsesFlowLayoutForChildControls },
   { name: "status bar uses flow layout for child controls", fn: testStatusBarUsesFlowLayoutForChildControls },
+  { name: "page header uses stacked title subtitle layout", fn: testPageHeaderUsesStackedTitleSubtitleLayout },
   { name: "tab control switches visible page", fn: testTabControlSwitchesVisiblePage },
   { name: "page direct children use flow layout while windows remain absolute", fn: testPageDirectChildrenUseFlowLayoutWhileWindowsRemainAbsolute },
   { name: "collection tracks updates selection dirty state and summaries", fn: testCollectionTracksUpdatesSelectionDirtyStateAndSummaries },

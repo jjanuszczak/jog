@@ -188,22 +188,12 @@
     shell.Fill = true;
     shell.Padding = 24;
 
-    var topBar = new JOG.Panel();
+    var topBar = new JOG.PageHeader();
     topBar.Name = "topBar";
     topBar.Dock = "top";
-    topBar.Height = 88;
     topBar.Margin = { bottom: 20 };
-
-    var title = new JOG.Label();
-    title.Text = "Customer Admin";
-    title.Location(0, 18);
-
-    var subtitle = new JOG.Label();
-    subtitle.Text = "A quieter CRUD-style test app for the V2 runtime.";
-    subtitle.Location(0, 46);
-
-    topBar.Add(title);
-    topBar.Add(subtitle);
+    topBar.TitleText = "Customer Admin";
+    topBar.SubtitleText = "A quieter CRUD-style test app for the V2 runtime.";
 
     var workspace = new JOG.SplitPanel();
     workspace.Name = "customerWorkspace";

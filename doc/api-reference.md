@@ -247,6 +247,22 @@ Notes:
 - intended for composing `Label` and other lightweight readout controls
 - segmented regions, resize grips, and richer status conventions are not implemented yet
 
+### `JOG.PageHeader`
+
+Extends `JOG.Control`.
+
+Properties:
+
+- `TitleText`
+- `SubtitleText`
+
+Notes:
+
+- renders a stacked shell header for page-level title and subtitle chrome
+- sizes itself from content instead of requiring a fixed explicit height
+- works cleanly as a `Dock = "top"` header inside `DockPanel`
+- intended to replace manual top panels that only exist to position title and subtitle labels
+
 ### `JOG.TabPage`
 
 Extends `JOG.Container`.
