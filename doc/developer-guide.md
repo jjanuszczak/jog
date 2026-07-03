@@ -55,6 +55,12 @@ Distribution build:
 - source map at `dist/JOG.min.js.map`
 - starter release bundle at `dist/starter/`
 
+Third-party control extensibility status:
+
+- there is not yet a public runtime API for third-party control registration or extension
+- the proposed future model is documented in [third-party-control-spec.md](third-party-control-spec.md)
+- treat that specification as roadmap direction, not current implementation truth
+
 ## Application Model
 
 The normal boot pattern is:

@@ -50,6 +50,8 @@ If you are new to the project, read these in order:
 
 The developer guide explains the runtime model. The API reference documents what exists now. The roadmap tells you what is implemented, what is partial, and what should happen next.
 
+For proposed future extensibility work around custom control packages, see [doc/third-party-control-spec.md](doc/third-party-control-spec.md). That document is a design target, not a description of implemented runtime behavior.
+
 ## Running The Examples
 
 Open these files directly in a browser:

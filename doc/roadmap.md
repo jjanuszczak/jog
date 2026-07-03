@@ -188,6 +188,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - the runtime, examples, and current developer docs now center the authoring model around `new`, property assignment, `Add`, `OnX`, and `Application.Run(page)`
 - older rationale documents still contain outdated or broader examples, including `Click(listener)`-first guidance and older future-control framing
 - the public contract needs to be reconciled so contributors have one canonical programming model
+- a third-party control specification now exists in `doc/third-party-control-spec.md`, but the runtime does not yet expose a public extension API that implements it
 
 ### Styling
 
@@ -229,9 +230,10 @@ That means the next phase is not broad control expansion for its own sake. The n
 1. Shell and layout hardening
 2. Richer binding and app-state helpers
 3. DataGrid depth and behavior hardening
-4. Accessibility and keyboard model
-5. Deeper shell-control behavior
-6. Browser-level interaction verification
+4. Third-party control extensibility
+5. Accessibility and keyboard model
+6. Deeper shell-control behavior
+7. Browser-level interaction verification
 
 ### 1. Shell And Layout Hardening
 
@@ -257,6 +259,16 @@ That means the next phase is not broad control expansion for its own sake. The n
 - expose finer per-column overflow and sizing behavior once more than the OpportunityBoard example needs it
 - keep `TreeView` behind deeper `DataGrid` maturity unless a concrete app need pulls it forward
 
+### 4. Third-Party Control Extensibility
+
+- implement a formal third-party control registration model instead of relying on runtime patching or private internals
+- define and document the supported extension contract for `Control`, `Container`, `Window`, and `Dialog`
+- expose documented extension lifecycle hooks so third-party controls do not need to bind to underscored runtime details
+- add control-package metadata and compatibility checks so JOG can reject duplicate or incompatible registrations cleanly
+- make diagnostics aware of registered third-party control names and package versions
+- prove the docs by building at least one real third-party control package outside the core runtime source using only the published third-party developer specification
+- feed anything awkward or missing from that proof build back into the runtime contract and the developer docs before calling the model stable
+
 ## Remaining From Initial Data Scope
 
 - sorting is still deferred
@@ -265,7 +277,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - persistence of collection mutations remains app-owned
 - keyboard-first and accessibility-grade grid behavior remains unfinished
 
-### 4. Accessibility And Keyboard Model
+### 5. Accessibility And Keyboard Model
 
 - add modal focus trap
 - restore focus after dialog close
@@ -274,14 +286,14 @@ That means the next phase is not broad control expansion for its own sake. The n
 - review control labeling and semantics
 - treat accessibility as framework completeness, not deferred polish
 
-### 5. Deeper Shell-Control Behavior
+### 6. Deeper Shell-Control Behavior
 
 - add menu hierarchy and better command behavior where appropriate
 - add toolbar overflow and separators
 - add stronger status-bar conventions
 - add closable and reorderable tabs when the underlying shell behavior is stable
 
-### 6. Browser-Level Interaction Verification
+### 7. Browser-Level Interaction Verification
 
 - keep the zero-dependency Node suite for fast regression coverage
 - add lightweight real-browser verification for focus order, keyboard flows, modal correctness, and pointer interaction edge cases
