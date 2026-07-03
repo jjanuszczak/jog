@@ -358,7 +358,7 @@ Common methods:
 Notes:
 - `Fill` stretches ordinary flow-layout controls with flex and `100%` sizing when appropriate
 - dock-managed children inside `DockPanel` still honor `Fill` for stretch intent, but do not keep raw `100%` width or height overrides because dock layout owns those dimensions
-
+- `Gap` is a generic spacing property, but `DockPanel` now uses it specifically for spacing between docked regions
 - `Dock` accepts `none`, `top`, `bottom`, `left`, `right`, `fill`
 - `ResponsiveLayout` accepts breakpoint keys `base`, `sm`, `md`, `lg`, and `xl`
 - `ResponsiveLayout` breakpoint values can override `width`, `height`, `minWidth`, `minHeight`, `maxWidth`, `maxHeight`, `left`, `top`, `padding`, `margin`, `gap`, and `dock`
@@ -435,17 +435,20 @@ Extends `JOG.Container`.
 Uses child `Dock` values and respects:
 
 - container `Padding`
+- container `Gap`
 - child `Margin`
+- docked-child `Gap` overrides
 - explicit child `Width` and `Height` where relevant
 
 Responsive support:
 
 - container-level changes can use inherited `ResponsiveLayout`
-- child dock, width, height, and margin changes can also use inherited `ResponsiveLayout`
+- child dock, width, height, margin, and gap changes can also use inherited `ResponsiveLayout`
 
 Notes:
 
 - still the main shell-chrome container for top, bottom, left, right, and fill regions
+- a docked child `Gap` applies spacing after that region and overrides the panel-level gap for that one child
 
 ### `JOG.SplitPanel`
 

@@ -2535,7 +2535,9 @@
   DockPanel.prototype._applyStateToDom = function(prevState, nextState) {
     var actualHeight;
     var actualWidth;
+    var childGap;
     var pagePadding;
+    var panelGap;
     var parentHeight;
     var parentNode;
     var parentWidth;
@@ -2557,6 +2559,7 @@
     resolvedState = this._resolvedResponsiveState || nextState;
 
     var padding = normalizeBox(resolvedState.padding);
+    panelGap = isNumber(resolvedState.gap) ? resolvedState.gap : 0;
     var top = padding.top;
     var left = padding.left;
     actualWidth = this._domNode.clientWidth || this._domNode.offsetWidth || this.Width || 0;
@@ -2602,6 +2605,7 @@
       var width = childState.width || child.Width || child._domNode.offsetWidth || 0;
       var height = childState.height || child.Height || child._domNode.offsetHeight || 0;
       var margin = normalizeBox(childState.margin);
+      childGap = isNumber(childState.gap) ? childState.gap : panelGap;
       var style = child._domNode.style;
 
       style.position = "absolute";
@@ -2613,7 +2617,7 @@
         if (height) {
           style.height = toCssPixels(height);
         }
-        top += height + margin.top + margin.bottom;
+        top += height + margin.top + margin.bottom + childGap;
         return;
       }
 
@@ -2624,7 +2628,7 @@
         if (height) {
           style.height = toCssPixels(height);
         }
-        bottom -= height + margin.top + margin.bottom;
+        bottom -= height + margin.top + margin.bottom + childGap;
         return;
       }
 
@@ -2635,7 +2639,7 @@
           style.width = toCssPixels(width);
         }
         style.height = toCssPixels(Math.max(bottom - top - margin.top - margin.bottom, 0));
-        left += width + margin.left + margin.right;
+        left += width + margin.left + margin.right + childGap;
         return;
       }
 
@@ -2646,7 +2650,7 @@
           style.width = toCssPixels(width);
         }
         style.height = toCssPixels(Math.max(bottom - top - margin.top - margin.bottom, 0));
-        right -= width + margin.left + margin.right;
+        right -= width + margin.left + margin.right + childGap;
         return;
       }
 

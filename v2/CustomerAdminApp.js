@@ -187,11 +187,11 @@
     shell.Name = "customerShell";
     shell.Fill = true;
     shell.Padding = 24;
+    shell.Gap = 20;
 
     var topBar = new JOG.PageHeader();
     topBar.Name = "topBar";
     topBar.Dock = "top";
-    topBar.Margin = { bottom: 20 };
     topBar.TitleText = "Customer Admin";
     topBar.SubtitleText = "A quieter CRUD-style test app for the V2 runtime.";
 

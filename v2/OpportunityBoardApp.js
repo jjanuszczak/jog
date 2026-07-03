@@ -486,7 +486,7 @@
     var topBar = new JOG.PageHeader();
     topBar.Name = "opportunityTopBar";
     topBar.Dock = "top";
-    topBar.Margin = { top: 0, right: 0, bottom: 16, left: 0 };
+    topBar.Gap = 16;
     topBar.TitleText = "Opportunity Board";
     topBar.SubtitleText = "A CRM-style sample using Collection plus DataGrid for selection, summaries, and row commands.";
 
@@ -496,20 +496,20 @@
     sidebar.Dock = "left";
     sidebar.Width = 270;
     sidebar.Padding = 12;
-    sidebar.Margin = { top: 0, right: 24, bottom: 0, left: 0 };
+    sidebar.Gap = 24;
     sidebar.ThemePreset = "primary";
     sidebar.ResponsiveLayout = {
       base: {
         dock: "top",
         width: null,
         height: 284,
-        margin: { bottom: 18 }
+        gap: 18
       },
       md: {
         dock: "left",
         width: 270,
         height: null,
-        margin: { top: 0, right: 24, bottom: 0, left: 0 }
+        gap: 24
       }
     };
     sidebar.Responsive = {
