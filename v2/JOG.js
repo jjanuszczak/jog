@@ -1775,6 +1775,9 @@
       ".jog-menu-bar-button:disabled { opacity: 0.5; cursor: default; }",
       ".jog-tool-bar { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); box-shadow: var(--jog-shadow-section); }",
       ".jog-status-bar { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 10px; background: var(--jog-surface-muted); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-control); color: var(--jog-text-muted); }",
+      ".jog-page-header { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 4px 0; }",
+      ".jog-page-header-title { font-size: calc(var(--jog-title-size) + 8px); line-height: 1.2; font-weight: 700; color: var(--jog-text-strong); }",
+      ".jog-page-header-subtitle { font-size: var(--jog-font-size); line-height: var(--jog-line-height); color: var(--jog-text-muted); max-width: 72ch; }",
       ".jog-tab-control { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--jog-surface); border: 1px solid var(--jog-border-soft); border-radius: var(--jog-radius-section); box-shadow: var(--jog-shadow-section); overflow: hidden; }",
       ".jog-tab-header { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 10px 0; background: var(--jog-surface-muted); border-bottom: 1px solid var(--jog-border-soft); }",
       ".jog-tab-button { border: 1px solid transparent; background: transparent; color: var(--jog-text-muted); border-top-left-radius: var(--jog-radius-control); border-top-right-radius: var(--jog-radius-control); padding: 8px 12px; cursor: pointer; font-size: var(--jog-font-size); line-height: var(--jog-line-height); }",
@@ -2943,6 +2946,56 @@
   StatusBar.prototype._childUsesFlowLayout = function() {
     return true;
   };
+
+  function PageHeader() {
+    Control.call(this, "PageHeader");
+    this._state.titleText = "";
+    this._state.subtitleText = "";
+    this._titleNode = null;
+    this._subtitleNode = null;
+  }
+
+  PageHeader.prototype = Object.create(Control.prototype);
+  PageHeader.prototype.constructor = PageHeader;
+
+  PageHeader.prototype._createDomNode = function(doc) {
+    var node = doc.createElement("div");
+    var title = doc.createElement("div");
+    var subtitle = doc.createElement("div");
+
+    node.className = "jog-control jog-page-header";
+    title.className = "jog-page-header-title";
+    subtitle.className = "jog-page-header-subtitle";
+
+    node.appendChild(title);
+    node.appendChild(subtitle);
+
+    this._titleNode = title;
+    this._subtitleNode = subtitle;
+    return node;
+  };
+
+  PageHeader.prototype._applyStateToDom = function(prevState, nextState) {
+    Control.prototype._applyStateToDom.call(this, prevState, nextState);
+    if (!this._domNode || !this._titleNode || !this._subtitleNode) {
+      return;
+    }
+    this._titleNode.textContent = nextState.titleText || "";
+    this._subtitleNode.textContent = nextState.subtitleText || "";
+    this._titleNode.style.display = nextState.titleText ? "" : "none";
+    this._subtitleNode.style.display = nextState.subtitleText ? "" : "none";
+    this._domNode.style.gap = nextState.titleText && nextState.subtitleText ? "6px" : "0";
+  };
+
+  Object.defineProperty(PageHeader.prototype, "TitleText", {
+    get: function() { return this._state.titleText; },
+    set: function(value) { this._setState("titleText", value == null ? "" : String(value)); }
+  });
+
+  Object.defineProperty(PageHeader.prototype, "SubtitleText", {
+    get: function() { return this._state.subtitleText; },
+    set: function(value) { this._setState("subtitleText", value == null ? "" : String(value)); }
+  });
 
   function TabPage() {
     Container.call(this, "TabPage");
@@ -4605,6 +4658,7 @@
   JOG.MenuBar = MenuBar;
   JOG.ToolBar = ToolBar;
   JOG.StatusBar = StatusBar;
+  JOG.PageHeader = PageHeader;
   JOG.TabPage = TabPage;
   JOG.TabControl = TabControl;
   JOG.SectionPanel = SectionPanel;

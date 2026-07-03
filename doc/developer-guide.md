@@ -27,7 +27,7 @@ Implemented public surface in `v2/JOG.js`:
 - application runtime: `Application`, `Page`
 - base types: `Component`, `Control`, `Container`
 - layout containers: `Panel`, `DockPanel`, `SplitPanel`, `StackPanel`, `SectionPanel`, `Grid`
-- shell controls: `MenuBar`, `ToolBar`, `StatusBar`, `TabControl`, `TabPage`
+- shell controls: `MenuBar`, `ToolBar`, `StatusBar`, `PageHeader`, `TabControl`, `TabPage`
 - windows: `Window`, `Dialog`
 - controls: `DataGrid`, `Label`, `ValidationMessage`, `ValidationSummary`, `Button`, `TextBox`, `TextArea`, `CheckBox`, `RadioButton`, `DropDownList`, `ListBox`
 - state: `Store`, `Collection`
@@ -275,6 +275,7 @@ JOG now includes a first minimal shell control:
 - `MenuBar`
 - `ToolBar`
 - `StatusBar`
+- `PageHeader`
 - `TabControl`
 
 `MenuBar` is a horizontal command strip for page-level application chrome. The current implementation is intentionally narrow:
@@ -312,6 +313,13 @@ menuBar.OnItemClick(function(args) {
 - uses flow layout for its children
 - provides shell styling for footer-style status content
 - does not yet implement grip areas, segmented regions, or automatic spring spacing
+
+`PageHeader` is a narrow shell header primitive for page title and subtitle chrome. The current implementation:
+
+- exposes `TitleText` and `SubtitleText`
+- stacks those values in normal flow instead of requiring absolute label coordinates
+- sizes itself from content instead of requiring a fixed explicit height
+- works cleanly as a `Dock = "top"` region inside `DockPanel`
 
 `TabControl` is a page-region container for switching between multiple child panels. The current implementation uses explicit `TabPage` children rather than a loose item array:
 
@@ -838,6 +846,7 @@ Calling setters on a disposed control throws.
 [v2/CustomerAdminApp.js](../v2/CustomerAdminApp.js) now also demonstrates:
 
 - one shared validation routine reused across inline save and modal save
+- `PageHeader` replacing manual fixed-height shell title layout
 - field-level error binding on text inputs in both page and dialog contexts
 - summary-level validation messaging reused across multiple save entry points
 - live revalidation after an invalid edit begins to be corrected
@@ -853,6 +862,7 @@ Calling setters on a disposed control throws.
 
 - breakpoint-aware dialog form layout inside the opportunity editor
 - responsive `DockPanel` shell behavior for the board sidebar
+- `PageHeader` replacing manual fixed-height shell title layout
 - responsive `StackPanel` action rows
 - `DataGrid` row commands with collection-backed updates
 - first-pass header drag resizing for pixel-width columns

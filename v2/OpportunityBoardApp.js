@@ -483,23 +483,12 @@
       md: { padding: 18 }
     };
 
-    var topBar = new JOG.Panel();
+    var topBar = new JOG.PageHeader();
     topBar.Name = "opportunityTopBar";
     topBar.Dock = "top";
-    topBar.Height = 74;
     topBar.Margin = { top: 0, right: 0, bottom: 16, left: 0 };
-
-    var title = new JOG.Label();
-    title.Text = "Opportunity Board";
-    title.ThemePreset = "strong";
-    title.Location(0, 12);
-
-    var subtitle = new JOG.Label();
-    subtitle.Text = "A CRM-style sample using Collection plus DataGrid for selection, summaries, and row commands.";
-    subtitle.Location(0, 36);
-
-    topBar.Add(title);
-    topBar.Add(subtitle);
+    topBar.TitleText = "Opportunity Board";
+    topBar.SubtitleText = "A CRM-style sample using Collection plus DataGrid for selection, summaries, and row commands.";
 
     var sidebar = new JOG.SectionPanel();
     sidebar.Name = "opportunitySidebar";
