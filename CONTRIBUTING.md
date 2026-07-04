@@ -42,10 +42,10 @@ At minimum, review these when they are affected:
 Run these when relevant:
 
 ```bash
-node --check v2/JOG.js
-node --check v2/ExampleApp.js
-node --check v2/CustomerAdminApp.js
-node --check v2/FormApp.js
+node --check v2/runtime/JOG.js
+node --check v2/apps/ExampleApp.js
+node --check v2/apps/CustomerAdminApp.js
+node --check v2/apps/FormApp.js
 node test/run-v2-tests.js
 ```
 

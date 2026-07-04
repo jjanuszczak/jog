@@ -157,7 +157,7 @@ function createDocument() {
 }
 
 function createJOGSandbox(options) {
-  var source = fs.readFileSync(path.join(__dirname, "..", "v2", "JOG.js"), "utf8");
+  var source = fs.readFileSync(path.join(__dirname, "..", "v2", "runtime", "JOG.js"), "utf8");
   var document = createDocument();
   var animationFrameQueue = [];
   var windowEventListeners = {};
@@ -245,7 +245,7 @@ function createJOGSandbox(options) {
     });
   };
   vm.createContext(sandbox);
-  vm.runInContext(source, sandbox, { filename: "v2/JOG.js" });
+  vm.runInContext(source, sandbox, { filename: "v2/runtime/JOG.js" });
   return sandbox;
 }
 
@@ -254,8 +254,24 @@ function loadJOG(options) {
 }
 
 function loadScriptIntoSandbox(sandbox, scriptName) {
-  var source = fs.readFileSync(path.join(__dirname, "..", "v2", scriptName), "utf8");
-  vm.runInContext(source, sandbox, { filename: "v2/" + scriptName });
+  var rootDir = path.join(__dirname, "..", "v2");
+  var candidatePaths = [
+    path.join(rootDir, scriptName),
+    path.join(rootDir, "apps", scriptName),
+    path.join(rootDir, "packages", scriptName),
+    path.join(rootDir, "runtime", scriptName)
+  ];
+  var resolvedPath = candidatePaths.find(function(candidate) {
+    return fs.existsSync(candidate);
+  });
+  var source;
+
+  if (!resolvedPath) {
+    throw new Error("Unable to resolve script: " + scriptName);
+  }
+
+  source = fs.readFileSync(resolvedPath, "utf8");
+  vm.runInContext(source, sandbox, { filename: path.relative(path.join(__dirname, ".."), resolvedPath) });
 }
 
 function loadExampleApp(scriptName, options, setupScripts) {

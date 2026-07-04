@@ -8,7 +8,7 @@ var terser = require("terser");
 
 async function main() {
   var rootDir = path.resolve(__dirname, "..");
-  var inputPath = path.join(rootDir, "v2", "JOG.js");
+  var inputPath = path.join(rootDir, "v2", "runtime", "JOG.js");
   var distDir = path.join(rootDir, "dist");
   var outputPath = path.join(distDir, "JOG.min.js");
   var sourceMapPath = path.join(distDir, "JOG.min.js.map");

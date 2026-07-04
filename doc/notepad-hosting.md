@@ -2,7 +2,7 @@
 
 ## Status
 
-This guide covers the current `v2/notepad.html` example when hosted as a static site.
+This guide covers the current `v2/examples/notepad.html` example when hosted as a static site.
 
 ## Summary
 

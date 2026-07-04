@@ -25,10 +25,10 @@ Yes, the roadmap should be kept current across sessions. If a task lands, the ro
 
 ## Working Areas
 
-- `v2/JOG.js`: main runtime
-- `v2/ExampleApp.js`: small runtime sanity example
-- `v2/CustomerAdminApp.js`: CRUD-style example
-- `v2/FormApp.js`: forms, validation, and binding example
+- `v2/runtime/JOG.js`: main runtime
+- `v2/apps/ExampleApp.js`: small runtime sanity example
+- `v2/apps/CustomerAdminApp.js`: CRUD-style example
+- `v2/apps/FormApp.js`: forms, validation, and binding example
 - `test/run-v2-tests.js`: zero-dependency Node regression runner
 
 ## Basic Workflow
@@ -70,10 +70,10 @@ At minimum, review and update these files when they are affected:
 
 At minimum, use these when relevant:
 
-- `node --check v2/JOG.js`
-- `node --check v2/ExampleApp.js`
-- `node --check v2/CustomerAdminApp.js`
-- `node --check v2/FormApp.js`
+- `node --check v2/runtime/JOG.js`
+- `node --check v2/apps/ExampleApp.js`
+- `node --check v2/apps/CustomerAdminApp.js`
+- `node --check v2/apps/FormApp.js`
 - `node test/run-v2-tests.js`
 
 ## Scope

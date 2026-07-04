@@ -226,7 +226,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - JOG now exposes a first-pass public extension contract through `JOG.RegisterControl()`, `JOG.RegisterStyleBlock()`, `JOG.DefineControlProperty()`, and public lifecycle hooks on the base classes
 - duplicate control registration and incompatible JOG version ranges are rejected cleanly
 - diagnostics and tree dumps now include registered third-party control names and package versions
-- the `AcmeJOG.Controls.js` and `BeaconJOG.Controls.js` sample packages now prove multiple primitive and composite third-party controls built outside `v2/JOG.js`
+- the `AcmeJOG.Controls.js` and `BeaconJOG.Controls.js` sample packages now prove multiple primitive and composite third-party controls built outside `v2/runtime/JOG.js`
 - the sample primitive control now covers first-pass keyboard interaction, but richer accessibility coverage and broader package tooling still need hardening before the extension model should be treated as long-term stable
 
 ### Styling
@@ -299,7 +299,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 
 - keep the new registration and lifecycle contract narrow, documented, and free of private-runtime leakage
 - harden the accessibility and keyboard quality bar for custom primitive controls before calling the contract stable
-- keep proving the docs with real third-party packages outside `v2/JOG.js`, not just one sample package
+- keep proving the docs with real third-party packages outside `v2/runtime/JOG.js`, not just one sample package
 - keep the new `GetWindowShell()` helper narrow and stable rather than opening broader DOM escape hatches for floating shells
 - add any missing metadata or diagnostics hooks that third-party authors uncover while building real packages
 

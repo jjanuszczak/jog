@@ -12,12 +12,12 @@ This review is based on the current rationale and implementation documents plus 
 - `doc/developer-guide.md`
 - `doc/api-reference.md`
 - `doc/roadmap.md`
-- `v2/JOG.js`
-- `v2/ExampleApp.js`
-- `v2/CustomerAdminApp.js`
-- `v2/FormApp.js`
-- `v2/OpportunityBoardApp.js`
-- `v2/NotepadApp.js`
+- `v2/runtime/JOG.js`
+- `v2/apps/ExampleApp.js`
+- `v2/apps/CustomerAdminApp.js`
+- `v2/apps/FormApp.js`
+- `v2/apps/OpportunityBoardApp.js`
+- `v2/apps/NotepadApp.js`
 - `test/run-v2-tests.js`
 
 The current regression suite passed in full at the time of review.
@@ -50,7 +50,7 @@ This is the foundation that makes the rest of the framework defensible:
 - more testable rendering behavior
 - room for responsive behavior and richer layout logic
 
-This is no longer a conceptual aspiration. It is implemented reality in `v2/JOG.js`.
+This is no longer a conceptual aspiration. It is implemented reality in `v2/runtime/JOG.js`.
 
 ### 3. The framework already covers real business-app building blocks
 

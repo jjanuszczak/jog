@@ -4,6 +4,13 @@
 
 This document describes the JOG V2 code that exists now under `v2/`. It is a living document and must be updated whenever the runtime or example apps change.
 
+Current `v2/` layout:
+
+- `v2/runtime/`: framework runtime source
+- `v2/apps/`: first-party example application scripts
+- `v2/packages/`: sample third-party control packages
+- `v2/examples/`: browser entry HTML files for the examples
+
 ## What JOG V2 Is
 
 JOG V2 is a browser UI runtime for developers who want to build front ends in straight JavaScript using controls, containers, windows, dialogs, state, and events instead of writing HTML or touching the DOM directly.
@@ -20,7 +27,7 @@ JOG owns rendering, DOM creation, styling injection, and event wiring.
 
 ## What Exists Today
 
-Implemented public surface in `v2/JOG.js`:
+Implemented public surface in `v2/runtime/JOG.js`:
 
 - theme API: `JOG.SetTheme()`, `JOG.GetTheme()`, `JOG.Theme`, `Application.Theme`
 - browser helpers: `JOG.Browser.OpenTextFile()`, `JOG.Browser.SaveTextFile()`
@@ -42,17 +49,17 @@ Test entrypoint:
 
 Example apps:
 
-- [v2/hello-world.html](../v2/hello-world.html)
-- [v2/example.html](../v2/example.html)
-- [v2/notepad.html](../v2/notepad.html)
-- [v2/customer-admin.html](../v2/customer-admin.html)
-- [v2/form-demo.html](../v2/form-demo.html)
-- [v2/opportunity-board.html](../v2/opportunity-board.html)
-- [v2/third-party-demo.html](../v2/third-party-demo.html)
+- [v2/examples/hello-world.html](../v2/examples/hello-world.html)
+- [v2/examples/example.html](../v2/examples/example.html)
+- [v2/examples/notepad.html](../v2/examples/notepad.html)
+- [v2/examples/customer-admin.html](../v2/examples/customer-admin.html)
+- [v2/examples/form-demo.html](../v2/examples/form-demo.html)
+- [v2/examples/opportunity-board.html](../v2/examples/opportunity-board.html)
+- [v2/examples/third-party-demo.html](../v2/examples/third-party-demo.html)
 
 Distribution build:
 
-- source runtime at [v2/JOG.js](../v2/JOG.js)
+- source runtime at [v2/runtime/JOG.js](../v2/runtime/JOG.js)
 - minified browser artifact at `dist/JOG.min.js`
 - source map at `dist/JOG.min.js.map`
 - starter release bundle at `dist/starter/`
@@ -60,7 +67,7 @@ Distribution build:
 Third-party control extensibility status:
 
 - JOG now exposes a first-pass public registration and extension surface for third-party controls
-- the current contract is implemented in `v2/JOG.js` and exercised by [AcmeJOG.Controls.js](../v2/AcmeJOG.Controls.js) plus [BeaconJOG.Controls.js](../v2/BeaconJOG.Controls.js)
+- the current contract is implemented in `v2/runtime/JOG.js` and exercised by [AcmeJOG.Controls.js](../v2/packages/AcmeJOG.Controls.js) plus [BeaconJOG.Controls.js](../v2/packages/BeaconJOG.Controls.js)
 - the broader direction and remaining gaps are documented in [third-party-control-spec.md](third-party-control-spec.md)
 
 ## Application Model
@@ -101,7 +108,7 @@ page.Add(helloLabel);
 app.Run(page);
 ```
 
-See [v2/HelloWorldApp.js](../v2/HelloWorldApp.js) and [v2/hello-world.html](../v2/hello-world.html).
+See [v2/apps/HelloWorldApp.js](../v2/apps/HelloWorldApp.js) and [v2/examples/hello-world.html](../v2/examples/hello-world.html).
 
 ## Theme Model
 
@@ -158,7 +165,7 @@ Npm packaging is intentionally deferred until the current release-asset automati
 The practical install story today is:
 
 1. treat GitHub Releases as the primary distribution channel for browser-ready artifacts
-2. ship `v2/JOG.js` as a readable development build, or ship `dist/JOG.min.js` as a release build
+2. ship `v2/runtime/JOG.js` as a readable development build, or ship `dist/JOG.min.js` as a release build
 3. include the runtime with a `<script>` tag
 4. load app code that constructs controls and calls `Application.Run(page)`
 
@@ -296,10 +303,10 @@ Behavior implemented now:
 
 Current sample package:
 
-- [AcmeJOG.Controls.js](../v2/AcmeJOG.Controls.js) registers `AcmeJOG.TagPicker` as a primitive control and `AcmeJOG.InspectorCard` as a composite container with a custom child host
-- [AcmeJOG.Controls.js](../v2/AcmeJOG.Controls.js) also registers `AcmeJOG.CommandPaletteDialog` as a third-party dialog that reuses the built-in window shell through `GetWindowShell()`
-- [BeaconJOG.Controls.js](../v2/BeaconJOG.Controls.js) registers `BeaconJOG.ViewSwitch` as a second primitive control and `BeaconJOG.MetricCard` as a composite control built largely from existing JOG controls
-- [ThirdPartyDemoApp.js](../v2/ThirdPartyDemoApp.js) and [third-party-demo.html](../v2/third-party-demo.html) show both packages used side by side from outside `v2/JOG.js`
+- [AcmeJOG.Controls.js](../v2/packages/AcmeJOG.Controls.js) registers `AcmeJOG.TagPicker` as a primitive control and `AcmeJOG.InspectorCard` as a composite container with a custom child host
+- [AcmeJOG.Controls.js](../v2/packages/AcmeJOG.Controls.js) also registers `AcmeJOG.CommandPaletteDialog` as a third-party dialog that reuses the built-in window shell through `GetWindowShell()`
+- [BeaconJOG.Controls.js](../v2/packages/BeaconJOG.Controls.js) registers `BeaconJOG.ViewSwitch` as a second primitive control and `BeaconJOG.MetricCard` as a composite control built largely from existing JOG controls
+- [ThirdPartyDemoApp.js](../v2/apps/ThirdPartyDemoApp.js) and [third-party-demo.html](../v2/examples/third-party-demo.html) show both packages used side by side from outside `v2/runtime/JOG.js`
 
 Current limits:
 
@@ -948,7 +955,7 @@ Calling setters on a disposed control throws.
 
 ### Example App
 
-[v2/ExampleApp.js](../v2/ExampleApp.js) demonstrates:
+[v2/apps/ExampleApp.js](../v2/apps/ExampleApp.js) demonstrates:
 
 - page boot
 - button and label usage
@@ -956,7 +963,7 @@ Calling setters on a disposed control throws.
 
 ### Customer Admin App
 
-[v2/CustomerAdminApp.js](../v2/CustomerAdminApp.js) demonstrates:
+[v2/apps/CustomerAdminApp.js](../v2/apps/CustomerAdminApp.js) demonstrates:
 
 - `DockPanel` shell layout
 - `SplitPanel` left-nav-plus-content workspace composition
@@ -967,7 +974,7 @@ Calling setters on a disposed control throws.
 
 ### Form Demo
 
-[v2/FormApp.js](../v2/FormApp.js) demonstrates:
+[v2/apps/FormApp.js](../v2/apps/FormApp.js) demonstrates:
 
 - `Grid` form layout
 - breakpoint-based responsive `Grid` layout
@@ -986,7 +993,7 @@ Calling setters on a disposed control throws.
 - validation summary region driven either by a dedicated store key or directly from multiple field error keys
 - checkbox and radio-group validation with invalid-state styling
 
-[v2/CustomerAdminApp.js](../v2/CustomerAdminApp.js) now also demonstrates:
+[v2/apps/CustomerAdminApp.js](../v2/apps/CustomerAdminApp.js) now also demonstrates:
 
 - one shared validation routine reused across inline save and modal save
 - `PageHeader` replacing manual fixed-height shell title layout
@@ -994,14 +1001,14 @@ Calling setters on a disposed control throws.
 - summary-level validation messaging reused across multiple save entry points
 - live revalidation after an invalid edit begins to be corrected
 
-[v2/ExampleApp.js](../v2/ExampleApp.js) now also demonstrates:
+[v2/apps/ExampleApp.js](../v2/apps/ExampleApp.js) now also demonstrates:
 
 - switching the public theme API at runtime between the built-in default and two distinct palettes
 - opening one modal dialog directly
 - opening a second modal on top of the first
 - verifying that the shared overlay stays between the top modal and lower modal windows
 
-[v2/OpportunityBoardApp.js](../v2/OpportunityBoardApp.js) now also demonstrates:
+[v2/apps/OpportunityBoardApp.js](../v2/apps/OpportunityBoardApp.js) now also demonstrates:
 
 - breakpoint-aware dialog form layout inside the opportunity editor
 - responsive `DockPanel` shell behavior for the board sidebar
@@ -1011,7 +1018,7 @@ Calling setters on a disposed control throws.
 - first-pass header drag resizing for pixel-width columns
 - built-in `ThemePreset` usage on buttons, labels, and sections
 
-[v2/NotepadApp.js](../v2/NotepadApp.js) now also demonstrates:
+[v2/apps/NotepadApp.js](../v2/apps/NotepadApp.js) now also demonstrates:
 
 - docked shell chrome without manual viewport resize math
 - `Fill = true` inside a tab workspace for full-height editor composition
@@ -1021,7 +1028,7 @@ Calling setters on a disposed control throws.
 ## Guidance for Developers
 
 - Prefer explicit JavaScript object composition over clever helper layers.
-- Treat `v2/JOG.js` as the runtime truth.
+- Treat `v2/runtime/JOG.js` as the runtime truth.
 - Treat `doc/v2-spec.md` as direction, not implementation truth.
 - Update this guide, the API reference, and the roadmap whenever the framework changes.
 

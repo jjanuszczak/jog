@@ -2,7 +2,7 @@
 
 ## Status
 
-This reference covers the implemented public API in [v2/JOG.js](../v2/JOG.js). If code and this document diverge, update this document immediately.
+This reference covers the implemented public API in [v2/runtime/JOG.js](../v2/runtime/JOG.js). If code and this document diverge, update this document immediately.
 
 ## Application Types
 
