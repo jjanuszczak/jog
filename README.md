@@ -42,6 +42,10 @@ It is not feature-complete. The roadmap in [doc/roadmap.md](doc/roadmap.md) is t
 - [v1](v1): earlier implementation kept for reference
 - [ref](ref): older reference material and experiments
 
+## License
+
+JOG is available under the [MIT License](LICENSE).
+
 ## Where To Start
 
 If you are new to the project, read these in order:
@@ -54,6 +58,19 @@ If you are new to the project, read these in order:
 The developer guide explains the runtime model. The API reference documents what exists now. The roadmap tells you what is implemented, what is partial, and what should happen next.
 
 JOG now includes a first-pass public third-party control API. The current contract and remaining direction are documented in [doc/third-party-control-spec.md](doc/third-party-control-spec.md).
+
+## Pre-Release Status
+
+JOG is close to a public pre-release, but it should still be treated as pre-release software.
+
+What that means today:
+
+- the framework is usable for early internal-tool evaluation
+- the core programming model is implemented and documented
+- the release artifact flow is in place
+- some areas are still intentionally partial, especially shell-control keyboard depth, broader accessibility hardening, and long-term stability guarantees for newer extension surfaces
+
+If you try JOG now, the right expectation is an early technical preview, not a finished general-purpose frontend platform.
 
 ## Running The Examples
 
@@ -121,6 +138,13 @@ The current manual release process is documented in [doc/release-guide.md](doc/r
 
 GitHub Release uploads are now automated with [.github/workflows/release-artifacts.yml](.github/workflows/release-artifacts.yml).
 
+The safest way to evaluate JOG today is:
+
+- start with the bundled examples
+- use the generated release assets from `dist/release/`
+- treat third-party extensibility as real but still early
+- expect some API and ergonomics tightening before a broader public launch
+
 ## Running Tests
 
 Run the current regression suite with:
@@ -153,6 +177,8 @@ app.LogTree();
 ## Development Rules
 
 This repo treats docs as part of the product.
+
+If you want to help, start with [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
 When you change `v2/`:
 
