@@ -36,7 +36,11 @@ It is not feature-complete. The roadmap in [doc/roadmap.md](doc/roadmap.md) is t
 
 ## Repo Layout
 
-- [v2](v2): active runtime and example apps
+- [v2](v2): active implementation tree
+- `v2/runtime/`: framework runtime source
+- `v2/apps/`: first-party example application scripts
+- `v2/packages/`: sample third-party control packages
+- `v2/examples/`: browser entry HTML files for the examples
 - [test](test): Node-based regression checks
 - [doc](doc): living documentation
 - [v1](v1): earlier implementation kept for reference
@@ -76,13 +80,13 @@ If you try JOG now, the right expectation is an early technical preview, not a f
 
 Open these files directly in a browser:
 
-- [v2/hello-world.html](v2/hello-world.html)
-- [v2/example.html](v2/example.html)
-- [v2/notepad.html](v2/notepad.html)
-- [v2/customer-admin.html](v2/customer-admin.html)
-- [v2/form-demo.html](v2/form-demo.html)
-- [v2/opportunity-board.html](v2/opportunity-board.html)
-- [v2/third-party-demo.html](v2/third-party-demo.html)
+- [v2/examples/hello-world.html](v2/examples/hello-world.html)
+- [v2/examples/example.html](v2/examples/example.html)
+- [v2/examples/notepad.html](v2/examples/notepad.html)
+- [v2/examples/customer-admin.html](v2/examples/customer-admin.html)
+- [v2/examples/form-demo.html](v2/examples/form-demo.html)
+- [v2/examples/opportunity-board.html](v2/examples/opportunity-board.html)
+- [v2/examples/third-party-demo.html](v2/examples/third-party-demo.html)
 
 What they cover:
 
@@ -101,7 +105,7 @@ JOG does not have an npm runtime package yet, and it is intentionally deferred w
 Today, the install model is direct browser usage, with GitHub Releases as the primary distribution channel for browser-ready artifacts.
 
 1. download the latest release artifacts from GitHub Releases, or build them locally
-2. copy `dist/JOG.min.js` into your project for the minified release build, or copy [v2/JOG.js](v2/JOG.js) for a readable source build
+2. copy `dist/JOG.min.js` into your project for the minified release build, or copy [v2/runtime/JOG.js](v2/runtime/JOG.js) for a readable source build
 3. optionally start from the files in `dist/starter/`
 4. load any third-party JOG control packages after the runtime
 5. load your app code after the runtime and any third-party packages

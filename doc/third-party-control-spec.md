@@ -4,7 +4,7 @@
 
 This document now serves two roles:
 
-- it describes the first-pass public third-party control contract implemented in `v2/JOG.js`
+- it describes the first-pass public third-party control contract implemented in `v2/runtime/JOG.js`
 - it keeps the remaining direction and quality bar explicit where the runtime is not yet fully hardened
 
 Use this document alongside `doc/developer-guide.md` and `doc/api-reference.md` when building third-party controls.
@@ -376,7 +376,7 @@ This specification works with JOG's current direct-browser distribution model.
 
 Near-term package expectations:
 
-- ship as a browser-ready script after `JOG.min.js` or `v2/JOG.js`
+- ship as a browser-ready script after `JOG.min.js` or `v2/runtime/JOG.js`
 - register controls during package load
 - export constructors through a stable namespace
 
