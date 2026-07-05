@@ -223,6 +223,45 @@ The important rule is simple: third-party controls should code against documente
 
 JOG should keep fields such as `_state`, `_domNode`, `_runtime`, and `_children` private implementation details unless a future extension API explicitly blesses a stable subset.
 
+## Adapter Wrapper Pattern
+
+When a package wraps an external library instead of composing only JOG primitives, the wrapper should stay split into two layers:
+
+1. a JOG-facing control shell
+2. a package-local adapter around the external library instance
+
+The shell owns:
+
+- public properties
+- public methods
+- validation state
+- JOG lifecycle hooks
+- normalized event emission
+
+The adapter owns:
+
+- library construction and disposal
+- library-specific option updates
+- library callbacks
+- DOM details required by the wrapped library
+
+This keeps the raw library instance private while still letting the package map an external component into a normal JOG control.
+
+The repo now proves this pattern in three distinct ways:
+
+- `ChartJOG.BarChart` wraps a Chart.js visualization with array-backed `Items`, field-mapped values, `BindCollection()`, and projected `OnPointClick()` events
+- `FlatpickrJOG.DatePicker` wraps a popup date picker with canonical string `Value`, `MinDate`, and `MaxDate`
+- `LexicalJOG.LexicalPlainTextBox` and `LexicalJOG.LexicalRichTextBox` wrap a structured editor with canonical JSON `Value` plus a plain-text convenience surface and explicit `BindPlainText()` wiring for ordinary form state
+
+The repo also now includes a narrow internal helper layer for repeated wrapper mechanics.
+That helper is not a public JOG extension API. It is a package-authoring convenience for:
+
+- adapter-to-state value sync
+- collection-to-property sync
+- suppression of echoed external writes
+- explicit store binding
+- detached popup theme-variable propagation
+
 ## State And Rendering Rules
 
 Custom controls should follow the same state model as core JOG controls:
@@ -317,6 +356,15 @@ If a control edits a primary value, it should also expose:
 
 This keeps third-party controls usable inside the same form patterns as `TextBox`, `DropDownList`, and `CheckBox`.
 
+The current bundled wrappers now prove the app-side baseline pattern as well:
+
+- bind wrapper values with `BindValue()` or `BindPlainText()`
+- bind field errors with `BindError()`
+- validate with `JOG.FormState`
+- revalidate after failure with `FormState.Watch([...])`
+- aggregate visible error copy with `ValidationSummary.BindErrors(...)`
+- call `Focus()` on the invalid wrapper from the submit action
+
 ## Binding Contract
 
 Binding should stay explicit.
@@ -348,6 +396,9 @@ Optional fields should reuse existing JOG naming where applicable:
 - `Value`
 - `Key`
 - `Index`
+
+Package-specific fields are allowed when the event needs additional business data.
+They should use literal names and must not override the core `JOG.EventArgs` fields.
 - `Row`
 - `RowId`
 - `Column`
@@ -451,7 +502,7 @@ Recommended runtime enhancements:
 7. developer-doc guidance for composite versus primitive custom controls
 8. at least one proof control built strictly from the published extension docs
 
-That proof control matters. JOG should test the docs by building a real third-party control from them rather than assuming the contract is complete.
+That proof control matters. JOG should test the docs by building a real third-party control from them rather than assuming the contract is complete. The current repo now does this with both small custom controls and the external-library-backed `LexicalJOG` editor wrappers.
 
 ## Acceptance Criteria For The Future JOG Feature
 

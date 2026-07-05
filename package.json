@@ -1,10 +1,21 @@
 {
   "private": true,
   "scripts": {
+    "build:chart-package": "node scripts/build-chart-package.js",
+    "build:flatpickr-package": "node scripts/build-flatpickr-package.js",
+    "build:lexical-package": "node scripts/build-lexical-package.js",
     "build:dist": "node scripts/build-dist.js",
     "build:release": "npm run build:dist && node scripts/build-release-assets.js"
   },
   "devDependencies": {
+    "esbuild": "^0.28.1",
     "terser": "^5.48.0"
+  },
+  "dependencies": {
+    "@lexical/plain-text": "^0.46.0",
+    "@lexical/rich-text": "^0.46.0",
+    "chart.js": "^4.5.1",
+    "flatpickr": "^4.6.13",
+    "lexical": "^0.46.0"
   }
 }

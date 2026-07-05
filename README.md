@@ -28,6 +28,7 @@ JOG V2 is functional and actively evolving. It already includes:
 - public theme API with global and per-app token overrides
 - built-in theme presets for selected control types
 - first-pass third-party control registration, compatibility checks, style-block registration, extension lifecycle hooks, and a stable window-shell helper for third-party dialogs
+- external-library proof controls through `ChartJOG.BarChart`, `FlatpickrJOG.DatePicker`, `LexicalJOG.LexicalPlainTextBox`, and `LexicalJOG.LexicalRichTextBox`, wrapping a visualization, a popup date picker, and plain-text and rich-text editor surfaces behind JOG-native control contracts
 - runtime diagnostics
 - a zero-dependency Node test runner
 - a minified browser distribution build at `dist/JOG.min.js`
@@ -39,7 +40,8 @@ It is not feature-complete. The roadmap in [doc/roadmap.md](doc/roadmap.md) is t
 - [v2](v2): active implementation tree
 - `v2/runtime/`: framework runtime source
 - `v2/apps/`: first-party example application scripts
-- `v2/packages/`: sample third-party control packages
+- `v2/packages/`: browser-ready third-party control packages
+- `v2/packages-src/`: source for bundled third-party packages that wrap external libraries
 - `v2/examples/`: browser entry HTML files for the examples
 - [test](test): Node-based regression checks
 - [doc](doc): living documentation
@@ -96,7 +98,7 @@ What they cover:
 - `customer-admin.html`: CRUD-style page shell with shared inline and dialog validation, using the shared workspace shell primitive
 - `form-demo.html`: form layout, responsive grid collapse, explicit store binding, derived summary wiring, `FormState` validation orchestration, inline errors, and radio-group invalid state
 - `opportunity-board.html`: CRM-style opportunity board using `Collection` plus `DataGrid` for row selection, edit and delete commands, dirty-state tracking, sortable, filterable, and inline-editable grid views, derived summaries, collection-to-store binding helpers, `Repeater`-driven sidebar rows, first-pass resizable columns, a bounded flexible notes column for wider datasets, and the shared workspace shell primitive
-- `third-party-demo.html`: sample `AcmeJOG` and `BeaconJOG` packages showing registered primitive, composite, and dialog controls built outside the core runtime source
+- `third-party-demo.html`: sample `AcmeJOG`, `BeaconJOG`, `ChartJOG`, `FlatpickrJOG`, and `LexicalJOG` packages showing primitive, composite, dialog, visualization, and external-library-backed controls built outside the core runtime source
 
 ## Installing JOG Today
 
@@ -115,6 +117,8 @@ Example:
 ```html
 <script src="JOG.min.js"></script>
 <script src="acme-jog-controls.js"></script>
+<script src="flatpickr-jog-controls.js"></script>
+<script src="lexical-jog-controls.js"></script>
 <script src="MyApp.js"></script>
 ```
 
