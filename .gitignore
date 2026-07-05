@@ -1,3 +1,12 @@
 .DS_Store
 node_modules/
 assets/
+
+# Keep dated internal notes and reviews out of the public repo surface.
+doc/????-??-??-*.md
+
+# Keep internal planning, blueprint, and broader spec docs private unless
+# they are intentionally rewritten as current public documentation.
+doc/browser-data-settings-utility-prd.md
+doc/modernization-blueprint.md
+doc/v2-spec.md

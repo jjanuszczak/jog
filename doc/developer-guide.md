@@ -236,6 +236,221 @@ Behavior implemented now:
 
 This should stay narrow. The intent is to remove obvious browser DOM escape hatches from app code, not to turn JOG into a broad browser-services layer.
 
+## Choosing A Control Authoring Path
+
+JOG now has enough extension capability that contributors need a simple decision rule before they start writing a new control.
+
+Use these paths:
+
+1. compose from existing JOG controls when the behavior is mostly shell, layout, validation, and state wiring
+2. wrap an external library when another package already owns the DOM, interaction model, or specialized behavior
+3. build a new low-level JOG control when the behavior is truly native to JOG and cannot be expressed cleanly through composition
+
+If you choose the wrong path, the code usually gets harder fast. The most common mistake is building a new low-level control when a composite `Container` would have been enough.
+
+### Path 1: Compose From Existing JOG Controls
+
+Choose this when:
+
+- the feature can be built from existing JOG controls and containers
+- the control mostly coordinates layout, state, validation, or command wiring
+- you do not need a third-party DOM subtree or custom native input behavior
+
+Typical base type:
+
+- `JOG.Container`
+
+Typical repo shape:
+
+- add the composite control to a package under `v2/packages-src/` if it is meant to prove or ship as a third-party package
+- add it to `v2/runtime/JOG.js` only if it belongs in the core runtime itself
+- add or update an example in `v2/apps/` and `v2/examples/`
+
+Recommended implementation steps:
+
+1. define a narrow public surface with plain properties, `OnX` events, and real container methods only if the control truly hosts children
+2. compose existing JOG controls inside the container instead of creating raw DOM by hand
+3. keep state explicit through stores, collections, or direct property state
+4. register the control with `JOG.RegisterControl()` if it lives outside the core runtime
+5. add a focused regression test and an example that exercises the control clearly
+
+Current repo examples:
+
+- `AcmeJOG.InspectorCard` in [AcmeJOG.Controls.js](../v2/packages/AcmeJOG.Controls.js)
+- `BeaconJOG.MetricCard` in [BeaconJOG.Controls.js](../v2/packages/BeaconJOG.Controls.js)
+
+### Path 2: Wrap An External Library
+
+Choose this when:
+
+- the third-party package already owns complex DOM, focus, popup, visualization, or editor behavior
+- the value of the control is reuse of an existing library, not recreation of it
+- app authors should interact with a JOG-native shell instead of the raw library object
+
+Typical base type:
+
+- `JOG.Control` for a single-surface wrapper
+- `JOG.Container` only if the wrapper genuinely needs JOG child composition around the library surface
+- `JOG.Window` or `JOG.Dialog` only when the wrapped concept is inherently a floating shell
+
+Required architectural line:
+
+1. the JOG control owns public properties, validation state, lifecycle hooks, and normalized events
+2. a package-local adapter owns the external library instance and library-specific DOM work
+3. app code never talks directly to the wrapped library object
+
+Typical repo shape:
+
+- editable source in `v2/packages-src/`
+- browser-ready bundle in `v2/packages/`
+- one rebuild script in `scripts/`
+- one example app flow proving normal JOG usage from outside `v2/runtime/JOG.js`
+
+Recommended implementation steps:
+
+1. start with a minimal public interface, usually `Value`, a few literal options, and `OnChange`
+2. implement `CreateDom()`, `OnAttached()`, `ApplyState()`, and `OnDisposed()` against documented hooks only
+3. define public properties with `JOG.DefineControlProperty()` so state writes stay inside the normal dirty-render model
+4. use `JOG.RegisterStyleBlock()` for package CSS instead of ad hoc DOM style injection
+5. normalize library callbacks into JOG events through `RaiseEvent(...)`
+6. add explicit binding helpers only when the pattern is repeated enough to justify them
+7. test attach, detach, disposal, store-driven updates, and loop suppression
+
+Current repo examples:
+
+- `ChartJOG.BarChart` in [ChartJOG.Controls.source.js](../v2/packages-src/ChartJOG.Controls.source.js)
+- `FlatpickrJOG.DatePicker` in [FlatpickrJOG.Controls.source.js](../v2/packages-src/FlatpickrJOG.Controls.source.js)
+- `LexicalJOG.LexicalPlainTextBox` and `LexicalJOG.LexicalRichTextBox` in [LexicalJOG.Controls.source.js](../v2/packages-src/LexicalJOG.Controls.source.js)
+- shared wrapper mechanics in [ThirdPartyJOG.Helpers.js](../v2/packages-src/ThirdPartyJOG.Helpers.js)
+
+### Path 3: Build A New Low-Level JOG Control
+
+Choose this when:
+
+- the control needs custom native DOM behavior that existing JOG controls cannot express
+- there is no external library worth wrapping
+- the control belongs to JOG's core programming model or to a package-specific primitive surface
+
+Typical base type:
+
+- `JOG.Control`
+
+Use this path sparingly. Low-level controls create long-term maintenance cost because they own more lifecycle, DOM, accessibility, and state detail directly.
+
+Recommended implementation steps:
+
+1. define the exact public contract first: properties, events, methods, validation behavior, and limits
+2. build against documented lifecycle hooks such as `CreateDom()`, `ApplyState()`, `BindDomEvents()`, `OnAttached()`, and `OnDisposed()`
+3. keep direct DOM ownership inside the control instead of leaking DOM nodes into app code
+4. use `JOG.DefineControlProperty()` for public state where appropriate
+5. register the control if it is third-party, then add example coverage and regression tests
+
+Current repo examples:
+
+- `AcmeJOG.TagPicker` in [AcmeJOG.Controls.js](../v2/packages/AcmeJOG.Controls.js)
+- `BeaconJOG.ViewSwitch` in [BeaconJOG.Controls.js](../v2/packages/BeaconJOG.Controls.js)
+
+### Minimum Contributor Checklist For New Controls
+
+Before calling a control done, make sure all of this is true:
+
+- the public API follows the normal JOG shape: `new`, plain properties, `OnX`, and `Add` only when it is a real container
+- the control uses documented hooks instead of private runtime fields
+- validation, visibility, enabled state, and focus behavior are clear
+- tests cover the behavior most likely to regress
+- an example shows the control in normal app code
+- docs describe what is implemented now, not what the control may support later
+
+### Setting Up A Standalone Third-Party Control Repo
+
+If you are creating your own repo for a JOG control package, treat it as a small standalone package with one browser-ready artifact plus one readable source tree.
+
+That guidance holds regardless of authoring path. The internals change between composition, external-library wrappers, and new low-level controls, but the repo shape should stay simple and predictable.
+
+Recommended layout:
+
+```text
+my-jog-control/
+  README.md
+  LICENSE
+  package.json
+  src/
+    MyJOG.Controls.source.js
+    MyJOG.Helpers.js
+  dist/
+    MyJOG.Controls.js
+  examples/
+    demo.html
+    DemoApp.js
+  scripts/
+    build-package.js
+  test/
+    run-tests.js
+```
+
+Notes:
+
+- `src/` holds the readable source for your control package
+- `dist/` holds the browser-ready bundle a JOG app loads after `JOG.min.js`
+- `examples/` proves the package from normal app code, not from internal helper code
+- `scripts/` holds the bundle or rebuild script
+- `test/` holds the package-level regression checks
+- `MyJOG.Helpers.js` is optional and should exist only if repeated package-internal mechanics justify it
+
+Minimum browser load order:
+
+```html
+<script src="JOG.min.js"></script>
+<script src="MyJOG.Controls.js"></script>
+<script src="DemoApp.js"></script>
+```
+
+Core package rules:
+
+1. ship one browser-ready control bundle that a JOG app can load directly
+2. keep the app-facing contract in the control layer, plain properties, `OnX`, and `Add` only for real containers
+3. register every exported control with `JOG.RegisterControl(...)`
+4. register package CSS through `JOG.RegisterStyleBlock(...)`
+5. keep raw DOM or library-instance details private to the package
+6. include at least one example showing normal JOG usage
+7. test attach, update, disposal, bindings, and any wrapper-specific loop suppression
+
+Minimum registration shape:
+
+```js
+JOG.RegisterControl({
+  fullName: "MyJOG.MyControl",
+  version: "1.0.0",
+  jogVersionRange: "^2.0.0",
+  constructor: MyControl,
+  metadata: {
+    baseType: "Control",
+    properties: ["Value"],
+    events: ["OnChange"],
+    methods: ["Focus"]
+  }
+});
+```
+
+What changes by authoring path:
+
+- composed packages usually keep most logic inside a `JOG.Container` and reuse existing JOG child controls directly
+- external-library wrappers should split into a JOG-facing shell plus a private adapter around the third-party library instance
+- new low-level controls still use the same repo shape, but more of the implementation lives in `CreateDom()`, `ApplyState()`, and DOM-event handling
+
+### Starter Checklist For A New Third-Party Control Repo
+
+Before publishing the repo, make sure all of this is true:
+
+- the README states which JOG version range the package targets
+- the README explains whether the package is composed, wrapped, or low-level
+- the README documents any required external scripts or styles if the package wraps another library
+- `dist/` contains a browser-ready bundle that matches the readable source
+- the package exposes a small example that can be loaded directly in a browser
+- the package never requires app code to reach into private DOM nodes or third-party objects
+- the tests cover initial attach, state updates, disposal, and error-prone binding flows
+- version compatibility is explicit through `jogVersionRange`
+
 ## Third-Party Controls
 
 JOG now includes a first-pass public extension contract for third-party controls.

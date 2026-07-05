@@ -4,6 +4,11 @@ JOG is still pre-release software.
 
 That means contribution quality matters more than contribution volume. Small, well-scoped fixes that keep the runtime, docs, tests, and examples aligned are more useful than broad speculative rewrites.
 
+Review these repo-level files before opening a public contribution:
+
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- [SECURITY.md](SECURITY.md)
+
 ## Before You Start
 
 Read these first:
@@ -63,6 +68,7 @@ Good contribution targets:
 - improving examples so real behavior is easier to verify
 - adding regression coverage
 - tightening docs so public expectations match reality
+- improving contributor-facing guidance for control composition, third-party wrappers, and low-level control authoring
 
 Less useful targets right now:
 

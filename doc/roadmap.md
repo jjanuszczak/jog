@@ -222,6 +222,9 @@ That means the next phase is not broad control expansion for its own sake. The n
 ### API Contract
 
 - the runtime, examples, and current developer docs now center the authoring model around `new`, property assignment, `Add`, `OnX`, and `Application.Run(page)`
+- the developer guide now also includes an explicit control-authoring decision path for composite controls, third-party wrappers, and new low-level controls so contributors do not have to infer the workflow from the spec docs alone
+- the developer guide now also includes a standalone third-party package repo layout and starter checklist so package authors have a concrete setup model outside this monorepo
+- the repo now also includes draft public-preview release notes and a draft pinned "Start here" discussion so the launch work has concrete copy, not just checklist items
 - older rationale documents still contain outdated or broader examples, including `Click(listener)`-first guidance and older future-control framing
 - the public contract needs to be reconciled so contributors have one canonical programming model
 
@@ -257,6 +260,7 @@ That means the next phase is not broad control expansion for its own sake. The n
 - GitHub Releases are the primary intended distribution channel for built browser artifacts
 - GitHub Release asset upload is automated for published releases
 - npm packaging is intentionally deferred unless the current release artifact flow proves insufficient
+- if npm packaging is revisited later, the first pass should stay narrow: publish a thin core runtime package first, keep the browser-global JOG model working, and treat external-library wrapper packages as optional follow-on packages rather than pulling Chart.js, Flatpickr, or Lexical into the core runtime package
 - minified distribution output exists, but there is no broader package-manager or CDN distribution story yet
 
 ### Validation

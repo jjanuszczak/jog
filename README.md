@@ -64,6 +64,7 @@ If you are new to the project, read these in order:
 The developer guide explains the runtime model. The API reference documents what exists now. The roadmap tells you what is implemented, what is partial, and what should happen next.
 
 JOG now includes a first-pass public third-party control API. The current contract and remaining direction are documented in [doc/third-party-control-spec.md](doc/third-party-control-spec.md).
+The main contributor workflow for deciding whether to compose a control, wrap a third-party library, or build a new low-level control is documented in [doc/developer-guide.md](doc/developer-guide.md).
 
 ## Pre-Release Status
 
@@ -187,6 +188,11 @@ app.LogTree();
 This repo treats docs as part of the product.
 
 If you want to help, start with [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+Public-repo operating files:
+
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- [SECURITY.md](SECURITY.md)
 
 When you change `v2/`:
 
