@@ -1060,6 +1060,7 @@
   }
 
   function EventArgs(source, type, originalEvent, extras) {
+    var key;
     this.Source = source;
     this.Type = type;
     this.OriginalEvent = originalEvent || null;
@@ -1075,6 +1076,15 @@
     this.RowIndex = extras.RowIndex;
     this.SortKey = extras.SortKey;
     this.SortDirection = extras.SortDirection;
+    for (key in extras) {
+      if (!Object.prototype.hasOwnProperty.call(extras, key)) {
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(this, key)) {
+        continue;
+      }
+      this[key] = extras[key];
+    }
   }
 
   function parseVersionString(value) {

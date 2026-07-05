@@ -8,7 +8,8 @@ Current `v2/` layout:
 
 - `v2/runtime/`: framework runtime source
 - `v2/apps/`: first-party example application scripts
-- `v2/packages/`: sample third-party control packages
+- `v2/packages/`: browser-ready third-party control packages
+- `v2/packages-src/`: source for bundled third-party packages that wrap external libraries
 - `v2/examples/`: browser entry HTML files for the examples
 
 ## What JOG V2 Is
@@ -67,7 +68,7 @@ Distribution build:
 Third-party control extensibility status:
 
 - JOG now exposes a first-pass public registration and extension surface for third-party controls
-- the current contract is implemented in `v2/runtime/JOG.js` and exercised by [AcmeJOG.Controls.js](../v2/packages/AcmeJOG.Controls.js) plus [BeaconJOG.Controls.js](../v2/packages/BeaconJOG.Controls.js)
+- the current contract is implemented in `v2/runtime/JOG.js` and exercised by [AcmeJOG.Controls.js](../v2/packages/AcmeJOG.Controls.js), [BeaconJOG.Controls.js](../v2/packages/BeaconJOG.Controls.js), [ChartJOG.Controls.js](../v2/packages/ChartJOG.Controls.js), [FlatpickrJOG.Controls.js](../v2/packages/FlatpickrJOG.Controls.js), and [LexicalJOG.Controls.js](../v2/packages/LexicalJOG.Controls.js)
 - the broader direction and remaining gaps are documented in [third-party-control-spec.md](third-party-control-spec.md)
 
 ## Application Model
@@ -306,13 +307,45 @@ Current sample package:
 - [AcmeJOG.Controls.js](../v2/packages/AcmeJOG.Controls.js) registers `AcmeJOG.TagPicker` as a primitive control and `AcmeJOG.InspectorCard` as a composite container with a custom child host
 - [AcmeJOG.Controls.js](../v2/packages/AcmeJOG.Controls.js) also registers `AcmeJOG.CommandPaletteDialog` as a third-party dialog that reuses the built-in window shell through `GetWindowShell()`
 - [BeaconJOG.Controls.js](../v2/packages/BeaconJOG.Controls.js) registers `BeaconJOG.ViewSwitch` as a second primitive control and `BeaconJOG.MetricCard` as a composite control built largely from existing JOG controls
-- [ThirdPartyDemoApp.js](../v2/apps/ThirdPartyDemoApp.js) and [third-party-demo.html](../v2/examples/third-party-demo.html) show both packages used side by side from outside `v2/runtime/JOG.js`
+- [ChartJOG.Controls.js](../v2/packages/ChartJOG.Controls.js) registers `ChartJOG.BarChart` as a Chart.js wrapper with array-backed `Items`, field-based series mapping, `BindCollection()`, and projected `OnPointClick()` events
+- [ChartJOG.Controls.source.js](../v2/packages-src/ChartJOG.Controls.source.js) is the editable source for that bundle, and [build-chart-package.js](../scripts/build-chart-package.js) rebuilds the browser-ready package
+- [FlatpickrJOG.Controls.js](../v2/packages/FlatpickrJOG.Controls.js) registers `FlatpickrJOG.DatePicker` as a popup date-picker wrapper around Flatpickr, with canonical string `Value`, `MinDate`, `MaxDate`, `BindValue()`, and normal JOG validation behavior
+- [FlatpickrJOG.Controls.source.js](../v2/packages-src/FlatpickrJOG.Controls.source.js) is the editable source for that bundle, and [build-flatpickr-package.js](../scripts/build-flatpickr-package.js) rebuilds the browser-ready package
+- [LexicalJOG.Controls.js](../v2/packages/LexicalJOG.Controls.js) now registers both `LexicalJOG.LexicalPlainTextBox` and `LexicalJOG.LexicalRichTextBox`, keeping Lexical JSON as the canonical `Value`, preserving `GetPlainText()`, `SetPlainText(text)`, and `BindPlainText()` for ordinary form wiring, tracking editable-host accessibility state for read-only and invalid transitions, and treating whitespace-only content as empty for required-field validation
+- [LexicalJOG.Controls.source.js](../v2/packages-src/LexicalJOG.Controls.source.js) is the editable source for that bundle, and [build-lexical-package.js](../scripts/build-lexical-package.js) rebuilds the browser-ready package
+- [ThirdPartyJOG.Helpers.js](../v2/packages-src/ThirdPartyJOG.Helpers.js) now holds the shared internal bridge used by the external-library wrappers for value synchronization, collection binding, store binding, and detached-popup theme-variable propagation
+- [ThirdPartyDemoApp.js](../v2/apps/ThirdPartyDemoApp.js) and [third-party-demo.html](../v2/examples/third-party-demo.html) show all five packages used side by side from outside `v2/runtime/JOG.js`, including the current baseline validation pattern for third-party inputs through `BindError()`, `FormState.Watch(...)`, `ValidationSummary.BindErrors(...)`, and `Focus()` on invalid submit, plus both a `ToolBar`-based button row using the Lexical convenience methods and a plain button row calling `FormatText(formatType)` directly
 
 Current limits:
 
 - the public extension contract is first-pass, not yet frozen as a long-term compatibility promise
 - the sample primitive control now proves first-pass keyboard interaction, but not yet deeper screen-reader validation across real browsers
+- the Flatpickr wrapper proves popup-library integration and canonical string-value mapping, but does not yet cover richer date-range, time, or locale-specific formatting modes
+- the Lexical wrapper is intentionally plain-text-first, with no rich-text toolbar, plugin surface, or HTML-first persistence contract yet
 - there is not yet higher-level tooling for serialization, designers, or package discovery
+
+The current wrapper pattern is narrow and deliberate:
+
+1. JOG owns the public control shell and public state.
+2. A package-local adapter owns the third-party library instance.
+3. Adapter callbacks normalize library events into JOG `RaiseEvent()` payloads.
+4. Public properties push state back through the adapter without exposing the raw library object.
+
+The repo now also includes a small shared helper for this pattern in [ThirdPartyJOG.Helpers.js](../v2/packages-src/ThirdPartyJOG.Helpers.js).
+It is intentionally internal and narrow. It covers only the mechanics both wrappers already needed:
+
+- canonical value bridging between adapter and JOG state
+- loop suppression for store-driven adapter writes
+- explicit `BindValue()` wiring
+- detached popup theme-variable propagation for body-mounted external UI
+
+Library-specific DOM, adapter options, and public control APIs still stay inside each package source file.
+
+That pattern is now proven against three different external-library categories:
+
+- visualization control through `ChartJOG.BarChart`
+- popup input control through `FlatpickrJOG.DatePicker`
+- editor controls through `LexicalJOG.LexicalPlainTextBox` and `LexicalJOG.LexicalRichTextBox`
 
 ## Control Model
 
@@ -890,6 +923,15 @@ saveButton.OnClick(function() {
 
 `FormState.Watch(keys)` re-runs validation only after errors exist, which keeps the model explicit without forcing eager validation on every keystroke. When your summary is just a composition of field-level error strings and you do not need a dedicated form helper, `ValidationSummary.BindErrors(store, ["nameError", "statusError"])` is still the smaller option.
 
+The same pattern now backs the third-party demo's `FlatpickrJOG.DatePicker` and `LexicalJOG` editor fields. The recommended baseline for third-party required fields is:
+
+1. bind the control value normally with `BindValue()` or `BindPlainText()`
+2. bind invalid state with `BindError(store, errorKey)`
+3. run one narrow `FormState` validator per field or per small form section
+4. call `Watch([...])` so a field only revalidates after it has first failed
+5. use `ValidationSummary.BindErrors(...)` when you want one visible summary across multiple third-party controls
+6. focus the invalid control in the submit handler after `Validate()` fails
+
 For radio-group validation, bind the error key to the `StackPanel` that owns the radio buttons. The built-in invalid styling now propagates from that row container to the radio captions.
 
 ## Events
@@ -931,6 +973,8 @@ Events receive a `JOG.EventArgs` instance with:
 - `Handled`
 - `Value` when applicable
 - `Key` when applicable
+
+Third-party controls may also attach additional documented event fields through `RaiseEvent(name, originalEvent, extras)`. Those extra fields are preserved on the delivered `JOG.EventArgs` instance as long as they do not collide with the core event-property names.
 
 Current limitation: the shorthand and `OnX` styles both still exist. The runtime now treats `OnX` as the preferred public style, while the older shorthand remains as a compatibility layer.
 

@@ -125,6 +125,7 @@ function createNode(tagName) {
 function createDocument() {
   var document = {
     title: "",
+    documentMode: null,
     head: createNode("head"),
     body: createNode("body"),
     activeElement: null,
@@ -178,6 +179,33 @@ function createJOGSandbox(options) {
     Promise: Promise,
     setTimeout: setTimeout,
     clearTimeout: clearTimeout,
+    navigator: options.navigator || {
+      platform: "MacIntel",
+      userAgent: "CodexTest"
+    },
+    MutationObserver: options.MutationObserver || function() {
+      this.observe = function() {};
+      this.disconnect = function() {};
+      this.takeRecords = function() {
+        return [];
+      };
+    },
+    Event: options.Event || function(type) {
+      this.type = type || "";
+    },
+    KeyboardEvent: options.KeyboardEvent || function(type) {
+      this.type = type || "";
+    },
+    ClipboardEvent: options.ClipboardEvent || function(type) {
+      this.type = type || "";
+      this.clipboardData = null;
+    },
+    InputEvent: options.InputEvent || function(type) {
+      this.type = type || "";
+      this.data = "";
+    },
+    HTMLElement: options.HTMLElement || function() {},
+    Node: options.Node || function() {},
     Blob: options.Blob || function(parts, config) {
       this.parts = parts || [];
       this.type = config && config.type ? config.type : "";
@@ -1206,6 +1234,804 @@ function testMultipleThirdPartyPackagesRegisterAndCoexistCleanly() {
   dump = app.DumpTree({ detailed: true });
   assert(dump.indexOf("BeaconJOG.ViewSwitch(beaconViewSwitch)") >= 0, "Tree dump should include the second package primitive control.");
   assert(dump.indexOf("BeaconJOG.MetricCard(beaconMetricCard)") >= 0, "Tree dump should include the second package composite control.");
+}
+
+function testLexicalThirdPartyControlRegistersBindsAndSuppressesLoopedUpdates() {
+  var sandbox = createJOGSandbox();
+  var JOG;
+  var LexicalJOG;
+  var app;
+  var page;
+  var store;
+  var editor;
+  var adapterInstances = [];
+  var events = [];
+  var focusEvents = [];
+  var blurEvents = [];
+  var emptyStateJson;
+  var dump;
+
+  function serializeFakePlainText(text) {
+    if (!text) {
+      return LexicalJOG.__EMPTY_EDITOR_STATE_JSON;
+    }
+    return JSON.stringify({
+      root: {
+        children: [
+          {
+            children: [
+              {
+                detail: 0,
+                format: 0,
+                mode: "normal",
+                style: "",
+                text: String(text),
+                type: "text",
+                version: 1
+              }
+            ],
+            direction: null,
+            format: "",
+            indent: 0,
+            type: "paragraph",
+            version: 1
+          }
+        ],
+        direction: null,
+        format: "",
+        indent: 0,
+        type: "root",
+        version: 1
+      }
+    });
+  }
+
+  function createFakeLexicalAdapter(options) {
+    function isPlainTextEmpty(text) {
+      return String(text == null ? "" : text).trim() === "";
+    }
+
+    var adapter = {
+      _hostNode: null,
+      _options: options,
+      _value: LexicalJOG.__EMPTY_EDITOR_STATE_JSON,
+      _plainText: "",
+      _editable: true,
+      _disposed: false,
+      attach: function(hostNode) {
+        this._hostNode = hostNode;
+      },
+      dispose: function() {
+        this._disposed = true;
+        this._hostNode = null;
+      },
+      setEditable: function(editable) {
+        this._editable = !!editable;
+      },
+      setSerializedState: function(serializedValue) {
+        this._value = String(serializedValue);
+        this._plainText = this._value === LexicalJOG.__EMPTY_EDITOR_STATE_JSON ? "" : this._plainText;
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            serializedValue: this._value,
+            plainText: this._plainText,
+            isEmpty: this._value === LexicalJOG.__EMPTY_EDITOR_STATE_JSON,
+            originalEvent: null
+          });
+        }
+      },
+      setPlainText: function(text) {
+        this._plainText = text ? String(text) : "";
+        this._value = serializeFakePlainText(this._plainText);
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            serializedValue: this._value,
+            plainText: this._plainText,
+            isEmpty: isPlainTextEmpty(this._plainText),
+            originalEvent: null
+          });
+        }
+      },
+      clear: function() {
+        this._value = LexicalJOG.__EMPTY_EDITOR_STATE_JSON;
+        this._plainText = "";
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            serializedValue: this._value,
+            plainText: "",
+            isEmpty: true,
+            originalEvent: null
+          });
+        }
+      },
+      getPlainText: function() {
+        return this._plainText;
+      },
+      isEmpty: function() {
+        return isPlainTextEmpty(this._plainText);
+      },
+      focus: function() {
+        if (this._hostNode && typeof this._hostNode.focus === "function") {
+          this._hostNode.focus();
+        }
+      },
+      simulateUserInput: function(serializedValue) {
+        this._value = String(serializedValue);
+        this._plainText = this._value === LexicalJOG.__EMPTY_EDITOR_STATE_JSON ? "" : "user note";
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            serializedValue: this._value,
+            plainText: this._plainText,
+            isEmpty: isPlainTextEmpty(this._plainText),
+            originalEvent: { type: "input" }
+          });
+        }
+      }
+    };
+
+    adapterInstances.push(adapter);
+    return adapter;
+  }
+
+  loadScriptIntoSandbox(sandbox, "LexicalJOG.Controls.js");
+  JOG = sandbox.JOG;
+  LexicalJOG = sandbox.LexicalJOG;
+  LexicalJOG.__setTestingAdapterFactory(createFakeLexicalAdapter);
+
+  assertEqual(JOG.GetRegisteredControl("LexicalJOG.LexicalPlainTextBox").metadata.baseType, "Control", "The Lexical wrapper should register as a Control.");
+  assertEqual(JOG.GetRegisteredControl("LexicalJOG.LexicalPlainTextBox").metadata.capabilities.supportsValidation, true, "The Lexical wrapper should advertise validation support.");
+
+  app = new JOG.Application();
+  page = new JOG.Page();
+  editor = new LexicalJOG.LexicalPlainTextBox();
+  emptyStateJson = editor.Value;
+  store = new JOG.Store({
+    notePlainText: "",
+    noteState: emptyStateJson,
+    noteError: ""
+  });
+
+  editor.Name = "lexicalEditor";
+  editor.Placeholder = "Enter account notes";
+  editor.BindValue(store, "noteState");
+  editor.BindPlainText(store, "notePlainText");
+  editor.BindError(store, "noteError");
+  editor.OnChange(function(args) {
+    events.push(args);
+  });
+  editor.OnFocus(function(args) {
+    focusEvents.push(args);
+  });
+  editor.OnBlur(function(args) {
+    blurEvents.push(args);
+  });
+
+  page.Add(editor);
+  app.Run(page);
+
+  assertEqual(adapterInstances.length, 1, "The Lexical wrapper should create one adapter instance after attach.");
+  assertEqual(editor._domNode.className.indexOf("lexicaljog-plain-text-box") >= 0, true, "The Lexical wrapper should render its package-scoped shell class.");
+  assertEqual(editor._placeholderNode.className.indexOf("hidden") < 0, true, "The placeholder should be visible while the editor is empty.");
+  assertEqual(adapterInstances[0]._editable, true, "The adapter should start editable when the control is enabled and not read-only.");
+  assertEqual(editor._editorHostNode.attributes.contenteditable, "true", "The editor host should expose a contenteditable root while editable.");
+  assertEqual(editor._editorHostNode.tabIndex, 0, "The editor host should stay keyboard-focusable while enabled.");
+  assertEqual(editor.IsEmpty(), true, "The Lexical wrapper should report empty state when no content exists.");
+
+  store.Set("noteError", "Enter some notes");
+  app.Runtime.flush();
+  assertEqual(editor.Invalid, true, "The Lexical wrapper should participate in the shared validation contract.");
+  assertEqual(editor.ErrorText, "Enter some notes", "BindError should update the Lexical wrapper error text.");
+  assertEqual(editor._editorHostNode.attributes["aria-invalid"], "true", "Invalid state should flow into the editable host for accessibility.");
+
+  editor.Focus();
+  assertEqual(app.Runtime.document.activeElement, editor._editorHostNode, "Focus should route to the editor host node.");
+  editor._focusInHandler({ type: "focusin" });
+  assertEqual(focusEvents.length, 1, "Focus should raise one public focus event.");
+  assertEqual(focusEvents[0].Value, emptyStateJson, "Focus should expose the current canonical JSON value.");
+  assertEqual(focusEvents[0].PlainText, "", "Focus should expose the current plain-text value.");
+
+  adapterInstances[0].simulateUserInput('{"root":{"children":[{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"","textStyleHash":"0","childrenSize":0}],"direction":null,"format":"","indent":0,"type":"root","version":1}}');
+  app.Runtime.flush();
+
+  assertEqual(events.length, 1, "User-driven editor changes should raise one public change event.");
+  assertEqual(store.Get("noteState"), events[0].Value, "BindValue should keep the bound store key in sync with the Lexical wrapper.");
+  assertEqual(store.Get("notePlainText"), "user note", "BindPlainText should keep the bound plain-text key in sync with user edits.");
+  assertEqual(events[0].PlainText, "user note", "The fake adapter should expose plain-text data through the public change event.");
+  assertEqual(editor._placeholderNode.className.indexOf("hidden") >= 0, true, "The placeholder should hide once the editor is non-empty.");
+  assertEqual(editor.IsEmpty(), false, "The Lexical wrapper should report non-empty state after user content.");
+  assertEqual(editor.GetPlainText(), "user note", "GetPlainText should expose the current adapter text.");
+
+  editor.SetPlainText("plain note");
+  app.Runtime.flush();
+  assertEqual(editor.GetPlainText(), "plain note", "SetPlainText should update the wrapper through the public plain-text surface.");
+  assertEqual(store.Get("noteState"), editor.Value, "SetPlainText should still keep the bound store key aligned with the canonical JSON Value.");
+  assertEqual(store.Get("notePlainText"), "plain note", "SetPlainText should also keep the bound plain-text key aligned with the edited text.");
+  assertEqual(events.length, 2, "SetPlainText should emit a public change because it performs an explicit editor edit.");
+  assertEqual(events[1].PlainText, "plain note", "SetPlainText should expose the edited plain text through the public change payload.");
+
+  adapterInstances[0].setPlainText("   ");
+  app.Runtime.flush();
+  assertEqual(editor.IsEmpty(), true, "Whitespace-only Lexical content should still count as empty for validation.");
+  assertEqual(events.length, 3, "Whitespace-only editor edits should still raise one public change event.");
+  assertEqual(events[2].PlainText, "   ", "Whitespace-only editor edits should preserve the raw plain-text payload.");
+
+  store.Set("noteState", emptyStateJson);
+  app.Runtime.flush();
+  assertEqual(events.length, 3, "Externally-driven value writes should not echo back through OnChange.");
+  assertEqual(editor._placeholderNode.className.indexOf("hidden") < 0, true, "Reapplying the empty editor state should restore the placeholder.");
+
+  store.Set("notePlainText", "store note");
+  app.Runtime.flush();
+  assertEqual(editor.GetPlainText(), "store note", "Externally-driven plain-text writes should update the wrapper through BindPlainText.");
+  assertEqual(events.length, 3, "Externally-driven plain-text writes should not echo back through OnChange.");
+  assertEqual(store.Get("noteState"), editor.Value, "Externally-driven plain-text writes should still update the canonical JSON Value.");
+
+  editor.ReadOnly = true;
+  app.Runtime.flush();
+  assertEqual(adapterInstances[0]._editable, false, "ReadOnly should switch the editor adapter into non-editable mode.");
+  assertEqual(editor._domNode.className.indexOf("is-readonly") >= 0, true, "ReadOnly should apply the wrapper read-only class.");
+  assertEqual(editor._editorHostNode.attributes["aria-readonly"], "true", "ReadOnly should flow into the editable host for accessibility.");
+  assertEqual(editor._editorHostNode.attributes.contenteditable, "false", "ReadOnly should flip the contenteditable root off.");
+
+  editor._focusOutHandler({ type: "focusout" });
+  assertEqual(blurEvents.length, 1, "Blur should raise one public blur event.");
+  assertEqual(blurEvents[0].PlainText, "store note", "Blur should expose the current plain-text value.");
+
+  editor.Clear();
+  app.Runtime.flush();
+  assertEqual(editor.Value, emptyStateJson, "Clear should restore the canonical empty editor state JSON.");
+  assertEqual(editor.Invalid, false, "Clear should also clear the shared validation state.");
+  assertEqual(editor.IsEmpty(), true, "Clear should restore the empty-state signal.");
+  assertEqual(editor._editorHostNode.attributes["aria-invalid"], "false", "Clearing the error state should also clear aria-invalid on the editable host.");
+
+  dump = app.DumpTree({ detailed: true });
+  assert(dump.indexOf("LexicalJOG.LexicalPlainTextBox(lexicalEditor)") >= 0, "Tree dump should report the Lexical wrapper by its registered third-party name.");
+  assert(dump.indexOf("registered=LexicalJOG.LexicalPlainTextBox@1.0.0") >= 0, "Detailed tree dump should include Lexical wrapper package metadata.");
+
+  editor.Dispose();
+  assertEqual(adapterInstances[0]._disposed, true, "Disposing the control should dispose the underlying adapter.");
+  LexicalJOG.__setTestingAdapterFactory(null);
+}
+
+function testLexicalRichTextThirdPartyControlSupportsFormattingCommands() {
+  var sandbox = createJOGSandbox();
+  var JOG;
+  var LexicalJOG;
+  var app;
+  var page;
+  var store;
+  var editor;
+  var adapterInstances = [];
+  var events = [];
+
+  function serializeFakeRichText(text, formats) {
+    var activeFormats = Array.isArray(formats) ? formats.slice().sort() : [];
+
+    if (!text && activeFormats.length === 0) {
+      return LexicalJOG.__EMPTY_EDITOR_STATE_JSON;
+    }
+    return JSON.stringify({
+      root: {
+        children: [
+          {
+            children: text ? [
+              {
+                detail: 0,
+                format: activeFormats.join(","),
+                mode: "normal",
+                style: "",
+                text: String(text),
+                type: "text",
+                version: 1
+              }
+            ] : [],
+            direction: null,
+            format: "",
+            indent: 0,
+            type: "paragraph",
+            version: 1
+          }
+        ],
+        direction: null,
+        format: "",
+        indent: 0,
+        type: "root",
+        version: 1
+      }
+    });
+  }
+
+  function isPlainTextEmpty(text) {
+    return String(text == null ? "" : text).trim() === "";
+  }
+
+  function createFakeLexicalAdapter(options) {
+    var adapter = {
+      _hostNode: null,
+      _options: options,
+      _mode: options.mode || "plainText",
+      _plainText: "",
+      _formats: [],
+      _value: LexicalJOG.__EMPTY_EDITOR_STATE_JSON,
+      _editable: options.editable !== false,
+      _disposed: false,
+      attach: function(hostNode) {
+        this._hostNode = hostNode;
+      },
+      dispose: function() {
+        this._disposed = true;
+      },
+      setEditable: function(editable) {
+        this._editable = !!editable;
+      },
+      setSerializedState: function(serializedValue) {
+        this._value = String(serializedValue);
+        this._plainText = this._value === LexicalJOG.__EMPTY_EDITOR_STATE_JSON ? "" : this._plainText;
+      },
+      setPlainText: function(text) {
+        this._plainText = text ? String(text) : "";
+        this._value = serializeFakeRichText(this._plainText, this._formats);
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            serializedValue: this._value,
+            plainText: this._plainText,
+            isEmpty: isPlainTextEmpty(this._plainText),
+            originalEvent: null
+          });
+        }
+      },
+      clear: function() {
+        this._plainText = "";
+        this._formats = [];
+        this._value = LexicalJOG.__EMPTY_EDITOR_STATE_JSON;
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            serializedValue: this._value,
+            plainText: "",
+            isEmpty: true,
+            originalEvent: null
+          });
+        }
+      },
+      getPlainText: function() {
+        return this._plainText;
+      },
+      isEmpty: function() {
+        return isPlainTextEmpty(this._plainText);
+      },
+      formatText: function(formatType) {
+        var index = this._formats.indexOf(formatType);
+
+        if (index >= 0) {
+          this._formats.splice(index, 1);
+        } else {
+          this._formats.push(formatType);
+        }
+        this._value = serializeFakeRichText(this._plainText, this._formats);
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            serializedValue: this._value,
+            plainText: this._plainText,
+            isEmpty: isPlainTextEmpty(this._plainText),
+            originalEvent: { type: "command", formatType: formatType }
+          });
+        }
+        return true;
+      },
+      focus: function() {
+        if (this._hostNode && typeof this._hostNode.focus === "function") {
+          this._hostNode.focus();
+        }
+      },
+      simulateUserInput: function(text, formats) {
+        this._plainText = text == null ? "" : String(text);
+        this._formats = Array.isArray(formats) ? formats.slice() : [];
+        this._value = serializeFakeRichText(this._plainText, this._formats);
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            serializedValue: this._value,
+            plainText: this._plainText,
+            isEmpty: isPlainTextEmpty(this._plainText),
+            originalEvent: { type: "input" }
+          });
+        }
+      }
+    };
+
+    adapterInstances.push(adapter);
+    return adapter;
+  }
+
+  loadScriptIntoSandbox(sandbox, "LexicalJOG.Controls.js");
+  JOG = sandbox.JOG;
+  LexicalJOG = sandbox.LexicalJOG;
+  LexicalJOG.__setTestingAdapterFactory(createFakeLexicalAdapter);
+
+  assertEqual(JOG.GetRegisteredControl("LexicalJOG.LexicalRichTextBox").metadata.baseType, "Control", "The Lexical rich-text wrapper should register as a Control.");
+  assertEqual(JOG.GetRegisteredControl("LexicalJOG.LexicalRichTextBox").metadata.capabilities.supportsRichText, true, "The Lexical rich-text wrapper should advertise rich-text support.");
+
+  app = new JOG.Application();
+  page = new JOG.Page();
+  editor = new LexicalJOG.LexicalRichTextBox();
+  store = new JOG.Store({
+    notePlainText: "",
+    noteState: editor.Value
+  });
+
+  editor.Name = "lexicalRichTextEditor";
+  editor.Placeholder = "Write formatted notes";
+  editor.BindValue(store, "noteState");
+  editor.BindPlainText(store, "notePlainText");
+  editor.OnChange(function(args) {
+    events.push(args);
+  });
+
+  page.Add(editor);
+  app.Run(page);
+
+  assertEqual(adapterInstances.length, 1, "The Lexical rich-text wrapper should create one adapter instance after attach.");
+  assertEqual(adapterInstances[0]._mode, "richText", "The Lexical rich-text wrapper should create the adapter in rich-text mode.");
+  assertEqual(editor._domNode.className.indexOf("lexicaljog-rich-text-box") >= 0, true, "The Lexical rich-text wrapper should render its package-scoped shell class.");
+
+  adapterInstances[0].simulateUserInput("Board-approved terms", []);
+  app.Runtime.flush();
+
+  assertEqual(events.length, 1, "User-driven rich-text edits should raise one public change event.");
+  assertEqual(editor.GetPlainText(), "Board-approved terms", "The Lexical rich-text wrapper should still expose the current plain text.");
+  assertEqual(store.Get("notePlainText"), "Board-approved terms", "BindPlainText should stay aligned for the rich-text wrapper.");
+
+  editor.ToggleBold();
+  app.Runtime.flush();
+  assertEqual(events.length, 2, "Toggling bold should raise one public change event.");
+  assertEqual(events[1].PlainText, "Board-approved terms", "Formatting commands should preserve the public plain-text payload.");
+  assert(events[1].Value.indexOf('"format":"bold"') >= 0, "Toggling bold should update the canonical JSON Value.");
+  assertEqual(store.Get("notePlainText"), "Board-approved terms", "Formatting commands should not disturb the bound plain-text store key.");
+
+  editor.ToggleItalic();
+  app.Runtime.flush();
+  assertEqual(events.length, 3, "Toggling italic should raise one public change event.");
+  assert(events[2].Value.indexOf('"format":"bold,italic"') >= 0 || events[2].Value.indexOf('"format":"italic,bold"') >= 0, "Multiple formatting commands should accumulate in the canonical JSON Value.");
+
+  editor.FormatText("underline");
+  app.Runtime.flush();
+  assertEqual(events.length, 4, "Formatting underline through the generic command API should raise one public change event.");
+  assert(events[3].Value.indexOf("underline") >= 0, "Underline formatting should update the canonical JSON Value through the generic command API.");
+
+  assertEqual(editor.FormatText("unknown"), false, "Unknown formatting commands should be rejected by the public rich-text wrapper.");
+  assertEqual(events.length, 4, "Rejected formatting commands should not emit extra change events.");
+
+  store.Set("notePlainText", "Plain text reset");
+  app.Runtime.flush();
+  assertEqual(editor.GetPlainText(), "Plain text reset", "Externally-driven plain-text writes should still work for the rich-text wrapper.");
+
+  editor.Dispose();
+  assertEqual(adapterInstances[0]._disposed, true, "Disposing the rich-text wrapper should dispose the underlying adapter.");
+  LexicalJOG.__setTestingAdapterFactory(null);
+}
+
+function testFlatpickrThirdPartyControlRegistersBindsAndSuppressesLoopedUpdates() {
+  var sandbox = createJOGSandbox();
+  var JOG;
+  var FlatpickrJOG;
+  var app;
+  var page;
+  var store;
+  var picker;
+  var adapterInstances = [];
+  var changes = [];
+  var opens = 0;
+  var closes = 0;
+  var dump;
+
+  function createFakeFlatpickrAdapter(options) {
+    var adapter = {
+      _hostNode: null,
+      _options: options,
+      _value: options.value || "",
+      _minDate: options.minDate || "",
+      _maxDate: options.maxDate || "",
+      _placeholder: options.placeholder || "",
+      _enabled: options.enabled !== false,
+      _readOnly: options.readOnly === true,
+      _disposed: false,
+      attach: function(hostNode) {
+        this._hostNode = hostNode;
+        this.setPlaceholder(this._placeholder);
+        this.setInteractive(this._enabled, this._readOnly);
+      },
+      dispose: function() {
+        this._disposed = true;
+        this._hostNode = null;
+      },
+      setValue: function(value) {
+        this._value = value == null ? "" : String(value);
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            value: this._value,
+            isEmpty: !this._value,
+            originalEvent: null
+          });
+        }
+      },
+      setMinDate: function(value) {
+        this._minDate = value == null ? "" : String(value);
+      },
+      setMaxDate: function(value) {
+        this._maxDate = value == null ? "" : String(value);
+      },
+      setPlaceholder: function(value) {
+        this._placeholder = value == null ? "" : String(value);
+        if (this._hostNode) {
+          this._hostNode.placeholder = this._placeholder;
+        }
+      },
+      setInteractive: function(enabled, readOnly) {
+        this._enabled = !!enabled;
+        this._readOnly = !!readOnly;
+        if (this._hostNode) {
+          this._hostNode.disabled = !this._enabled;
+          this._hostNode.readOnly = !this._enabled || this._readOnly;
+          this._hostNode.setAttribute("aria-readonly", !this._enabled || this._readOnly ? "true" : "false");
+        }
+      },
+      clear: function() {
+        this._value = "";
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            value: "",
+            isEmpty: true,
+            originalEvent: null
+          });
+        }
+      },
+      getValue: function() {
+        return this._value;
+      },
+      isEmpty: function() {
+        return !this._value;
+      },
+      focus: function() {
+        if (this._hostNode && typeof this._hostNode.focus === "function") {
+          this._hostNode.focus();
+        }
+      },
+      open: function() {
+        if (typeof this._options.onOpen === "function") {
+          this._options.onOpen({ originalEvent: null });
+        }
+      },
+      close: function() {
+        if (typeof this._options.onClose === "function") {
+          this._options.onClose({ originalEvent: null });
+        }
+      },
+      simulateUserInput: function(value) {
+        this._value = value == null ? "" : String(value);
+        if (typeof this._options.onChange === "function") {
+          this._options.onChange({
+            value: this._value,
+            isEmpty: !this._value,
+            originalEvent: { type: "change" }
+          });
+        }
+      }
+    };
+
+    adapterInstances.push(adapter);
+    return adapter;
+  }
+
+  loadScriptIntoSandbox(sandbox, "FlatpickrJOG.Controls.js");
+  JOG = sandbox.JOG;
+  FlatpickrJOG = sandbox.FlatpickrJOG;
+  FlatpickrJOG.__setTestingAdapterFactory(createFakeFlatpickrAdapter);
+
+  assertEqual(JOG.GetRegisteredControl("FlatpickrJOG.DatePicker").metadata.baseType, "Control", "The Flatpickr wrapper should register as a Control.");
+  assertEqual(JOG.GetRegisteredControl("FlatpickrJOG.DatePicker").metadata.capabilities.supportsValidation, true, "The Flatpickr wrapper should advertise validation support.");
+
+  app = new JOG.Application();
+  page = new JOG.Page();
+  picker = new FlatpickrJOG.DatePicker();
+  store = new JOG.Store({
+    followUpDate: "",
+    followUpDateError: ""
+  });
+
+  picker.Name = "flatpickrDatePicker";
+  picker.Placeholder = "Choose the next follow-up date";
+  picker.MinDate = "2026-07-01";
+  picker.MaxDate = "2026-12-31";
+  picker.BindValue(store, "followUpDate");
+  picker.BindError(store, "followUpDateError");
+  picker.OnChange(function(args) {
+    changes.push(args.Value);
+  });
+  picker.OnOpen(function() {
+    opens += 1;
+  });
+  picker.OnClose(function() {
+    closes += 1;
+  });
+
+  page.Add(picker);
+  app.Run(page);
+
+  assertEqual(adapterInstances.length, 1, "The Flatpickr wrapper should create one adapter instance after attach.");
+  assertEqual(picker._domNode.className.indexOf("flatpickrjog-date-picker") >= 0, true, "The Flatpickr wrapper should render its package-scoped shell class.");
+  assertEqual(picker._inputNode.placeholder, "Choose the next follow-up date", "The Flatpickr wrapper should flow placeholder state into the hosted input.");
+  assertEqual(adapterInstances[0]._minDate, "2026-07-01", "The Flatpickr wrapper should apply the initial min date constraint.");
+  assertEqual(adapterInstances[0]._maxDate, "2026-12-31", "The Flatpickr wrapper should apply the initial max date constraint.");
+  assertEqual(adapterInstances[0]._enabled, true, "The Flatpickr wrapper should start enabled.");
+  assertEqual(adapterInstances[0]._readOnly, false, "The Flatpickr wrapper should start editable when not read-only.");
+  assertEqual(picker.IsEmpty(), true, "The Flatpickr wrapper should report empty state when no date is selected.");
+
+  store.Set("followUpDateError", "Pick a valid follow-up date");
+  assertEqual(picker.Invalid, true, "The Flatpickr wrapper should participate in the shared validation contract.");
+  assertEqual(picker.ErrorText, "Pick a valid follow-up date", "BindError should update the Flatpickr wrapper error text.");
+
+  picker.Focus();
+  assertEqual(app.Runtime.document.activeElement, picker._inputNode, "Focus should route to the hosted Flatpickr input.");
+
+  picker.Open();
+  app.Runtime.flush();
+  assertEqual(opens, 1, "Open should raise one public open event.");
+  assertEqual(picker._domNode.className.indexOf("is-open") >= 0, true, "Open should apply the wrapper open class.");
+
+  adapterInstances[0].simulateUserInput("2026-07-18");
+  app.Runtime.flush();
+  assertEqual(changes.length, 1, "User-driven date changes should raise one public change event.");
+  assertEqual(changes[0], "2026-07-18", "The Flatpickr wrapper should emit the canonical date string through OnChange.");
+  assertEqual(store.Get("followUpDate"), "2026-07-18", "BindValue should keep the bound store key in sync with the Flatpickr wrapper.");
+  assertEqual(picker.IsEmpty(), false, "The Flatpickr wrapper should report non-empty state after user selection.");
+
+  picker.Close();
+  app.Runtime.flush();
+  assertEqual(closes, 1, "Close should raise one public close event.");
+  assertEqual(picker._domNode.className.indexOf("is-open") < 0, true, "Close should remove the wrapper open class.");
+
+  store.Set("followUpDate", "2026-08-05");
+  app.Runtime.flush();
+  assertEqual(changes.length, 1, "Externally-driven value writes should not echo back through OnChange.");
+  assertEqual(picker.Value, "2026-08-05", "External store writes should still update the wrapper value.");
+
+  picker.ReadOnly = true;
+  app.Runtime.flush();
+  assertEqual(adapterInstances[0]._readOnly, true, "ReadOnly should switch the adapter into non-editable mode.");
+  assertEqual(picker._domNode.className.indexOf("is-readonly") >= 0, true, "ReadOnly should apply the wrapper read-only class.");
+  assertEqual(picker._inputNode.readOnly, true, "ReadOnly should flip the hosted input into read-only mode.");
+
+  picker.Clear();
+  app.Runtime.flush();
+  assertEqual(picker.Value, "", "Clear should restore the canonical empty date value.");
+  assertEqual(picker.Invalid, false, "Clear should also clear the shared validation state.");
+  assertEqual(picker.IsEmpty(), true, "Clear should restore the empty-state signal.");
+
+  dump = app.DumpTree({ detailed: true });
+  assert(dump.indexOf("FlatpickrJOG.DatePicker(flatpickrDatePicker)") >= 0, "Tree dump should report the Flatpickr wrapper by its registered third-party name.");
+  assert(dump.indexOf("registered=FlatpickrJOG.DatePicker@1.0.0") >= 0, "Detailed tree dump should include Flatpickr wrapper package metadata.");
+
+  picker.Dispose();
+  assertEqual(adapterInstances[0]._disposed, true, "Disposing the control should dispose the underlying Flatpickr adapter.");
+  FlatpickrJOG.__setTestingAdapterFactory(null);
+}
+
+function testChartThirdPartyControlRegistersBindsAndRefreshesFromCollection() {
+  var sandbox = createJOGSandbox();
+  var JOG;
+  var ChartJOG;
+  var app;
+  var page;
+  var chart;
+  var collection;
+  var adapterInstances = [];
+  var pointClicks = [];
+  var dump;
+
+  function createFakeChartAdapter(options) {
+    var adapter = {
+      _canvasNode: null,
+      _rootNode: null,
+      _options: options,
+      _config: options.config || null,
+      _disposed: false,
+      attach: function(canvasNode, rootNode) {
+        this._canvasNode = canvasNode;
+        this._rootNode = rootNode;
+      },
+      dispose: function() {
+        this._disposed = true;
+        this._canvasNode = null;
+        this._rootNode = null;
+      },
+      setConfig: function(config) {
+        this._config = config;
+      },
+      simulatePointClick: function(index) {
+        var model = this._config && this._config.model ? this._config.model : { items: [], labels: [], values: [] };
+
+        if (typeof this._options.onPointClick === "function") {
+          this._options.onPointClick({
+            index: index,
+            item: model.items[index] || null,
+            label: model.labels[index] || "",
+            value: model.values[index] || 0,
+            originalEvent: { type: "click" }
+          });
+        }
+      }
+    };
+
+    adapterInstances.push(adapter);
+    return adapter;
+  }
+
+  loadScriptIntoSandbox(sandbox, "ChartJOG.Controls.js");
+  JOG = sandbox.JOG;
+  ChartJOG = sandbox.ChartJOG;
+  ChartJOG.__setTestingAdapterFactory(createFakeChartAdapter);
+
+  assertEqual(JOG.GetRegisteredControl("ChartJOG.BarChart").metadata.baseType, "Control", "The Chart wrapper should register as a Control.");
+  assertEqual(JOG.GetRegisteredControl("ChartJOG.BarChart").metadata.capabilities.supportsCollection, true, "The Chart wrapper should advertise collection support.");
+
+  app = new JOG.Application();
+  page = new JOG.Page();
+  collection = new JOG.Collection({
+    rows: [
+      { id: "qualified", stage: "Qualified", count: 12 },
+      { id: "proposal", stage: "Proposal", count: 7 }
+    ]
+  });
+  chart = new ChartJOG.BarChart();
+
+  chart.Name = "pipelineChart";
+  chart.TitleText = "Open pipeline by stage";
+  chart.SeriesLabel = "Open deals";
+  chart.EmptyText = "No pipeline data available.";
+  chart.BindCollection(collection, {
+    labelField: "stage",
+    valueField: "count"
+  });
+  chart.OnPointClick(function(args) {
+    pointClicks.push(args);
+  });
+
+  page.Add(chart);
+  app.Run(page);
+
+  assertEqual(adapterInstances.length, 1, "The Chart wrapper should create one adapter instance after attach.");
+  assertEqual(chart._domNode.className.indexOf("chartjog-bar-chart") >= 0, true, "The Chart wrapper should render its package-scoped shell class.");
+  assertEqual(chart.Items.length, 2, "BindCollection should hydrate Items from the collection on mount.");
+  assertEqual(adapterInstances[0]._config.model.labels[0], "Qualified", "The chart adapter config should map labels from the configured field.");
+  assertEqual(adapterInstances[0]._config.model.values[1], 7, "The chart adapter config should map values from the configured field.");
+  assertEqual(chart._emptyNode.className.indexOf("hidden") >= 0, true, "The empty-state label should hide when rows exist.");
+
+  collection.Update("proposal", { count: 9 });
+  app.Runtime.flush();
+
+  assertEqual(chart.Items[1].count, 9, "Collection updates should refresh the chart Items property.");
+  assertEqual(adapterInstances[0]._config.model.values[1], 9, "Collection updates should rebuild the adapter config.");
+
+  adapterInstances[0].simulatePointClick(1);
+  app.Runtime.flush();
+
+  assertEqual(pointClicks.length, 1, "Chart point clicks should raise one public event.");
+  assertEqual(pointClicks[0].Label, "Proposal", "PointClick should expose the clicked label.");
+  assertEqual(pointClicks[0].Value, 9, "PointClick should expose the clicked value.");
+  assertEqual(pointClicks[0].Item.count, 9, "PointClick should expose the clicked source item.");
+
+  collection.SetRows([]);
+  app.Runtime.flush();
+
+  assertEqual(chart.Items.length, 0, "Clearing the collection should clear chart Items.");
+  assertEqual(chart._emptyNode.className.indexOf("hidden") < 0, true, "The empty-state label should show when no rows remain.");
+
+  dump = app.DumpTree({ detailed: true });
+  assert(dump.indexOf("ChartJOG.BarChart(pipelineChart)") >= 0, "Tree dump should report the Chart wrapper by its registered third-party name.");
+  assert(dump.indexOf("registered=ChartJOG.BarChart@1.0.0") >= 0, "Detailed tree dump should include Chart wrapper package metadata.");
+
+  chart.Dispose();
+  assertEqual(adapterInstances[0]._disposed, true, "Disposing the control should dispose the underlying chart adapter.");
+  ChartJOG.__setTestingAdapterFactory(null);
 }
 
 function testGridSupportsNamedAreasAndAutoRows() {
@@ -2636,6 +3462,264 @@ function testCustomerAdminSelectionAndDialogClosePaths() {
   assertEqual(app.Runtime._modalWindows.length, 0, "Window chrome close should clear the modal stack.");
 }
 
+function testThirdPartyDemoNotesValidationFlow() {
+  var sandbox = createJOGSandbox();
+  var originalRun = sandbox.JOG.Application.prototype.Run;
+  var JOG;
+  var FlatpickrJOG;
+  var LexicalJOG;
+  var ChartJOG;
+  var app;
+  var page;
+  var followUpPicker;
+  var validateDateButton;
+  var noteEditor;
+  var validateNotesButton;
+  var planningSummary;
+  var noteError;
+
+  function serializePlainText(text) {
+    if (!text) {
+      return LexicalJOG.__EMPTY_EDITOR_STATE_JSON;
+    }
+    return JSON.stringify({
+      root: {
+        children: [
+          {
+            children: [
+              {
+                detail: 0,
+                format: 0,
+                mode: "normal",
+                style: "",
+                text: String(text),
+                type: "text",
+                version: 1
+              }
+            ],
+            direction: null,
+            format: "",
+            indent: 0,
+            type: "paragraph",
+            version: 1
+          }
+        ],
+        direction: null,
+        format: "",
+        indent: 0,
+        type: "root",
+        version: 1
+      }
+    });
+  }
+
+  sandbox.JOG.Application.prototype.Run = function(nextPage) {
+    sandbox.__lastApp = this;
+    sandbox.__lastPage = nextPage;
+    return originalRun.call(this, nextPage);
+  };
+
+  loadScriptIntoSandbox(sandbox, "AcmeJOG.Controls.js");
+  loadScriptIntoSandbox(sandbox, "BeaconJOG.Controls.js");
+  loadScriptIntoSandbox(sandbox, "ChartJOG.Controls.js");
+  loadScriptIntoSandbox(sandbox, "FlatpickrJOG.Controls.js");
+  loadScriptIntoSandbox(sandbox, "LexicalJOG.Controls.js");
+
+  JOG = sandbox.JOG;
+  FlatpickrJOG = sandbox.FlatpickrJOG;
+  LexicalJOG = sandbox.LexicalJOG;
+  ChartJOG = sandbox.ChartJOG;
+
+  FlatpickrJOG.__setTestingAdapterFactory(function(options) {
+    return {
+      _value: options.value || "",
+      _hostNode: null,
+      attach: function(hostNode) {
+        this._hostNode = hostNode;
+      },
+      dispose: function() {},
+      setValue: function(value) {
+        this._value = value == null ? "" : String(value);
+        if (typeof options.onChange === "function") {
+          options.onChange({
+            value: this._value,
+            isEmpty: !this._value,
+            originalEvent: null
+          });
+        }
+      },
+      setMinDate: function() {},
+      setMaxDate: function() {},
+      setPlaceholder: function(value) {
+        if (this._hostNode) {
+          this._hostNode.placeholder = value || "";
+        }
+      },
+      setInteractive: function(enabled, readOnly) {
+        if (this._hostNode) {
+          this._hostNode.disabled = !enabled;
+          this._hostNode.readOnly = !enabled || !!readOnly;
+          this._hostNode.setAttribute("aria-readonly", !enabled || readOnly ? "true" : "false");
+        }
+      },
+      clear: function() {
+        this.setValue("");
+      },
+      getValue: function() {
+        return this._value;
+      },
+      isEmpty: function() {
+        return !this._value;
+      },
+      focus: function() {
+        if (this._hostNode && typeof this._hostNode.focus === "function") {
+          this._hostNode.focus();
+        }
+      },
+      open: function() {},
+      close: function() {}
+    };
+  });
+
+  ChartJOG.__setTestingAdapterFactory(function(options) {
+    return {
+      attach: function() {},
+      dispose: function() {},
+      setConfig: function(config) {
+        this._config = config;
+      }
+    };
+  });
+
+  LexicalJOG.__setTestingAdapterFactory(function(options) {
+    return {
+      _hostNode: null,
+      _plainText: "",
+      _value: LexicalJOG.__EMPTY_EDITOR_STATE_JSON,
+      attach: function(hostNode) {
+        this._hostNode = hostNode;
+      },
+      dispose: function() {},
+      setEditable: function() {},
+      setSerializedState: function(serializedValue) {
+        this._value = String(serializedValue);
+        this._plainText = this._value === LexicalJOG.__EMPTY_EDITOR_STATE_JSON ? "" : this._plainText;
+        if (typeof options.onChange === "function") {
+          options.onChange({
+            serializedValue: this._value,
+            plainText: this._plainText,
+            isEmpty: String(this._plainText).trim() === "",
+            originalEvent: null
+          });
+        }
+      },
+      setPlainText: function(text) {
+        this._plainText = text == null ? "" : String(text);
+        this._value = serializePlainText(this._plainText);
+        if (typeof options.onChange === "function") {
+          options.onChange({
+            serializedValue: this._value,
+            plainText: this._plainText,
+            isEmpty: String(this._plainText).trim() === "",
+            originalEvent: null
+          });
+        }
+      },
+      clear: function() {
+        this._plainText = "";
+        this._value = LexicalJOG.__EMPTY_EDITOR_STATE_JSON;
+        if (typeof options.onChange === "function") {
+          options.onChange({
+            serializedValue: this._value,
+            plainText: "",
+            isEmpty: true,
+            originalEvent: null
+          });
+        }
+      },
+      getPlainText: function() {
+        return this._plainText;
+      },
+      isEmpty: function() {
+        return String(this._plainText).trim() === "";
+      },
+      focus: function() {
+        if (this._hostNode && typeof this._hostNode.focus === "function") {
+          this._hostNode.focus();
+        }
+      }
+    };
+  });
+
+  loadScriptIntoSandbox(sandbox, "ThirdPartyDemoApp.js");
+  (sandbox._windowEventListeners.load || []).forEach(function(listener) {
+    listener();
+  });
+
+  app = sandbox.__lastApp;
+  page = sandbox.__lastPage;
+  followUpPicker = findControl(page, function(control) {
+    return control.Name === "thirdPartyFlatpickrDatePicker";
+  });
+  validateDateButton = findControl(page, function(control) {
+    return control._typeName === "Button" && control.Text === "Validate date";
+  });
+  noteEditor = findControl(page, function(control) {
+    return control.Name === "thirdPartyLexicalEditor";
+  });
+  validateNotesButton = findControl(page, function(control) {
+    return control._typeName === "Button" && control.Text === "Validate notes";
+  });
+  planningSummary = findControl(page, function(control) {
+    return control._typeName === "ValidationSummary";
+  });
+  noteError = findControl(page, function(control) {
+    return control._typeName === "ValidationMessage" && control.Text === "";
+  });
+
+  validateDateButton._raiseEvent("Click", null);
+  app.Runtime.flush();
+
+  assertEqual(followUpPicker.Invalid, true, "Third-party demo date validation should mark the Flatpickr wrapper invalid when empty.");
+  assertEqual(followUpPicker.ErrorText, "Choose a follow-up date before validating the wrapper.", "Third-party demo date validation should set the expected date error message.");
+  assertEqual(app.Runtime.document.activeElement, followUpPicker._inputNode, "Third-party demo date validation should focus the date picker after an empty validate.");
+  assertEqual(planningSummary.Visible, true, "Third-party demo validation summary should show after an empty third-party date validate.");
+  assertEqual(planningSummary.Children[0].Text, "Please fix: Choose a follow-up date before validating the wrapper.", "Third-party demo validation summary should include the date error.");
+
+  followUpPicker._pickerAdapter.setValue("2026-07-20");
+  app.Runtime.flush();
+
+  assertEqual(followUpPicker.Invalid, false, "Entering a date after an error should clear the Flatpickr wrapper invalid state.");
+  assertEqual(planningSummary.Visible, false, "Third-party demo validation summary should hide after the date error clears.");
+
+  validateNotesButton._raiseEvent("Click", null);
+  app.Runtime.flush();
+  noteError = findControl(page, function(control) {
+    return control._typeName === "ValidationMessage" && control.Text === "Enter notes before validating the editor wrapper.";
+  });
+
+  assertEqual(noteEditor.Invalid, true, "Third-party demo notes validation should mark the Lexical wrapper invalid when empty.");
+  assertEqual(noteEditor.ErrorText, "Enter notes before validating the editor wrapper.", "Third-party demo notes validation should set the expected error message.");
+  assertEqual(noteEditor._editorHostNode.attributes["aria-invalid"], "true", "Third-party demo notes validation should expose aria-invalid on the editable host.");
+  assertEqual(app.Runtime.document.activeElement, noteEditor._editorHostNode, "Third-party demo notes validation should focus the editor after an empty validate.");
+  assert(!!noteError, "Third-party demo notes validation should create a visible validation message for empty notes.");
+  assertEqual(noteError.Text, "Enter notes before validating the editor wrapper.", "Third-party demo notes validation should show the visible validation message.");
+  assertEqual(noteError.Visible, true, "Third-party demo notes validation should show the validation message control.");
+  assertEqual(planningSummary.Visible, true, "Third-party demo validation summary should show after an empty Lexical validate.");
+  assertEqual(planningSummary.Children[0].Text, "Please fix: Enter notes before validating the editor wrapper.", "Third-party demo validation summary should include the notes error.");
+
+  noteEditor.SetPlainText("Next call is blocked on security review.");
+  app.Runtime.flush();
+
+  assertEqual(noteEditor.Invalid, false, "Typing notes after an error should clear the Lexical wrapper invalid state.");
+  assertEqual(noteError.Visible, false, "Typing notes after an error should hide the validation message.");
+  assertEqual(planningSummary.Visible, false, "Third-party demo validation summary should hide after the notes error clears.");
+
+  FlatpickrJOG.__setTestingAdapterFactory(null);
+  LexicalJOG.__setTestingAdapterFactory(null);
+  ChartJOG.__setTestingAdapterFactory(null);
+}
+
 function testRuntimeFormatsEventErrorsClearly() {
   var capturedErrors = [];
   var customConsole = {
@@ -3191,6 +4275,10 @@ var tests = [
   { name: "third-party dialog uses public window shell hooks", fn: testThirdPartyDialogUsesPublicWindowShellHooks },
   { name: "third-party control errors report package diagnostics clearly", fn: testThirdPartyControlErrorsReportPackageDiagnosticsClearly },
   { name: "multiple third-party packages register and coexist cleanly", fn: testMultipleThirdPartyPackagesRegisterAndCoexistCleanly },
+  { name: "Lexical third-party control registers binds and suppresses looped updates", fn: testLexicalThirdPartyControlRegistersBindsAndSuppressesLoopedUpdates },
+  { name: "Lexical rich-text third-party control supports formatting commands", fn: testLexicalRichTextThirdPartyControlSupportsFormattingCommands },
+  { name: "Flatpickr third-party control registers binds and suppresses looped updates", fn: testFlatpickrThirdPartyControlRegistersBindsAndSuppressesLoopedUpdates },
+  { name: "Chart third-party control registers and refreshes from collection", fn: testChartThirdPartyControlRegistersBindsAndRefreshesFromCollection },
   { name: "Grid supports named areas and auto rows", fn: testGridSupportsNamedAreasAndAutoRows },
   { name: "Grid responsive breakpoints apply on mount and resize", fn: testGridResponsiveBreakpointsApplyOnMountAndResize },
   { name: "responsive dock and stack layouts apply on mount and resize", fn: testResponsiveDockAndStackLayoutsApplyOnMountAndResize },
@@ -3227,6 +4315,7 @@ var tests = [
   { name: "customer admin dialog integration flow", fn: testCustomerAdminDialogIntegrationFlow },
   { name: "form demo validation and reset integration flow", fn: testFormDemoValidationAndResetIntegrationFlow },
   { name: "customer admin selection and dialog close paths", fn: testCustomerAdminSelectionAndDialogClosePaths },
+  { name: "third-party demo notes validation flow", fn: testThirdPartyDemoNotesValidationFlow },
   { name: "runtime formats event errors clearly", fn: testRuntimeFormatsEventErrorsClearly },
   { name: "debug topics filter runtime logs", fn: testDebugTopicsFilterRuntimeLogs },
   { name: "menu bar renders items and raises click events", fn: testMenuBarRendersItemsAndRaisesClickEvents },

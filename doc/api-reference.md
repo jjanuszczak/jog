@@ -472,6 +472,11 @@ Notes:
 - `TrackBinding(unsubscribe)` lets third-party controls clean up custom subscriptions during disposal
 - `GetRegistration()` returns the registered third-party definition for that instance, or `null` for core controls
 - the sample `AcmeJOG.TagPicker` uses these hooks to implement a keyboard-accessible single-select control with `radiogroup` and `radio` semantics
+- the bundled `ChartJOG.BarChart` package uses the same hooks to keep a Chart.js visualization behind a JOG-native `Items`, `BindCollection()`, and `OnPointClick()` surface without exposing the raw chart instance to app code
+- the bundled `FlatpickrJOG.DatePicker` package uses the same hooks to keep a Flatpickr popup date picker behind a JOG-native `Value`, `MinDate`, `MaxDate`, `BindValue()`, and validation surface without exposing the raw picker instance to app code
+- the bundled `LexicalJOG.LexicalPlainTextBox` and `LexicalJOG.LexicalRichTextBox` packages use the same hooks to keep a Lexical editor instance behind a JOG-native `Value`, `ReadOnly`, `BindValue()`, `BindPlainText()`, focus and blur payloads, and validation surface without exposing the raw editor object to app code
+- `LexicalJOG.LexicalPlainTextBox.IsEmpty()` and `LexicalJOG.LexicalRichTextBox.IsEmpty()` treat whitespace-only and zero-width-space-only editor content as empty so normal JOG required-field validation behaves as expected
+- `LexicalJOG.LexicalRichTextBox` also exposes `FormatText(formatType)`, `ToggleBold()`, `ToggleItalic()`, and `ToggleUnderline()` as a narrow public formatting surface while keeping app-level toolbar composition outside the wrapper
 
 ### `JOG.Control`
 
@@ -1065,6 +1070,7 @@ Notes:
 - `ClearErrors()` clears configured error keys and resets `summaryKey` and `validKey` when those options are present
 - `Watch(keys)` re-runs validation only when one of the watched keys changes and the form currently has errors
 - `Watch(keys, { mode: "always" })` validates on every watched key change
+- third-party controls participate through the same store contract as core controls, for example `BindError(...)` plus `Watch([...])` in the third-party demo's Flatpickr and Lexical wrappers
 - this helper is intentionally narrow and store-oriented, not a form-schema system
 
 ### `JOG.Collection`
@@ -1125,6 +1131,14 @@ Properties:
 - `Column`
 - `Command`
 - `Index`
+- `RowIndex`
+- `SortKey`
+- `SortDirection`
+
+Notes:
+
+- `new JOG.EventArgs(source, type, originalEvent, extras)` copies the common core fields above from `extras`
+- any additional own properties on `extras` are also preserved on the event args instance unless they would overwrite an existing core field
 
 ## Minimal Example
 

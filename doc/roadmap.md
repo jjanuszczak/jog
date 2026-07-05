@@ -170,6 +170,10 @@ That means the next phase is not broad control expansion for its own sake. The n
 - third-party controls demo with a registered composite `AcmeJOG.InspectorCard`
 - third-party dialog sample with `AcmeJOG.CommandPaletteDialog`, proving a custom floating shell through the public `Window` helper
 - third-party controls demo with a second package, including `BeaconJOG.ViewSwitch` and `BeaconJOG.MetricCard`
+- third-party controls demo now also includes `ChartJOG.BarChart`, a bundled Chart.js wrapper that follows a JOG collection-oriented control contract with array-backed items and point-click events
+- third-party controls demo now also includes `FlatpickrJOG.DatePicker`, a bundled popup date-picker wrapper around Flatpickr that follows the JOG input-control contract with canonical string values
+- third-party controls demo now also includes `LexicalJOG.LexicalPlainTextBox` and `LexicalJOG.LexicalRichTextBox`, bundled Lexical wrappers that persist editor state as JSON while following the JOG input-control contract
+- the third-party controls demo now also proves the current recommended validation pattern for third-party inputs by combining `BindError()`, `FormState.Watch(...)`, `ValidationSummary.BindErrors(...)`, and invalid-control focus across the Flatpickr and Lexical wrappers
 
 ### Tests
 
@@ -227,7 +231,18 @@ That means the next phase is not broad control expansion for its own sake. The n
 - duplicate control registration and incompatible JOG version ranges are rejected cleanly
 - diagnostics and tree dumps now include registered third-party control names and package versions
 - the `AcmeJOG.Controls.js` and `BeaconJOG.Controls.js` sample packages now prove multiple primitive and composite third-party controls built outside `v2/runtime/JOG.js`
+- `ChartJOG.Controls.js` now proves the same extension contract against an external visualization library with collection-driven redraws and projected chart interaction events
+- `FlatpickrJOG.Controls.js` now proves the same extension contract against a popup-oriented external input library instead of only editor-style or pure-JOG controls
+- `LexicalJOG.Controls.js` now proves that the same extension contract can wrap an external editor library behind a JOG-native input control surface
+- third-party `RaiseEvent(..., extras)` payloads now preserve package-specific event fields on `JOG.EventArgs`, which keeps external wrappers compatible with the shared event contract without exposing private runtime state
+- the repo now has three concrete external-library adapter examples, which makes the shell-plus-adapter wrapper pattern concrete across visualization, popup-input, and editor categories instead of treating Lexical as a one-off
+- `ThirdPartyJOG.Helpers.js` now extracts the shared internal wrapper bridge for value sync, collection binding, explicit store binding, and detached-popup theme propagation so new external-library packages do not start from a blank file
 - the sample primitive control now covers first-pass keyboard interaction, but richer accessibility coverage and broader package tooling still need hardening before the extension model should be treated as long-term stable
+- a concrete design spec now exists for a Lexical-based proof control in [doc/lexical-control-spec.md](lexical-control-spec.md), starting with a `LexicalPlainTextBox` third-party input wrapper
+- the first Lexical stage is now implemented as a bundled plain-text control with JSON persistence, JOG validation integration, a `BindPlainText()` helper for plain-text-first form wiring, first-pass editable-host accessibility state for invalid and read-only transitions, and empty-state semantics that treat whitespace-only content as empty
+- the next Lexical stage is now also implemented as a bundled rich-text control with the same JSON `Value` contract, plain-text convenience helpers, and a narrow inline formatting surface through `FormatText()`, `ToggleBold()`, `ToggleItalic()`, and `ToggleUnderline()`
+- the third-party demo now shows both app-level command patterns for the Lexical rich-text wrapper: a `ToolBar` row using convenience toggles and a plain button row using `FormatText(formatType)` directly
+- the main Lexical post-MVP work now is selection-state reporting, active-toolbar-state wiring, richer block-format commands, and deeper real-browser accessibility verification
 
 ### Styling
 
