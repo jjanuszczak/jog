@@ -1,0 +1,17 @@
+# Hugo generated output
+public/
+resources/_gen/
+.hugo_build.lock
+
+# Optional Hugo build metadata
+hugo_stats.json
+
+# Frontend package manager artifacts
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
