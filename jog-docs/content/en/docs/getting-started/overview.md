@@ -1,3 +1,10 @@
+---
+title: "Overview"
+linkTitle: "Overview"
+description: "What JOG is, where to start, and how to evaluate the current V2 runtime."
+---
+> Generated from `README.md`. Edit the source file, then rerun `node jog-docs/scripts/sync-docs.mjs`.
+
 # JavaScript Object GUI ("JOG")
 
 JOG is a JavaScript-first browser UI framework aimed at developers who want a desktop-style programming model for front ends.
@@ -33,39 +40,39 @@ JOG V2 is functional and actively evolving. It already includes:
 - a zero-dependency Node test runner
 - a minified browser distribution build at `dist/JOG.min.js`
 
-It is not feature-complete. The roadmap in [doc/roadmap.md](doc/roadmap.md) is the living source for what is next.
+It is not feature-complete. The roadmap in [doc/roadmap.md]({{< relref "/docs/project/roadmap.md" >}}) is the living source for what is next.
 
 ## Repo Layout
 
-- [v2](v2): active implementation tree
+- [v2](https://github.com/jjanuszczak/jog/tree/main/v2): active implementation tree
 - `v2/runtime/`: framework runtime source
 - `v2/apps/`: first-party example application scripts
 - `v2/packages/`: browser-ready third-party control packages
 - `v2/packages-src/`: source for bundled third-party packages that wrap external libraries
 - `v2/examples/`: browser entry HTML files for the examples
-- [test](test): Node-based regression checks
-- [doc](doc): living documentation
-- [jog-docs](jog-docs): Docsy-based documentation site source for GitHub Pages
-- [v1](v1): earlier implementation kept for reference
-- [ref](ref): older reference material and experiments
+- [test](https://github.com/jjanuszczak/jog/tree/main/test): Node-based regression checks
+- [doc](https://github.com/jjanuszczak/jog/tree/main/doc): living documentation
+- [jog-docs](https://github.com/jjanuszczak/jog/tree/main/jog-docs): Docsy-based documentation site source for GitHub Pages
+- [v1](https://github.com/jjanuszczak/jog/tree/main/v1): earlier implementation kept for reference
+- [ref](https://github.com/jjanuszczak/jog/tree/main/ref): older reference material and experiments
 
 ## License
 
-JOG is available under the [MIT License](LICENSE).
+JOG is available under the [MIT License](https://github.com/jjanuszczak/jog/blob/main/LICENSE).
 
 ## Where To Start
 
 If you are new to the project, read these in order:
 
-1. [doc/developer-guide.md](doc/developer-guide.md)
-2. [doc/api-reference.md](doc/api-reference.md)
-3. [doc/roadmap.md](doc/roadmap.md)
-4. [AGENTS.md](AGENTS.md)
+1. [doc/developer-guide.md]({{< relref "/docs/guides/developer-guide.md" >}})
+2. [doc/api-reference.md]({{< relref "/docs/reference/api-reference.md" >}})
+3. [doc/roadmap.md]({{< relref "/docs/project/roadmap.md" >}})
+4. [AGENTS.md](https://github.com/jjanuszczak/jog/blob/main/AGENTS.md)
 
 The developer guide explains the runtime model. The API reference documents what exists now. The roadmap tells you what is implemented, what is partial, and what should happen next.
 
-JOG now includes a first-pass public third-party control API. The current contract and remaining direction are documented in [doc/third-party-control-spec.md](doc/third-party-control-spec.md).
-The main contributor workflow for deciding whether to compose a control, wrap a third-party library, or build a new low-level control is documented in [doc/developer-guide.md](doc/developer-guide.md).
+JOG now includes a first-pass public third-party control API. The current contract and remaining direction are documented in [doc/third-party-control-spec.md]({{< relref "/docs/reference/third-party-controls.md" >}}).
+The main contributor workflow for deciding whether to compose a control, wrap a third-party library, or build a new low-level control is documented in [doc/developer-guide.md]({{< relref "/docs/guides/developer-guide.md" >}}).
 
 ## Pre-Release Status
 
@@ -84,13 +91,13 @@ If you try JOG now, the right expectation is an early technical preview, not a f
 
 Open these files directly in a browser:
 
-- [v2/examples/hello-world.html](v2/examples/hello-world.html)
-- [v2/examples/example.html](v2/examples/example.html)
-- [v2/examples/notepad.html](v2/examples/notepad.html)
-- [v2/examples/customer-admin.html](v2/examples/customer-admin.html)
-- [v2/examples/form-demo.html](v2/examples/form-demo.html)
-- [v2/examples/opportunity-board.html](v2/examples/opportunity-board.html)
-- [v2/examples/third-party-demo.html](v2/examples/third-party-demo.html)
+- [v2/examples/hello-world.html](https://github.com/jjanuszczak/jog/blob/main/v2/examples/hello-world.html)
+- [v2/examples/example.html](https://github.com/jjanuszczak/jog/blob/main/v2/examples/example.html)
+- [v2/examples/notepad.html](https://github.com/jjanuszczak/jog/blob/main/v2/examples/notepad.html)
+- [v2/examples/customer-admin.html](https://github.com/jjanuszczak/jog/blob/main/v2/examples/customer-admin.html)
+- [v2/examples/form-demo.html](https://github.com/jjanuszczak/jog/blob/main/v2/examples/form-demo.html)
+- [v2/examples/opportunity-board.html](https://github.com/jjanuszczak/jog/blob/main/v2/examples/opportunity-board.html)
+- [v2/examples/third-party-demo.html](https://github.com/jjanuszczak/jog/blob/main/v2/examples/third-party-demo.html)
 
 What they cover:
 
@@ -109,7 +116,7 @@ JOG does not have an npm runtime package yet, and it is intentionally deferred w
 Today, the install model is direct browser usage, with GitHub Releases as the primary distribution channel for browser-ready artifacts.
 
 1. download the latest release artifacts from GitHub Releases, or build them locally
-2. copy `dist/JOG.min.js` into your project for the minified release build, or copy [v2/runtime/JOG.js](v2/runtime/JOG.js) for a readable source build
+2. copy `dist/JOG.min.js` into your project for the minified release build, or copy [v2/runtime/JOG.js](https://github.com/jjanuszczak/jog/blob/main/v2/runtime/JOG.js) for a readable source build
 3. optionally start from the files in `dist/starter/`
 4. load any third-party JOG control packages after the runtime
 5. load your app code after the runtime and any third-party packages
@@ -144,10 +151,10 @@ This writes:
 
 The `dist/starter/` folder is the current starter release bundle. It is meant to be copied as a small working starting point alongside `JOG.min.js`.
 
-The current manual release process is documented in [doc/release-guide.md](doc/release-guide.md).
+The current manual release process is documented in [doc/release-guide.md]({{< relref "/docs/project/release-guide.md" >}}).
 
-GitHub Release uploads are now automated with [.github/workflows/release-artifacts.yml](.github/workflows/release-artifacts.yml).
-The Docsy documentation site in [jog-docs](jog-docs) is now published through GitHub Pages with [.github/workflows/docs-pages.yml](.github/workflows/docs-pages.yml).
+GitHub Release uploads are now automated with [.github/workflows/release-artifacts.yml](https://github.com/jjanuszczak/jog/blob/main/.github/workflows/release-artifacts.yml).
+The Docsy documentation site in [jog-docs](https://github.com/jjanuszczak/jog/tree/main/jog-docs) is now published through GitHub Pages with [.github/workflows/docs-pages.yml](https://github.com/jjanuszczak/jog/blob/main/.github/workflows/docs-pages.yml).
 
 The safest way to evaluate JOG today is:
 
@@ -189,19 +196,19 @@ app.LogTree();
 
 This repo treats docs as part of the product.
 
-If you want to help, start with [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+If you want to help, start with [CONTRIBUTING.md]({{< relref "/docs/project/contributing.md" >}}) before opening a pull request.
 
 Public-repo operating files:
 
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- [SECURITY.md](SECURITY.md)
+- [CODE_OF_CONDUCT.md](https://github.com/jjanuszczak/jog/blob/main/CODE_OF_CONDUCT.md)
+- [SECURITY.md](https://github.com/jjanuszczak/jog/blob/main/SECURITY.md)
 
 When you change `v2/`:
 
-- update [doc/developer-guide.md](doc/developer-guide.md) if the programming model changed
-- update [doc/api-reference.md](doc/api-reference.md) if the public surface changed
-- update [doc/roadmap.md](doc/roadmap.md) so status and next steps stay accurate
-- update [doc/release-guide.md](doc/release-guide.md) if the release contents or process changed
+- update [doc/developer-guide.md]({{< relref "/docs/guides/developer-guide.md" >}}) if the programming model changed
+- update [doc/api-reference.md]({{< relref "/docs/reference/api-reference.md" >}}) if the public surface changed
+- update [doc/roadmap.md]({{< relref "/docs/project/roadmap.md" >}}) so status and next steps stay accurate
+- update [doc/release-guide.md]({{< relref "/docs/project/release-guide.md" >}}) if the release contents or process changed
 - run `npm run build:release` if the browser distribution should be refreshed for release
 
 Do that in the same change as the code.
@@ -218,4 +225,4 @@ The nearer target is narrower and more practical:
 - CRUD-style interfaces
 - developers who prefer a control-and-container mental model over a markup-first one
 
-That direction is described in more detail in [doc/v2-spec.md](doc/v2-spec.md).
+That direction is described in more detail in [doc/v2-spec.md](https://github.com/jjanuszczak/jog/blob/main/doc/v2-spec.md).

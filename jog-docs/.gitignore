@@ -2,9 +2,12 @@
 public/
 resources/_gen/
 .hugo_build.lock
+.hugo_cache/
+.gomodcache/
 
 # Optional Hugo build metadata
 hugo_stats.json
+package.hugo.json
 
 # Frontend package manager artifacts
 node_modules/

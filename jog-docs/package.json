@@ -1,0 +1,22 @@
+{
+  "comments": {
+    "dependencies": {},
+    "devDependencies": {}
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "6.7.2",
+    "bootstrap": "5.3.8"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.5.2",
+    "postcss": "^8.5.16",
+    "postcss-cli": "^11.0.1"
+  },
+  "name": "jog-docs",
+  "scripts": {
+    "build": "node scripts/sync-docs.mjs && HUGO_CACHEDIR=$PWD/.hugo_cache GOMODCACHE=$PWD/.gomodcache hugo",
+    "dev": "node scripts/sync-docs.mjs && HUGO_CACHEDIR=$PWD/.hugo_cache GOMODCACHE=$PWD/.gomodcache hugo server --disableFastRender",
+    "sync:docs": "node scripts/sync-docs.mjs"
+  },
+  "version": "0.1.0"
+}
