@@ -5,8 +5,8 @@ params:
   body_class: td-navbar-links-all-active
 ---
 
-{{% blocks/cover title="JOG Documentation" image_anchor="top" height="full td-below-navbar" color="dark" %}}
-JOG is a JavaScript-first browser UI framework for desktop-style internal tools, form-heavy systems, and CRUD-heavy applications. { .display-6 }
+{{% blocks/cover title="JOG Documentation" image_anchor="top" height="full td-below-navbar" color="dark" image_url="/images/code.jpg" %}}
+JOG is a JavaScript-first browser UI framework for desktop-style internal tools, form-heavy systems, and CRUD-heavy applications. 
 
 <a class="btn btn-lg btn-primary me-3 mb-4" href="{{< relref "/docs/_index.md" >}}">Read the docs</a>
 <a class="btn btn-lg btn-outline-light me-3 mb-4" href="{{< relref "/docs/guides/developer-guide.md" >}}">Developer Guide</a>
@@ -42,7 +42,7 @@ Read the overview first, then move to the developer guide and API reference.
 The roadmap and reference pages describe what exists now, what is partial, and what still needs hardening.
 {{% /blocks/feature %}}
 {{% blocks/feature title="One Source of Truth" icon="fa-solid fa-code-branch" %}}
-The Docsy pages are generated from the repo docs, not maintained as a second manual copy.
+These pages are generated from the repo docs, not maintained as a second manual copy.
 {{% /blocks/feature %}}
 {{% /blocks/section %}}
 

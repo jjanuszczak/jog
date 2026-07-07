@@ -1,6 +1,6 @@
-baseURL = 'https://example.org/'
+baseURL = 'https://jjanuszczak.github.io/jog/'
 languageCode = 'en-us'
-title = 'JOG Documentation'
+title = 'JavaScript Object GUI Docs'
 contentDir = 'content/en'
 defaultContentLanguage = 'en'
 enableGitInfo = true
@@ -9,7 +9,7 @@ disableKinds = ['taxonomy']
 [languages]
   [languages.en]
     languageName = 'en'
-    title = 'JOG Documentation'
+    title = 'JavaScript Object GUI Docs'
 
 [outputs]
   home = ['HTML']
