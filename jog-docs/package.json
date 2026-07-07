@@ -15,7 +15,9 @@
   "name": "jog-docs",
   "scripts": {
     "build": "node scripts/sync-docs.mjs && HUGO_CACHEDIR=$PWD/.hugo_cache GOMODCACHE=$PWD/.gomodcache hugo",
+    "build:pages": "node scripts/sync-docs.mjs && HUGO_CACHEDIR=$PWD/.hugo_cache GOMODCACHE=$PWD/.gomodcache hugo --environment production --baseURL http://localhost:1314/jog/",
     "dev": "node scripts/sync-docs.mjs && HUGO_CACHEDIR=$PWD/.hugo_cache GOMODCACHE=$PWD/.gomodcache hugo server --disableFastRender",
+    "preview:pages": "node scripts/sync-docs.mjs && HUGO_CACHEDIR=$PWD/.hugo_cache GOMODCACHE=$PWD/.gomodcache hugo server --environment production --disableFastRender --port 1314 --baseURL http://localhost:1314/jog/",
     "sync:docs": "node scripts/sync-docs.mjs"
   },
   "version": "0.1.0"

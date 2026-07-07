@@ -5,7 +5,7 @@ params:
   body_class: td-navbar-links-all-active
 ---
 
-{{% blocks/cover title="JOG Documentation" image_anchor="top" height="full td-below-navbar" color="dark" %}}
+{{% blocks/cover title="JavaScript Object GUI" image_anchor="top" height="full td-below-navbar" color="dark" %}}
 JOG is a JavaScript-first browser UI framework for desktop-style internal tools, form-heavy systems, and CRUD-heavy applications. 
 
 <a class="btn btn-lg btn-primary me-3 mb-4" href="{{< relref "/docs/_index.md" >}}">Read the docs</a>
